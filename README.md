@@ -23,57 +23,68 @@ tools/    ← per-tool wiring instructions (claude, gemini, antigravity)
 Content composes in layers, broadest to narrowest:
 
 ```
-global  ⊕  stack(s)  ⊕  project
+universal  ⊕  workflow(s)  ⊕  stack(s)  ⊕  project
 ```
 
-- **global** — applies everywhere (`agents/global/AGENTS.md`, `agents/global/skills/`)
-- **stack** — applies to a tech (`agents/stacks/python/…`, `…/javascript/react/…`)
+- **universal** — applies everywhere (`agents/AGENTS.md`, `agents/rules/`)
+- **workflow** — a process you run (`agents/workflows/dev`, `…/delivery`)
+- **stack** — applies to a tech (`agents/stacks/python/…`, `…/javascript/react`)
 - **project** — applies to one repo; **lives in that repo**, not here
 
-To set up a project you pull in `global` + the relevant `stack(s)`, then add
-project-specific instructions locally.
+To set up a project you pull in the universal rules + the workflow(s) and stack(s)
+you need, then add project-specific instructions locally.
 
 ## Directory map
 
 ```
 agentic/
-├── agents/                      # GENERIC source of truth — edit here
-│   ├── global/                  # global scope (applies everywhere)
-│   │   ├── AGENTS.md            # global instructions (every project)
-│   │   └── skills/              # global, tech-agnostic workflow skills
-│   └── stacks/                  # tech-specific layers
+├── agents/                          # GENERIC source of truth — edit here
+│   ├── AGENTS.md                    # universal index + pointers
+│   ├── rules/                       # universal rules (type: rule)
+│   ├── workflows/                   # process skills + rules (type: workflow)
+│   │   ├── dev/                     # build pipeline
+│   │   │   ├── AGENTS.md
+│   │   │   ├── rules/               # dev-scoped rules
+│   │   │   └── skills/  → dev-explore … dev-document, dev-start
+│   │   └── delivery/                # Jira / Confluence / Drive docs
+│   │       ├── AGENTS.md
+│   │       ├── rules/               # delivery-scoped rules
+│   │       ├── shared/skills/  → delivery-start, delivery-connect, delivery-drive-archive
+│   │       ├── pre/skills/     → delivery-pre-requirements
+│   │       └── post/skills/    → delivery-post-confluence, -changelog, -jira-link
+│   └── stacks/                      # tech-specific layers (type: stack)
 │       ├── python/{generic,fastapi,django}/
-│       ├── javascript/
-│       │   ├── node/generic/
-│       │   ├── react/  svelte/  styles/
-│       ├── go/   bash/   git/
-│       └── …                    # each leaf: AGENTS.md + skills/
-└── tools/                       # THIN adapters (how each tool consumes agents/)
-    ├── claude/      gemini/      antigravity/
+│       ├── javascript/{node/generic,react,svelte,styles}/
+│       └── go/  bash/  git/
+└── tools/                           # THIN adapters (how each tool consumes agents/)
+    └── claude/  gemini/  antigravity/
 ```
 
-Each stack leaf holds its own `AGENTS.md` (stack instructions) and a `skills/`
-dir. Multi-variant techs (python, javascript) are grouping folders; single techs
-(go, bash, git) are leaves directly.
+## Skills, rules, and folders
 
-## Why tech is the folder axis, domain is a tag
+Three content kinds, each declaring a `type`:
 
-An agent doesn't choose a skill by its folder — it matches the skill's
-`description` frontmatter (or you invoke it by name). So folders exist for
-**composition** (what you copy into a project) and **human maintenance**, while
-frontmatter drives **agent selection** and **browsing**.
+- **`type: workflow` / `type: stack` skills** — a `skills/<name>/SKILL.md` with
+  full frontmatter. Selected by the model via its `description` (or an explicit
+  `/name`), so the body is loaded on demand.
+- **`type: rule` rules** — a short `rules/<name>.md`, loaded as **always-on
+  context** (no selection step). Each skill names the rules it needs in its
+  `rules:` frontmatter so a tool can load them alongside the skill.
 
-Tech is the hard relevance gate — `pytest` is useless in a Go repo — so tech is
-the folder. The conceptual grouping you'd browse by (testing, deploy, lint) lives
-in a `domain:` frontmatter tag. You get both without ever choosing between them.
-See [`agents/README.md`](agents/README.md) for the skill format.
+An agent selects a skill by `description`, **not** by folder — folders exist for
+**composition** (what you copy into a project) and **maintenance**. Workflows
+group by *process* (and cycle: `pre/`, `post/`, `shared/`); stacks group by
+*tech* (the hard relevance gate). The `domain` field mirrors the folder.
+
+See [`agents/README.md`](agents/README.md) for the exact skill and rule formats.
 
 ## Usage (copy-paste)
 
 1. Clone or download this repo.
-2. Copy `agents/global/AGENTS.md` (plus any `agents/stacks/<tech>/AGENTS.md` you
-   need) into your project's instruction file.
-3. Copy the `skills/` you want into your tool's skills location.
+2. Copy `agents/AGENTS.md` + the universal `agents/rules/`, plus the
+   `workflows/<wf>/` and `stacks/<tech>/` (`AGENTS.md`, `rules/`, `skills/`) you
+   need, into your project / your tool's locations.
+3. Copy the skill directories you want into your tool's skills location.
 4. Follow the matching [`tools/<tool>/README.md`](tools/) for exact paths.
 
 Copy-paste is intentional — chosen over symlinks or a setup script so it behaves
@@ -81,8 +92,9 @@ identically on Linux, macOS, and Windows with zero tooling.
 
 ## Contributing
 
-- Add content to **`agents/` first** — global if it's universal, otherwise the
-  right `stacks/<tech>/`.
-- Give each skill a clear `description` (what the agent matches on) and an
-  optional `domain:` tag.
+- Add content to **`agents/` first** — a process under `workflows/<wf>/`, a tech
+  under `stacks/<tech>/`, universal rules in `agents/rules/`.
+- Give each skill a clear `description`, a `type` + `domain`, a `model` +
+  `model-fallback`, and a `rules:` list of the rules it depends on.
+- Keep rules short and frontmatter-light (they're always-on context).
 - Only touch `tools/` when a tool needs new *wiring* — never to store content.

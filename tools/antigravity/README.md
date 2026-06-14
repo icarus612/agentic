@@ -9,7 +9,7 @@ it into place.
 ## Instructions
 
 _TODO: verify Antigravity's instruction-file name and location, then document the
-copy-paste target for `agents/global/AGENTS.md` (+ chosen stack layers) here._
+copy-paste target for `agents/AGENTS.md` (+ chosen workflow/stack layers) here._
 
 ## Skills
 

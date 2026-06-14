@@ -16,14 +16,15 @@ any stack layers you need, into your project's `CLAUDE.md`:
 - Project-wide: `./CLAUDE.md` or `./.claude/CLAUDE.md`
 - Personal/global: `~/.claude/CLAUDE.md`
 
-Combine `agents/global/AGENTS.md` + `agents/stacks/<tech>/AGENTS.md` into that
-file.
+Combine `agents/AGENTS.md` + the `agents/workflows/<wf>/AGENTS.md` and
+`agents/stacks/<tech>/AGENTS.md` you need into that file.
 
 **Optional (unix, advanced):** instead of pasting, import by reference inside your
 `CLAUDE.md`:
 
 ```markdown
-@~/repos/agentic/agents/global/AGENTS.md
+@~/repos/agentic/agents/AGENTS.md
+@~/repos/agentic/agents/workflows/dev/AGENTS.md
 @~/repos/agentic/agents/stacks/python/generic/AGENTS.md
 
 # project-specific additions below

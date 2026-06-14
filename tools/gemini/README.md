@@ -8,8 +8,9 @@ you copy it into place.
 
 ## Instructions
 
-Gemini reads a `GEMINI.md` instruction file. Combine `agents/global/AGENTS.md`
-plus any `agents/stacks/<tech>/AGENTS.md` you need into the project's `GEMINI.md`.
+Gemini reads a `GEMINI.md` instruction file. Combine `agents/AGENTS.md` plus the
+`agents/workflows/<wf>/AGENTS.md` and `agents/stacks/<tech>/AGENTS.md` you need
+into the project's `GEMINI.md`.
 
 ## Skills
 
