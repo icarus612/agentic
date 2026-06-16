@@ -14,7 +14,7 @@ Before anyone plans or writes code, you build an accurate map of the codebase: i
 
 ## When to use
 
-- At the start of any non-trivial task, kicked off by `dev-start` or run directly.
+- At the start of any non-trivial task, kicked off by an orchestrator (e.g. `dev-start`) or run directly.
 - When `dev-plan`, `dev-plan-review`, or `dev-code-review` finds the current understanding is wrong or stale and loops back.
 - Any time you need ground truth about a project instead of assumptions.
 
@@ -66,4 +66,4 @@ Hand the map to `dev-plan`; its accuracy directly determines plan quality. If yo
 - Prefer real code and config over prose; descriptions drift, source doesn't.
 - Be honest about coverage — "I did not read X" beats a confident guess.
 - Stay tech-agnostic: any technology named is only an example; report what the repo actually uses.
-- Respect scope boundaries in single-app mode to stay fast and keep your context clean for `dev-start`.
+- Respect scope boundaries in single-app mode to stay fast and keep your context clean for the orchestrator.

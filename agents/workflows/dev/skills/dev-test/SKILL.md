@@ -1,6 +1,6 @@
 ---
 name: dev-test
-description: Step 4 (3 of 3) - verify the implementation against the plan; the only skill that can break the code/debug/test loop with a terminal success exit.
+description: Verify the implementation against the plan; the only skill that can break the dev-code/dev-debug/dev-test loop with a terminal success exit.
 type: workflow
 domain: dev
 rules: [verify-dont-assume, respect-versions-and-conventions]
@@ -10,13 +10,13 @@ model-fallback: [gemini-pro]
 
 # dev-test
 
-You verify that the implementation actually does what the plan said it should. You are the smallest of the three step-4 skills and you work in unison with dev-code and dev-debug. Crucially, you are the ONLY skill allowed to break the dev-code/dev-debug/dev-test loop with a clean, terminal success exit. Nothing leaves step 4 until you confirm the work is correct.
+You verify that the implementation actually does what the plan said it should. You are the smallest of the three build-loop skills and you work in unison with dev-code and dev-debug. Crucially, you are the ONLY skill allowed to break the dev-code/dev-debug/dev-test loop with a clean, terminal success exit. Nothing leaves the loop until you confirm the work is correct.
 
 ## When to use
 
 - Right after dev-code (which never exits on its own) hands a finished slice to you.
 - When dev-debug finishes a fix and wants the change confirmed against the plan and the rest of the suite.
-- Any time you need to decide whether step 4 is genuinely done or must loop back for more work.
+- Any time you need to decide whether the build loop is genuinely done or must loop back for more work.
 
 ## How it works
 
@@ -27,14 +27,14 @@ You verify that the implementation actually does what the plan said it should. Y
 5. **Decide the outcome:**
    - **Failures or regressions** -> hand off to dev-debug to diagnose and fix.
    - **Code is incomplete or a slice is missing** -> hand off to dev-code to build it.
-   - **Everything passes and matches the plan** -> exit step 4 successfully. You are the only skill permitted to do this.
-6. **Report cleanly.** On exit, summarize what was verified, what passed, and any accepted limitations, so the orchestrator (dev-start) and dev-code-review have a clear, trustworthy picture.
+   - **Everything passes and matches the plan** -> exit the loop successfully. You are the only skill permitted to do this.
+6. **Report cleanly.** On exit, summarize what was verified, what passed, and any accepted limitations, so the orchestrator (e.g. `dev-start`) and dev-code-review have a clear, trustworthy picture.
 
 ## Hand-off / next
 
 - Found a defect? -> **dev-debug**.
 - Found missing implementation? -> **dev-code**.
-- All green and faithful to the plan? -> break the loop and exit step 4. The workflow advances to **dev-code-review**.
+- All green and faithful to the plan? -> break the loop and exit. Next: **dev-code-review**.
 - Remember the loop rules: **dev-code** never exits (always -> dev-debug or dev-test); **dev-debug** may exit but prefers handing back to dev-code or dev-test; **dev-test** is the sole loop-breaker.
 
 ## Notes

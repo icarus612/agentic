@@ -1,6 +1,6 @@
----
+ ---
 name: dev-document
-description: Step 6: write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit.
+description: Write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit.
 type: workflow
 domain: dev
 rules: [verify-dont-assume, never-push, plans-and-docs-locations]
@@ -16,7 +16,7 @@ You are the final phase of the workflow. After the work has passed dev-code-revi
 
 - After dev-code-review has accepted the changes and the loop has settled.
 - When the user explicitly asks to document, write docs, or update the changelog.
-- As the closing step that dev-start invokes once implementation is complete.
+- As the closing step the orchestrator (e.g. `dev-start`) invokes once implementation is complete.
 
 Do not start here cold. Documentation must reflect what was actually built and reviewed, not a plan. If dev-code-review has not happened, say so and defer.
 
@@ -48,7 +48,7 @@ Do not start here cold. Documentation must reflect what was actually built and r
 
 ## Hand-off / next
 
-dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to dev-start or the user. If while documenting you discover the code and docs cannot be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
+dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. `dev-start`) or the user. If while documenting you discover the code and docs cannot be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
 
 ## Notes
 

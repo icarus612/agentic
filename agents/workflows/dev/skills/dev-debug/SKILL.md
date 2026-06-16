@@ -1,6 +1,6 @@
 ---
 name: dev-debug
-description: Step 4 (2 of 3): diagnose and fix issues following plan patterns; may exit but prefers handing off to code or test.
+description: Diagnose and fix issues following plan patterns; may exit but prefers handing off to dev-code or dev-test.
 type: workflow
 domain: dev
 rules: [verify-dont-assume, respect-versions-and-conventions]

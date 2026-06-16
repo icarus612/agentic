@@ -22,7 +22,7 @@ Not for investigating failures (dev-debug) or writing/running verification (dev-
 
 ## Before you write a line
 
-1. Read the plan in `/project-plans/` (or the location named in `docs/AGENTS.md`). Implement what it says, don't redesign it; if it's wrong or missing, stop and surface that to dev-start rather than improvising.
+1. Read the plan in `/project-plans/` (or the location named in `docs/AGENTS.md`). Implement what it says, don't redesign it; if it's wrong or missing, stop and surface that to the orchestrator (e.g. `dev-start`) rather than improvising.
 2. Read the surrounding code to match existing patterns, not generic defaults.
 3. Pin the conventions here: honor the project's MAJOR versions and house rules exactly (examples only — no class components in a function-component codebase, no Python 2 idioms in Python 3, no vanilla CSS where a utility/component framework is standard). When unsure, copy the nearest existing example.
 
@@ -47,6 +47,6 @@ After investigating, dev-debug prefers to hand back to you (apply the fix) or to
 ## Notes
 
 - Call your siblings dev-debug and dev-test; don't absorb their jobs.
-- Stay inside the plan. If reality diverges, that's a signal for dev-start (possibly a loop back to dev-plan or dev-explore) — flag it, don't silently invent a new design.
+- Stay inside the plan. If reality diverges, that's a signal for the orchestrator (possibly a loop back to dev-plan or dev-explore) — flag it, don't silently invent a new design.
 - Automated checks (format, lint, type) are blocking — fix any hook failure before handing off.
 - Documenting belongs to dev-document, not here; just write the code and pass the baton.
