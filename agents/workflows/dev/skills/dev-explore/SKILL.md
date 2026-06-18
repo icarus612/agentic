@@ -18,13 +18,30 @@ Before anyone plans or writes code, you build an accurate map of the codebase: i
 - When `dev-plan`, `dev-plan-review`, or `dev-code-review` finds the current understanding is wrong or stale and loops back.
 - Any time you need ground truth about a project instead of assumptions.
 
-## Two modes
+## Modes
 
-Pick one up front and state which you're running.
+Three modes. If the caller explicitly named one, run it and state which. Otherwise, before reading anything, open a selection modal via `AskUserQuestion` offering SHALLOW, DEEP, and AUTO (AUTO as the default/recommended option), and run what the user picks. Always state the mode you end up running.
+
+**AUTO** — you choose SHALLOW or DEEP yourself via the decision rule below, then state which you picked and why. This is the mode an orchestrator (e.g. `dev-start`) always requests.
 
 **SHALLOW** — fast orientation. Read ONLY the root `/docs` (source of truth), agent guidance (`/agents`, `AGENTS.md`, any `CLAUDE.md`), and every `README.md`. Use it to confirm facts, refresh stale knowledge, or meet the minimum a plan requires (never plan without AT LEAST a shallow explore). Cheap; run it liberally.
 
 **DEEP** — full understanding. Read the entire target: source, config, tests, build files, docs. Trace real code paths, not descriptions. Use when the task touches non-trivial logic or you can't answer the structured-map questions from docs alone.
+
+### Choosing DEEP vs SHALLOW (the AUTO decision rule)
+
+Go DEEP if ANY of these hold:
+- The task will change or depend on non-trivial logic, control flow, or data shapes.
+- You can't answer the structured-map questions (stack, dependency graph, patterns, conventions) from docs/READMEs alone.
+- The docs are absent, thin, or suspected stale — code is the only reliable ground truth.
+- The change crosses module/package boundaries or touches a hot/risky path.
+
+Go SHALLOW otherwise:
+- You only need to confirm or refresh facts the docs already state.
+- It's a small, localized change in well-documented code.
+- You just need the minimum orientation a plan requires before a possible later deep pass.
+
+When genuinely on the fence, prefer DEEP — a wasted read is cheaper than a confidently wrong map.
 
 ## Monorepo awareness
 
@@ -37,7 +54,7 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH; in-project doc folders and READM
 
 ## How it works
 
-1. **Declare scope and mode.** DEEP or SHALLOW; for monorepos, whole-repo or single-app(+deps), naming the target app.
+1. **Settle scope and mode.** If the caller gave no mode, ask the user (SHALLOW/DEEP/AUTO); resolve AUTO via the decision rule above. State the mode, and for monorepos whether it's whole-repo or single-app(+deps), naming the target app.
 2. **Read global guidance first.** `AGENTS.md`/`CLAUDE.md` and root `/docs` define the conventions to report; note any override (docs/plans location, tooling).
 3. **Identify the tech stack.** From manifests, lockfiles, config: languages, frameworks, libraries, and especially MAJOR VERSIONS — record them precisely, since they drive which idioms are legal later.
 4. **Map structure and dependencies.** Walk the layout. For monorepos build the app/package dependency graph; for a single app list exactly which internal packages and external libraries it depends on.

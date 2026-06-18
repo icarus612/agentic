@@ -17,8 +17,18 @@ You are the final phase of the workflow. After the work passes dev-code-review, 
 - After dev-code-review has accepted the changes and the loop has settled.
 - When the user explicitly asks to document, write docs, or update the changelog.
 - As the closing step the orchestrator (e.g. `dev-start`) invokes once implementation is complete.
+- When the user asks to bootstrap, refresh, or clean up documentation that may be stale or missing — a **cold start** (see below).
 
-Don't start here cold. Documentation must reflect what was actually built and reviewed, not a plan. If dev-code-review hasn't happened, say so and defer.
+When documenting a **change**, don't start cold: documentation must reflect what was actually built and reviewed, not a plan — if dev-code-review hasn't happened, say so and defer. The exception is an explicit **cold-start** pass (below), where mapping the project and writing docs from scratch is the whole point.
+
+## Cold start
+
+Use this when the task IS the documentation — bootstrapping docs for an undocumented project, or cleaning up docs suspected stale — rather than recording a reviewed change:
+
+1. **Locate the docs root.** Resolve where docs belong: root `/docs`, or the location named in `docs/AGENTS.md`/root `AGENTS.md`.
+2. **If no docs root exists yet, map first.** Run a DEEP **dev-explore** of the project before writing anything, so the docs reflect real code rather than assumptions. Use its map (stack with MAJOR versions, structure, dependency graph, patterns, conventions) as the backbone for the new docs.
+3. **If docs exist but are suspected stale, run a DEEP dev-explore to discover the drift.** Unlike a change-driven run there's no diff to tell you what moved, so let explore surface ground truth; the normal flow below then handles the actual update/delete/add against it.
+4. **Then follow the normal flow below** for structure-mirroring, symlinks, and version rules. A cold start produces the same `/docs` topology as a change-driven run.
 
 ## How it works
 

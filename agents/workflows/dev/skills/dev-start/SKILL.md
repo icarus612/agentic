@@ -24,7 +24,7 @@ If the user wants only one phase (just an explore, just a plan), invoke that sib
 
 Drive these phases in order. "Repeat" means you may loop back to ANY earlier step at the listed gates, then resume forward.
 
-1. **dev-explore** — understand the codebase and patterns (DEEP or SHALLOW; handle monorepos).
+1. **dev-explore** — understand the codebase and patterns. ALWAYS request AUTO mode so explore picks DEEP or SHALLOW itself; handle monorepos.
 2. **dev-plan** — turn findings into a concrete project plan saved under `/project-plans/` (or the location in `docs/AGENTS.md`).
 3. **dev-plan-review** — verify the plan, ask when unsure. HUMAN review gate. May loop back to **dev-explore** or **dev-plan**. Repeat until the user approves; then switch to auto mode.
 4. **dev-code / dev-debug / dev-test** — build the plan as a tight loop (see loop rules below).
@@ -34,7 +34,7 @@ Drive these phases in order. "Repeat" means you may loop back to ANY earlier ste
 ## How it works
 
 1. **Confirm scope.** Read the user's request. For a monorepo, decide WITH the user whether to cover the entire repo or one app and its dependencies. Set the target before exploring.
-2. **Explore.** Delegate to **dev-explore** via a Sonnet agent. Ensure AT LEAST a shallow explore happens before any planning. Collect the returned patterns/summary; do not pull the full file contents into your own context.
+2. **Explore.** Delegate to **dev-explore** via a Sonnet agent, ALWAYS requesting AUTO mode so explore picks DEEP or SHALLOW itself rather than asking the user. Ensure AT LEAST a shallow explore happens before any planning. Collect the returned patterns/summary; do not pull the full file contents into your own context.
 3. **Plan.** Delegate to **dev-plan** using an Opus agent (planning is high-leverage). Pass the explore summary, the current tech stack, and the available agent skills so the plan respects MAJOR versions and project conventions. Confirm the plan was written to `/project-plans/`.
 4. **Plan review (gate).** Run **dev-plan-review**. This is the human gate: present the plan and the review's verified-vs-uncertain notes to the user. If the user dislikes it, loop back to **dev-explore** or **dev-plan** and repeat. Only proceed once approved, then switch to auto mode.
 5. **Build (code/debug/test loop).** Hand the approved plan to the **dev-code** skill. Respect the loop rules exactly:

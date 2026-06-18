@@ -52,8 +52,9 @@ Two cycles plus shared skills:
 - **`delivery-post-confluence`** — publish/update the Confluence page(s):
   technical implementation **and** the original ask + story narrative; big assets
   via `delivery-drive-archive`.
-- **`delivery-post-changelog`** — record a dated changelog entry in Confluence,
-  linked to the main page and the Jira ticket(s).
+- **`delivery-post-changelog`** — promote dev's local `docs/changelog` into a
+  Confluence changelog page (mirroring un-promoted entries), linked to the main
+  page and the Jira ticket(s). Local docs stay canonical in `/docs`.
 - **`delivery-post-jira-link`** — link the Confluence docs/changelog to the
   required Jira ticket(s), update status/fields, ensure bidirectional links.
 
