@@ -4,7 +4,7 @@ description: Write all docs into the root /docs single source of truth, mirror p
 type: workflow
 domain: dev
 rules: [verify-dont-assume, never-push, plans-and-docs-locations]
-model: sonnet
+model: sonnet[200k]
 model-fallback: [gemini-pro]
 ---
 
