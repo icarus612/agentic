@@ -3,6 +3,8 @@ name: dev-explore
 description: Map a codebase before planning: deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware, outputs tech stack, patterns, conventions, and dependency graph.
 type: workflow
 domain: dev
+context: fork
+agent: Explore
 rules: [verify-dont-assume, tech-agnostic, plans-and-docs-locations]
 model: sonnet
 model-fallback: [gemini-pro]
@@ -18,9 +20,13 @@ Before anyone plans or writes code, you build an accurate map of the codebase: i
 - When `dev-plan`, `dev-plan-review`, or `dev-code-review` finds the current understanding is wrong or stale and loops back.
 - Any time you need ground truth about a project instead of assumptions.
 
+## Inputs
+
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo) and the mode (AUTO/DEEP/SHALLOW). If the mode is unspecified, default to AUTO.
+
 ## Modes
 
-Three modes. If the caller explicitly named one, run it and state which. Otherwise, before reading anything, open a selection modal via `AskUserQuestion` offering SHALLOW, DEEP, and AUTO (AUTO as the default/recommended option), and run what the user picks. Always state the mode you end up running.
+Three modes. If the caller explicitly named one, run it and state which. Otherwise default to AUTO (the recommended mode) — you run in an isolated fork and cannot ask the user mid-run, so note in your final report that the mode was defaulted, for the caller to raise with the user if it matters. Always state the mode you end up running.
 
 **AUTO** — you choose SHALLOW or DEEP yourself via the decision rule below, then state which you picked and why. This is the mode an orchestrator (e.g. `dev-start`) always requests.
 
@@ -50,12 +56,12 @@ Detect single project vs. monorepo (look for `apps/`, `packages/`, workspace man
 1. **Whole monorepo** — every app and package. Use when the task is cross-cutting or scope is unknown.
 2. **Single app + its dependencies only** — explore in order and STOP at the edges: (1) root/global docs (`/docs`, `AGENTS.md`), (2) `apps/[project]/docs` and the app's source, (3) the docs and (if deep) source of EACH dependency it actually uses, e.g. `packages/[pkg]`. Don't wander into unrelated apps/packages.
 
-The root `/docs` is the SINGLE SOURCE OF TRUTH; in-project doc folders and READMEs are SYMLINKS into it — same content, don't double-count. If `docs/AGENTS.md` names a different docs/plans location, honor it.
+The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env var is set); in-project doc folders and READMEs are SYMLINKS into it — same content, don't double-count.
 
 ## How it works
 
-1. **Settle scope and mode.** If the caller gave no mode, ask the user (SHALLOW/DEEP/AUTO); resolve AUTO via the decision rule above. State the mode, and for monorepos whether it's whole-repo or single-app(+deps), naming the target app.
-2. **Read global guidance first.** `AGENTS.md`/`CLAUDE.md` and root `/docs` define the conventions to report; note any override (docs/plans location, tooling).
+1. **Settle scope and mode.** If the caller gave no mode, default to AUTO; resolve AUTO via the decision rule above. State the mode, and for monorepos whether it's whole-repo or single-app(+deps), naming the target app.
+2. **Read global guidance first.** `AGENTS.md`/`CLAUDE.md` and root `/docs` define the conventions to report; note any tooling override. (Docs/plans locations come only from `CLAUDE_DOCS_DIR`/`CLAUDE_PROJECT_PLANS_DIR` env vars or their defaults — never from these files.)
 3. **Identify the tech stack.** From manifests, lockfiles, config: languages, frameworks, libraries, and especially MAJOR VERSIONS — record them precisely, since they drive which idioms are legal later.
 4. **Map structure and dependencies.** Walk the layout. For monorepos build the app/package dependency graph; for a single app list exactly which internal packages and external libraries it depends on.
 5. **Extract patterns and conventions** (deep, or as far as docs allow): how code is organized, named, tested, styled; what's idiomatic vs. forbidden (styling, preferred reuse, error handling, test layout, lint/format rules).
@@ -76,6 +82,8 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH; in-project doc folders and READM
 ## Hand-off / next
 
 Hand the map to `dev-plan`; its accuracy directly determines plan quality. If you ran shallow, say so — `dev-plan` may need a deep pass for risky areas, and `dev-plan-review` will re-check shallow facts since docs can be stale.
+
+Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return the full structured map (findings summary) to the caller (`dev-start` or the main conversation), with `dev-plan` as the recommended next step.
 
 ## Notes
 

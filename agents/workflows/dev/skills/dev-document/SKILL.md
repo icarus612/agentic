@@ -3,8 +3,9 @@ name: dev-document
 description: Write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit.
 type: workflow
 domain: dev
+context: fork
 rules: [verify-dont-assume, never-push, plans-and-docs-locations]
-model: sonnet[200k]
+model: sonnet
 model-fallback: [gemini-pro]
 ---
 
@@ -21,18 +22,24 @@ You are the final phase of the workflow. After the work passes dev-code-review, 
 
 When documenting a **change**, don't start cold: documentation must reflect what was actually built and reviewed, not a plan — if dev-code-review hasn't happened, say so and defer. The exception is an explicit **cold-start** pass (below), where mapping the project and writing docs from scratch is the whole point.
 
+## Inputs
+
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the plan path in `/project-plans/`, a summary of what was built and the dev-code-review outcome, and whether to record a changelog (commit, `docs/changelog`, both, or none). If a required input is missing, note it in your report instead of guessing.
+
 ## Cold start
 
 Use this when the task IS the documentation — bootstrapping docs for an undocumented project, or cleaning up docs suspected stale — rather than recording a reviewed change:
 
-1. **Locate the docs root.** Resolve where docs belong: root `/docs`, or the location named in `docs/AGENTS.md`/root `AGENTS.md`.
+1. **Locate the docs root.** Docs belong in root `/docs`, or `CLAUDE_DOCS_DIR` if that env var is set.
 2. **If no docs root exists yet, map first.** Run a DEEP **dev-explore** of the project before writing anything, so the docs reflect real code rather than assumptions. Use its map (stack with MAJOR versions, structure, dependency graph, patterns, conventions) as the backbone for the new docs.
 3. **If docs exist but are suspected stale, run a DEEP dev-explore to discover the drift.** Unlike a change-driven run there's no diff to tell you what moved, so let explore surface ground truth; the normal flow below then handles the actual update/delete/add against it.
 4. **Then follow the normal flow below** for structure-mirroring, symlinks, and version rules. A cold start produces the same `/docs` topology as a change-driven run.
 
+Running as a fork you can't invoke `dev-explore` mid-run — perform the equivalent deep read yourself, producing the same map (stack with MAJOR versions, structure, dependency graph, patterns, conventions) before writing.
+
 ## How it works
 
-1. **Re-read the source-of-truth layout.** Open `docs/AGENTS.md` (or root `AGENTS.md`) and the existing `/docs` tree to learn the conventions already in use: naming, headings, how monorepo apps are split. Match the existing style instead of inventing one. If the project specifies a different docs root, honor it.
+1. **Re-read the source-of-truth layout.** Open `docs/AGENTS.md` (or root `AGENTS.md`) and the existing `/docs` tree to learn the conventions already in use: naming, headings, how monorepo apps are split. Match the existing style instead of inventing one.
 
 2. **Confirm what changed.** Check the plan in `/project-plans/`, the dev-code-review outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during dev-code/dev-debug/dev-test, document what shipped.
 
@@ -52,13 +59,15 @@ Use this when the task IS the documentation — bootstrapping docs for an undocu
    - **git commit** — `git add` the relevant files then `git commit` with a clear message. **NEVER push.** If on the default branch and the workflow created a feature branch, commit there; otherwise follow the project's branching convention.
    - **`docs/changelog`** — append a dated entry describing what changed and why.
    - **both** — commit and a `docs/changelog` entry.
-   Ask which the user prefers if it isn't already established; default to none unless requested or conventionally expected.
+   Use the preference given in the invocation args or established by the conventions; you run in an isolated fork and cannot ask the user mid-run, so if it isn't established, default to none and flag the open changelog question in your final report for the caller to raise with the user.
 
 7. **Verify.** Confirm `/docs` reflects reality, symlinks resolve, and any changelog/commit landed. Run the project's docs/format checks if they exist.
 
 ## Hand-off / next
 
 dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. `dev-start`) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
+
+Return contract: as a fork your final report IS the hand-off — return exactly what was written and committed (docs paths, symlinks, changelog/commit outcome) to the caller (`dev-start` or the main conversation); any loop-back is a recommendation in that report, not a phase you invoke yourself.
 
 ## Notes
 

@@ -3,6 +3,7 @@ name: dev-plan
 description: Turn explore's findings into a concrete, convention-grounded project plan saved to /project-plans/.
 type: workflow
 domain: dev
+context: fork
 rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, plans-and-docs-locations]
 model: opus
 model-fallback: [sonnet, gemini-pro]
@@ -18,16 +19,20 @@ You turn the patterns and facts from `dev-explore` into a concrete, actionable i
 - After `dev-explore` has run and you have the project's patterns in hand.
 - Before any `dev-code`/`dev-debug`/`dev-test` work begins.
 
+## Inputs
+
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the explore summary (or a pointer to where its findings live), the user's request and scope, and any corrections from a prior `dev-plan-review` round. If a load-bearing input is missing, flag it in your report instead of guessing.
+
 ## Precondition: explore first
 
 A plan built on assumptions is worthless. Confirm **at least a shallow explore** happened first:
 
 - Shallow explore = root/global docs (`/docs`, `/agents` or `AGENTS.md`) and `README.md` files have been read.
-- If none has, **trigger `dev-explore` now** (shallow at minimum) and wait for its findings.
+- If none has, do the shallow read yourself now (root/global docs + READMEs) before planning; recommend a proper `dev-explore` pass in your report if the gap is bigger than that.
 - For anything non-trivial, prefer a deep `dev-explore` of the area you'll change — or, in a monorepo, the app and only its dependencies (root/global docs, then `apps/[project]/docs`, then each dependency it uses, e.g. `packages/[pkg]`).
 - In monorepos the ROOT `/docs` is the source of truth; in-project doc folders are symlinks into it — read the source of truth.
 
-Don't pad gaps in explore's findings with guesses; if you need a fact it didn't surface, send `dev-explore` back for it.
+Don't pad gaps in explore's findings with guesses; if you need a fact it didn't surface, verify it from the source directly or request another `dev-explore` pass in your report.
 
 ## How it works
 
@@ -36,7 +41,7 @@ Don't pad gaps in explore's findings with guesses; if you need a fact it didn't 
 3. **Account for the executing skills** — `dev-code`, `dev-debug`, `dev-test`, then `dev-code-review` and `dev-document`, plus any project-specific skills explore found. Shape tasks to map cleanly onto them; don't plan work a skill already does.
 4. **Break work into ordered, concrete tasks.** Each names the files/areas it touches, the pattern to follow (reference the exact existing example from explore), acceptance criteria, and how it's tested. Sequence by dependency; call out risks, unknowns, and decision points explicitly.
 5. **Surface choices instead of silently picking.** Present real alternatives ("approach A vs B, tradeoffs…") for the human to decide at the review gate. Mark any assumption you couldn't verify so `dev-plan-review` can challenge it.
-6. **Write the plan to disk** under `/project-plans/` (or the `docs/AGENTS.md` location), in a clear dated/feature-named file. It's an artifact others read — make it self-contained.
+6. **Write the plan to disk** under `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set), in a clear dated/feature-named file. It's an artifact others read — make it self-contained.
 
 ## Plan contents (checklist)
 
@@ -50,6 +55,8 @@ Don't pad gaps in explore's findings with guesses; if you need a fact it didn't 
 ## Hand-off / next
 
 Hand the saved plan to `dev-plan-review` (the human gate). It verifies your claims, challenges unverified assumptions, and either approves (then on to `dev-code`/`dev-debug`/`dev-test`) or loops back to `dev-plan` or `dev-explore`. Don't start coding until the plan is reviewed.
+
+Return contract: as a fork you cannot invoke the next phase yourself — return the plan file path plus a short digest (goal, task count, key risks and decision points) to the caller (`dev-start` or the main conversation), with `dev-plan-review` as the recommended next step.
 
 ## Notes
 

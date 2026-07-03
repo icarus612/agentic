@@ -3,7 +3,7 @@ name: dev-code
 description: Implement the approved plan following its patterns; never exit on your own, always hand off to dev-debug or dev-test.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic]
+rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, plans-and-docs-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -22,7 +22,7 @@ Not for investigating failures (dev-debug) or writing/running verification (dev-
 
 ## Before you write a line
 
-1. Read the plan in `/project-plans/` (or the location named in `docs/AGENTS.md`). Implement what it says, don't redesign it; if it's wrong or missing, stop and surface that to the orchestrator (e.g. `dev-start`) rather than improvising.
+1. Read the plan in `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set). Implement what it says, don't redesign it; if it's wrong or missing, stop and surface that to the orchestrator (e.g. `dev-start`) rather than improvising.
 2. Read the surrounding code to match existing patterns, not generic defaults.
 3. Pin the conventions here: honor the project's MAJOR versions and house rules exactly (examples only — no class components in a function-component codebase, no Python 2 idioms in Python 3, no vanilla CSS where a utility/component framework is standard). When unsure, copy the nearest existing example.
 

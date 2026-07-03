@@ -3,7 +3,7 @@ name: dev-debug
 description: Diagnose and fix issues following plan patterns; may exit but prefers handing off to dev-code or dev-test.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, respect-versions-and-conventions]
+rules: [verify-dont-assume, respect-versions-and-conventions, plans-and-docs-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -17,7 +17,7 @@ You are the diagnosis-and-repair half of the build loop. Something is wrong — 
 - A test reported a failure and handed off to you (see dev-test).
 - dev-code wrote something that doesn't run, doesn't compile, or behaves wrong, and handed off to you (dev-code NEVER exits on its own).
 - You hit an unexpected error, regression, or flaky behavior mid-build.
-- Behavior diverges from what the plan in `/project-plans/` specified.
+- Behavior diverges from what the plan in `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set) specified.
 
 ## How it works
 
@@ -43,5 +43,5 @@ You work inside the dev-code/dev-debug/dev-test loop. The rules are strict:
 
 - Stay small. You diagnose and repair; you do not redesign. Architectural problems are a signal to surface a blocker and loop back via dev-code-review to dev-plan or dev-explore — not to improvise a rewrite here.
 - Verify, don't assume. A confidently-wrong fix is worse than an honest "I haven't isolated this yet."
-- Keep changes aligned with `/project-plans/`. If the plan itself is the source of the bug, raise it rather than silently diverging.
+- Keep changes aligned with `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set). If the plan itself is the source of the bug, raise it rather than silently diverging.
 - One root cause at a time. If you find several issues, fix the one you can prove, hand off, and let the loop come back around.

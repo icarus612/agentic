@@ -3,7 +3,7 @@ name: dev-test
 description: Verify the implementation against the plan; the only skill that can break the dev-code/dev-debug/dev-test loop with a terminal success exit.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, respect-versions-and-conventions]
+rules: [verify-dont-assume, respect-versions-and-conventions, plans-and-docs-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -20,7 +20,7 @@ You verify that the implementation actually does what the plan said it should. Y
 
 ## How it works
 
-1. **Anchor on the plan.** Pull up the plan in `/project-plans/` (or the location named by `docs/AGENTS.md`). Verify behavior against what the plan promised, not against your assumptions about what the code "probably" does.
+1. **Anchor on the plan.** Pull up the plan in `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set). Verify behavior against what the plan promised, not against your assumptions about what the code "probably" does.
 2. **Run the project's real verification.** Use the existing test commands, runners, and quality gates already in the repo (whatever the stack provides). Do NOT invent a new framework or harness; match the conventions dev-explore and dev-plan established.
 3. **Cover what matters.** Run the relevant existing tests, add focused tests for the new behavior where the plan implies them, and exercise the feature end-to-end. Check edge cases and the plan's acceptance criteria.
 4. **Honor stack conventions.** Tests must respect the same major-version idioms and conventions enforced in dev-plan (examples only: current-version component patterns, the project's assertion style, no banned constructs). Tests are code too.

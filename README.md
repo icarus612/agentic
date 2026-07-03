@@ -45,7 +45,8 @@ agentic/
 │   │   ├── dev/                     # build pipeline
 │   │   │   ├── AGENTS.md
 │   │   │   ├── rules/               # dev-scoped rules
-│   │   │   └── skills/  → dev-explore … dev-document, dev-start
+│   │   │   └── skills/  → dev-start orchestrates:
+│   │   │                 explore → plan → plan-review → code/debug/test → code-review → document
 │   │   └── delivery/                # Jira / Confluence / Drive docs
 │   │       ├── AGENTS.md
 │   │       ├── rules/               # delivery-scoped rules
