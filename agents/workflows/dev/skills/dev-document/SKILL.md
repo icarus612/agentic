@@ -18,30 +18,24 @@ You are the final phase of the workflow. After the work passes dev-code-review, 
 - After dev-code-review has accepted the changes and the loop has settled.
 - When the user explicitly asks to document, write docs, or update the changelog.
 - As the closing step the orchestrator (e.g. `dev-start`) invokes once implementation is complete.
-- When the user asks to bootstrap, refresh, or clean up documentation that may be stale or missing — a **cold start** (see below).
+- When an orchestrator (e.g. `dev-map`) hands you a fresh dev-explore map to bootstrap or refresh docs with no code change — a **map-driven** run.
 
-When documenting a **change**, don't start cold: documentation must reflect what was actually built and reviewed, not a plan — if dev-code-review hasn't happened, say so and defer. The exception is an explicit **cold-start** pass (below), where mapping the project and writing docs from scratch is the whole point.
+When documenting a **change**, don't start cold: documentation must reflect what was actually built and reviewed, not a plan — if dev-code-review hasn't happened, say so and defer. The exception is a **map-driven** run, where a deep dev-explore map arrives via args and writing or refreshing docs from it is the whole point.
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the plan path in `/project-plans/`, a summary of what was built and the dev-code-review outcome, and whether to record a changelog (commit, `docs/changelog`, both, or none). If a required input is missing, note it in your report instead of guessing.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect one of two shapes:
 
-## Cold start
+- **Change-driven** (from `dev-start` or a direct invocation after review): the plan path in `/project-plans/` and a summary of what was built and the dev-code-review outcome.
+- **Map-driven** (from `dev-map`): dev-explore's full structured map (stack with MAJOR versions, structure, dependency graph, patterns, conventions), standing in for plan and diff.
 
-Use this when the task IS the documentation — bootstrapping docs for an undocumented project, or cleaning up docs suspected stale — rather than recording a reviewed change:
-
-1. **Locate the docs root.** Docs belong in root `/docs`, or `CLAUDE_DOCS_DIR` if that env var is set.
-2. **If no docs root exists yet, map first.** Run a DEEP **dev-explore** of the project before writing anything, so the docs reflect real code rather than assumptions. Use its map (stack with MAJOR versions, structure, dependency graph, patterns, conventions) as the backbone for the new docs.
-3. **If docs exist but are suspected stale, run a DEEP dev-explore to discover the drift.** Unlike a change-driven run there's no diff to tell you what moved, so let explore surface ground truth; the normal flow below then handles the actual update/delete/add against it.
-4. **Then follow the normal flow below** for structure-mirroring, symlinks, and version rules. A cold start produces the same `/docs` topology as a change-driven run.
-
-Running as a fork you can't invoke `dev-explore` mid-run — perform the equivalent deep read yourself, producing the same map (stack with MAJOR versions, structure, dependency graph, patterns, conventions) before writing.
+Both shapes also carry whether to record a changelog (commit, `docs/changelog`, both, or none). If a required input is missing, note it in your report instead of guessing — do not perform your own exploration to fill the gap; that is `dev-map`'s job.
 
 ## How it works
 
 1. **Re-read the source-of-truth layout.** Open `docs/AGENTS.md` (or root `AGENTS.md`) and the existing `/docs` tree to learn the conventions already in use: naming, headings, how monorepo apps are split. Match the existing style instead of inventing one.
 
-2. **Confirm what changed.** Check the plan in `/project-plans/`, the dev-code-review outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during dev-code/dev-debug/dev-test, document what shipped.
+2. **Confirm what changed.** Check the plan in `/project-plans/`, the dev-code-review outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during dev-code/dev-debug/dev-test, document what shipped. In a map-driven run there is no plan or diff — the dev-explore map is your ground truth; reconcile the existing `/docs` tree against it and add, update, or delete accordingly.
 
 3. **Mirror the project structure inside `/docs`.** The docs tree reflects the source tree:
    - Single project: write into `/docs` directly (e.g. `docs/README.md`, `docs/architecture.md`, topic files).
@@ -65,7 +59,7 @@ Running as a fork you can't invoke `dev-explore` mid-run — perform the equival
 
 ## Hand-off / next
 
-dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. `dev-start`) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
+dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. `dev-start`, `dev-map`) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
 
 Return contract: as a fork your final report IS the hand-off — return exactly what was written and committed (docs paths, symlinks, changelog/commit outcome) to the caller (`dev-start` or the main conversation); any loop-back is a recommendation in that report, not a phase you invoke yourself.
 

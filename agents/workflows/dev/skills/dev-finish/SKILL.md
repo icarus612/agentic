@@ -21,7 +21,7 @@ You close out a completed workflow run. Your job is to make sure every artifact 
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the worktree path, the branch name, and confirmation from the caller that the workflow is completely done. Verify — don't trust: check `git status` is clean and the branch is the expected `dev/<name>` before doing anything.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the worktree path, the branch name, and confirmation from the caller that the workflow is completely done. Verify — don't trust: check `git status` is clean and the branch is the expected `<type>/<name>` (where `<type>` is `feature`, `bug`, or `hotfix`) before doing anything.
 
 ## How it works
 
