@@ -4,7 +4,7 @@ description: Review gate: verify implemented code against the plan and conventio
 type: workflow
 domain: dev
 context: fork
-rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, plans-and-docs-locations]
+rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, artifact-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

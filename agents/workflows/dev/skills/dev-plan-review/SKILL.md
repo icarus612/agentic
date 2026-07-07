@@ -4,7 +4,7 @@ description: Human review gate that verifies the project plan against reality be
 type: workflow
 domain: dev
 context: fork
-rules: [verify-dont-assume, respect-versions-and-conventions, plans-and-docs-locations]
+rules: [verify-dont-assume, respect-versions-and-conventions, artifact-locations, plan-format]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

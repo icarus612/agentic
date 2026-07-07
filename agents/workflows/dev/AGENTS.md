@@ -47,6 +47,8 @@ when something is off, then resume forward.
 > Story/narrative documentation and ticket linking are **not** here — that's the
 > [`delivery`](../delivery/AGENTS.md) workflow, which brackets this one.
 
-Rules: dev-scoped rules live in [`rules/`](rules/) (`plans-and-docs-locations`);
-universal rules are in [`../../rules/`](../../rules/). Each skill lists the rules
-it needs in its `rules:` frontmatter.
+Rules: the artifact conventions this workflow relies on — `artifact-locations`
+(where docs/plans/worktrees live), `plan-format`, and `doc-format` (how they are
+named and structured) — are universal rules in [`../../rules/`](../../rules/);
+the workflow has no dev-scoped rules of its own. Each skill lists the rules it
+needs in its `rules:` frontmatter.

@@ -5,7 +5,7 @@ type: workflow
 domain: dev
 context: fork
 agent: Explore
-rules: [verify-dont-assume, tech-agnostic, plans-and-docs-locations]
+rules: [verify-dont-assume, tech-agnostic, artifact-locations, doc-format]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

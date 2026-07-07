@@ -3,7 +3,7 @@ name: dev-code
 description: Implement the approved plan following its patterns; never exit on your own, always hand off to dev-debug or dev-test.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, plans-and-docs-locations]
+rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, artifact-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

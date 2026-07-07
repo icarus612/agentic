@@ -3,7 +3,7 @@ name: dev-start
 description: Orchestrator that drives the full explore→plan→plan-review→code/debug/test→code-review→document workflow and manages context.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, model-policy, plans-and-docs-locations]
+rules: [verify-dont-assume, model-policy, artifact-locations]
 model: opus
 model-fallback: [sonnet, gemini-pro]
 hooks:

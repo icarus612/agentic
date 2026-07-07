@@ -3,7 +3,7 @@ name: dev-test
 description: Verify the implementation against the plan; the only skill that can break the dev-code/dev-debug/dev-test loop with a terminal success exit.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, respect-versions-and-conventions, plans-and-docs-locations]
+rules: [verify-dont-assume, respect-versions-and-conventions, artifact-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

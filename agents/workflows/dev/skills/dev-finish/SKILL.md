@@ -1,10 +1,10 @@
 ---
 name: dev-finish
-description: Terminal phase: commit and push the workflow branch, then tear down the workflow worktree once everything is published. Never force-pushes, never pushes main.
+description: Terminal phase: commit and push the workflow branch (always asking for confirmation first), then tear down the workflow worktree once everything is published. Never force-pushes, never pushes main.
 type: workflow
 domain: dev
 context: fork
-rules: [verify-dont-assume, plans-and-docs-locations]
+rules: [verify-dont-assume, artifact-locations, push-policy]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -26,13 +26,13 @@ You run as an isolated fork with no access to the conversation history — every
 ## How it works
 
 1. **Verify completion.** Inside the worktree, confirm the working tree is clean and you're on the expected workflow branch — never main. If straggler artifacts (plans, docs) are uncommitted and the caller authorized committing them, commit with a clear message; otherwise stop and report.
-2. **Publish.** `git push -u origin <branch>` to the workflow branch ONLY. Never `--force` in any form, never push main or the base branch. Pushing may be DENIED by permission settings (a global never-push policy exists) — if the push is blocked or rejected, do NOT retry or work around it: record that the branch exists locally with all commits and move on.
+2. **Publish.** `git push -u origin <branch>` to the workflow branch ONLY. Never `--force` in any form, never push main or the base branch. This always prompts the user for explicit confirmation before it runs (standing permission policy) — if the user declines, do NOT retry or work around it: record that the branch exists locally with all commits and move on.
 3. **Tear down.** Only when the working tree is clean and all work is committed (commits are safe — the worktree shares the repo's object store, so removing the directory loses nothing committed): `git worktree remove <path>`. If that command is permission-blocked, fall back to reporting the exact cleanup commands for the user instead of deleting via raw `rm -rf` yourself. Then `git worktree prune` if removal succeeded. The local branch stays (deleting it is the user's call).
 4. **Verify teardown.** `git worktree list` no longer shows the path; the workflows dir entry is gone.
 
 ## Hand-off / next
 
-dev-finish ends the workflow — nothing follows. Return contract: the final report states the branch name; whether it was pushed or blocked (with the exact push command if blocked); whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made.
+dev-finish ends the workflow — nothing follows. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made.
 
 ## Notes
 
@@ -40,4 +40,4 @@ dev-finish ends the workflow — nothing follows. Return contract: the final rep
 - Never push or commit to main/the base branch.
 - Never remove a worktree with uncommitted changes.
 - If anything isn't clean, stop and report instead of cleaning up.
-- A blocked push is a VALID outcome, not an error to route around — the user's never-push policy may legitimately deny it.
+- A declined push is a VALID outcome, not an error to route around — the user may legitimately decline via the confirmation prompt.

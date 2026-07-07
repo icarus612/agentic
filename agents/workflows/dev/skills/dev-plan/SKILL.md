@@ -4,7 +4,7 @@ description: Turn explore's findings into a concrete, convention-grounded projec
 type: workflow
 domain: dev
 context: fork
-rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, plans-and-docs-locations]
+rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, artifact-locations, plan-format]
 model: opus
 model-fallback: [sonnet, gemini-pro]
 ---
@@ -39,18 +39,20 @@ Don't pad gaps in explore's findings with guesses; if you need a fact it didn't 
 1. **Ground yourself in the stack.** From explore's findings, pin the languages, frameworks, libraries, and build tooling in use — and their **MAJOR versions** (verify from manifests/lockfiles, not memory). The plan must use idioms correct for those majors, never older-generation patterns (examples only, tech-agnostic: no Svelte 4 idioms in Svelte 5, no Python 2.7 in 3.x, no React class components in a function-component codebase).
 2. **Enumerate the conventions to enforce** as hard constraints: styling (e.g. no vanilla CSS in a Tailwind project; prefer daisyUI over raw Tailwind when available), structure, naming, error handling, testing, commit/doc rules. Pull these from `AGENTS.md`/`/docs`, not assumption.
 3. **Account for the executing skills** — `dev-code`, `dev-debug`, `dev-test`, then `dev-code-review` and `dev-document`, plus any project-specific skills explore found. Shape tasks to map cleanly onto them; don't plan work a skill already does.
-4. **Break work into ordered, concrete tasks.** Each names the files/areas it touches, the pattern to follow (reference the exact existing example from explore), acceptance criteria, and how it's tested. Sequence by dependency; call out risks, unknowns, and decision points explicitly.
+4. **Break work into phases of ordered, concrete tasks**, numbered `<phase>.<task>` (`4.3` = phase 4, task 3). Each task names the files/areas it touches, the pattern to follow (reference the exact existing example from explore), acceptance criteria, and how it's tested. Sequence by dependency; call out risks, unknowns, and decision points explicitly. Open the plan with the **phase syllabus**: HIGH LEVEL ONLY — one `- [ ]` checkbox per phase, using just the phase's section title (5 phases → 5 bullets). All detail lives in the phase sections below; the syllabus exists so anyone can see at a glance which work is complete, checked off as later skills finish each phase.
 5. **Surface choices instead of silently picking.** Present real alternatives ("approach A vs B, tradeoffs…") for the human to decide at the review gate. Mark any assumption you couldn't verify so `dev-plan-review` can challenge it.
-6. **Write the plan to disk** under `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set), in a clear dated/feature-named file. It's an artifact others read — make it self-contained.
+6. **Write the plan to disk** under `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set), named `<feature-slug>-MM-DD-YY.md` per `plan-format` (slug first, then date). It's an artifact others read — make it self-contained.
 
 ## Plan contents (checklist)
 
+- Phase syllabus at the top: one checkbox per phase, title only — no detail.
 - Goal and scope (in, and explicitly out).
 - Stack + MAJOR versions, with the source you verified them from.
 - Conventions to enforce, as hard constraints.
-- Ordered task list: each with files touched, pattern/example to follow, acceptance criteria, test approach.
+- Phased task list, numbered `<phase>.<task>`: each with files touched, pattern/example to follow, acceptance criteria, test approach.
 - Risks, open questions, decision points (with options).
 - Which agent skills execute which parts.
+- **NEVER time estimates** — no durations, effort estimates, story points, or delivery dates; you always get them wrong. Express sequencing through task order and dependencies only.
 
 ## Hand-off / next
 

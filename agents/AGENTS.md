@@ -36,11 +36,13 @@ Behavioral rules are individual files (`type: rule`) loaded as **always-on
 context**. Each declares its scope via `domain`:
 
 - **Universal** ([`rules/`](rules/)) — apply everywhere: `verify-dont-assume`,
-  `respect-versions-and-conventions`, `never-push`, `model-policy`,
-  `tech-agnostic`.
+  `respect-versions-and-conventions`, `push-policy`, `model-policy`,
+  `tech-agnostic`, plus the artifact conventions `artifact-locations`,
+  `doc-format`, `plan-format` (where docs/plans/worktrees live and how they
+  are named and structured).
 - **Workflow-scoped** — live with their workflow and apply when it is in play:
-  [`workflows/dev/rules/`](workflows/dev/rules/) (`plans-and-docs-locations`),
   [`workflows/delivery/rules/`](workflows/delivery/rules/) (`external-storage-cap`).
+  The dev workflow currently has none — its conventions are universal.
 
 Each skill names the rules it depends on in its `rules:` frontmatter field, so a
 tool can load them alongside the skill — universal rules are on regardless.

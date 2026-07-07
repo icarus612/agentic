@@ -3,7 +3,7 @@ name: dev-debug
 description: Diagnose and fix issues following plan patterns; may exit but prefers handing off to dev-code or dev-test.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, respect-versions-and-conventions, plans-and-docs-locations]
+rules: [verify-dont-assume, respect-versions-and-conventions, artifact-locations]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

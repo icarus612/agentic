@@ -4,7 +4,7 @@ description: Write all docs into the root /docs single source of truth, mirror p
 type: workflow
 domain: dev
 context: fork
-rules: [verify-dont-assume, never-push, plans-and-docs-locations]
+rules: [verify-dont-assume, push-policy, artifact-locations, doc-format]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -35,7 +35,7 @@ Both shapes also carry whether to record a changelog (commit, `docs/changelog`, 
 
 1. **Re-read the source-of-truth layout.** Open `docs/AGENTS.md` (or root `AGENTS.md`) and the existing `/docs` tree to learn the conventions already in use: naming, headings, how monorepo apps are split. Match the existing style instead of inventing one.
 
-2. **Confirm what changed.** Check the plan in `/project-plans/`, the dev-code-review outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during dev-code/dev-debug/dev-test, document what shipped. In a map-driven run there is no plan or diff — the dev-explore map is your ground truth; reconcile the existing `/docs` tree against it and add, update, or delete accordingly.
+2. **Confirm what changed, then mark the plan.** Check the plan in `/project-plans/`, the dev-code-review outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during dev-code/dev-debug/dev-test, document what shipped. Then update the plan itself: in the high-level syllabus check off (`- [x]`) the phases now complete and annotate abandoned ones as `- [dropped]`, and annotate any task that was dropped or changed in the phase sections — the syllabus must reflect reality just like the docs do. In a map-driven run there is no plan or diff — the dev-explore map is your ground truth; reconcile the existing `/docs` tree against it and add, update, or delete accordingly.
 
 3. **Mirror the project structure inside `/docs`.** The docs tree reflects the source tree:
    - Single project: write into `/docs` directly (e.g. `docs/README.md`, `docs/architecture.md`, topic files).
@@ -59,7 +59,7 @@ Both shapes also carry whether to record a changelog (commit, `docs/changelog`, 
 
 ## Hand-off / next
 
-dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. `dev-start`, `dev-map`) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
+dev-document is the end of the workflow. Report a concise summary of what was documented (paths under `/docs`), which plan syllabus items were checked off or annotated, any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. `dev-start`, `dev-map`) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to dev-code-review or the dev-code/dev-debug/dev-test loop — rather than papering over it in prose.
 
 Return contract: as a fork your final report IS the hand-off — return exactly what was written and committed (docs paths, symlinks, changelog/commit outcome) to the caller (`dev-start` or the main conversation); any loop-back is a recommendation in that report, not a phase you invoke yourself.
 

@@ -3,7 +3,7 @@ name: delivery-drive-archive
 description: Offload large or binary artifacts to Google Drive and return shareable links so Confluence/Jira only hold text.
 type: workflow
 domain: delivery
-rules: [external-storage-cap, never-push]
+rules: [external-storage-cap, push-policy]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

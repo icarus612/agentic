@@ -3,7 +3,7 @@ name: delivery-post-changelog
 description: Promote dev's local docs/changelog into a Confluence changelog page for this change, linking the story page and Jira ticket(s)
 type: workflow
 domain: delivery
-rules: [never-push, external-storage-cap]
+rules: [push-policy, external-storage-cap]
 model: sonnet
 model-fallback: [gemini-pro]
 ---

@@ -3,7 +3,7 @@ name: dev-map
 description: Orchestrate a documentation-only run — a deep dev-explore followed by a map-driven dev-document — to bootstrap or refresh root /docs when there is no code change to record.
 type: workflow
 domain: dev
-rules: [verify-dont-assume, model-policy, plans-and-docs-locations]
+rules: [verify-dont-assume, model-policy, artifact-locations, doc-format]
 model: opus
 model-fallback: [sonnet, gemini-pro]
 ---

@@ -3,7 +3,7 @@ name: delivery-post-confluence
 description: Publish Confluence page(s) documenting the technical work plus the original ask and story narrative after implementation.
 type: workflow
 domain: delivery
-rules: [verify-dont-assume, never-push, external-storage-cap]
+rules: [verify-dont-assume, push-policy, external-storage-cap]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
