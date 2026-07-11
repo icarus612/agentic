@@ -39,7 +39,7 @@ Drive these phases in order. "Repeat" means you may loop back to ANY earlier ste
 5. **`code` / `debug` / `test`** — build the plan as a tight loop (see loop rules below).
 6. **`review-code`** — verify the implementation, same verify-don't-assume discipline. May loop back to ANY earlier phase. Repeat until clean.
 7. **`document-local`** — write everything into the ROOT `/docs` (mirror project structure), and optionally record a changelog (git commit only, never push; and/or `docs/changelog`).
-8. **`push-branch`** — publish the workflow branch and tear down the worktree; ONLY runs when everything else is COMPLETELY done.
+8. **`push-pr`** — publish the workflow branch, open a pull request against the base branch, and tear down the worktree; ONLY runs when everything else is COMPLETELY done.
 
 ## How it works
 
@@ -56,7 +56,7 @@ Drive these phases in order. "Repeat" means you may loop back to ANY earlier ste
    Let the subagent run the loop; only surface blockers or the completion summary back to yourself.
 8. **Code review.** Invoke the **`review-code`** skill directly via the Skill tool — it is a `context: fork` skill that runs in its own subagent. Pass the plan path and the build summary as args. Same verify-don't-assume rigor as the plan review. The fork returns a structured verdict report; present it to the user, collect approve/revise, and from here you may loop back to ANY previous phase (code/debug/test, plan, or explore) if something feels off — re-invoke the earlier skill yourself with the corrections as args. Repeat until the review is clean.
 9. **Document (& log).** Invoke the **`document-local`** skill directly via the Skill tool — it is a `context: fork` skill that runs in its own subagent and returns a summary. Pass as args the plan path, the build/review summary, and the changelog preference. It writes into ROOT `/docs`, mirroring project structure (monorepo → `docs/apps/[project]`, etc.), keeping `/docs` as the single source of truth. Optionally record the changelog as a git commit (`git add` + `git commit` ONLY, NEVER push), in `docs/changelog`, or both.
-10. **Finish (& tear down).** Invoke the **`push-branch`** skill directly via the Skill tool — it is a `context: fork` skill that runs in its own subagent. Pass as args the worktree path, the branch name, and confirmation the workflow is completely done. It commits any straggler artifacts, pushes the workflow branch (`git push` may be permission-blocked — a blocked push is a valid reported outcome, never worked around), and removes the worktree. The `dev` orchestrator is NOT done until `push-branch` reports.
+10. **Finish (& tear down).** Invoke the **`push-pr`** skill directly via the Skill tool — it is a `context: fork` skill that runs in its own subagent. Pass as args the worktree path, the branch name, the base branch, a short work summary for the PR, and confirmation the workflow is completely done. It commits any straggler artifacts, pushes the workflow branch and opens a pull request against the base branch (`git push` and PR creation may be permission-blocked or declined — a blocked push or declined PR is a valid reported outcome, never worked around), and removes the worktree. The `dev` orchestrator is NOT done until `push-pr` reports. If the user wants an independent review of the opened PR, invoke the **`review-pr`** skill with the PR URL afterwards.
 
 ## Context management
 
@@ -69,9 +69,9 @@ Drive these phases in order. "Repeat" means you may loop back to ANY earlier ste
 
 ## Hand-off / next
 
-- The `dev` orchestrator runs workflow setup, then invokes, in order: **`explore`** → **`init-workspace`** → **`plan`** → **`review-plan`** → **`code`** (which loops with **`debug`** and **`test`**) → **`review-code`** → **`document-local`** → **`push-branch`**.
+- The `dev` orchestrator runs workflow setup, then invokes, in order: **`explore`** → **`init-workspace`** → **`plan`** → **`review-plan`** → **`code`** (which loops with **`debug`** and **`test`**) → **`review-code`** → **`document-local`** → **`push-pr`**.
 - Loop-back points: `review-plan` → `explore`/`plan`; `review-code` → any earlier phase. Resume forward after each loop.
-- The run ends after **`push-branch`** has published the workflow branch (or reported the push blocked) and torn down the worktree, following a clean code review and completed docs.
+- The run ends after **`push-pr`** has published the workflow branch and opened the PR (or reported them blocked/declined) and torn down the worktree, following a clean code review and completed docs. An optional **`review-pr`** pass on the opened PR follows only when the user asks for one.
 
 ## Notes
 

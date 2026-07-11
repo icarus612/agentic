@@ -41,15 +41,19 @@ when something is off, then resume forward.
 7. **`document-local`** — write technical docs into root `/docs` (single source
    of truth; in-project paths symlink in). Optional changelog: `git add` + `git
    commit` only — never push.
-8. **`push-branch`** — terminal phase: commit stragglers, push the workflow
-   branch (always asking first), tear down the worktree.
+8. **`push-pr`** — terminal phase: commit stragglers, push the workflow
+   branch and open a pull request against the base branch (always asking
+   first), tear down the worktree.
+9. **`review-pr`** — review a GitHub PR (the one `push-pr` opened, or any the
+   user points at): fetch the real diff, verify against plan and conventions,
+   return a structured verdict; posts comments only on explicit instruction.
 
 - **`dev`** — the orchestrator (`/dev`). Drives the whole pipeline and the
   loop-backs, and acts as context manager: Opus for itself, Sonnet worker agents
   (Opus for the `plan` skill), tracks the current step, surfaces only blockers
   and completion summaries. For a single phase, invoke that skill directly.
 - **`map`** — the documentation-only orchestrator (`/map`): a deep `explore`,
-  `init-workspace`, a map-driven `document-local`, then `push-branch`, on a
+  `init-workspace`, a map-driven `document-local`, then `push-pr`, on a
   dedicated `feature/{re,}map-repo` branch.
 
 > Story/narrative documentation and ticket linking are **not** here — that's the
