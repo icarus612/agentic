@@ -1,60 +1,57 @@
 # Stack layers
 
-`agents/stacks/<tech>/` is the third composition layer — tech-specific
+`skills/stacks/<tech>/` is the third composition layer — tech-specific
 conventions that apply on top of the universal rules and whichever workflow is
 in play (see [`architecture.md`](architecture.md#2-layered-scope)). Each stack
 directory follows the same shape:
 
 ```
-stacks/<tech>/
-├── AGENTS.md         # stack guide (currently a stub for every stack)
-└── skills/.gitkeep   # placeholder — no stack skills authored yet
+skills/stacks/<tech>/
+├── AGENTS.md         # stack guide (conventions, tooling, defaults)
+├── rules/            # stack-scoped always-on rules (type: rule, domain: <tech>)
+└── skills/           # stack skills (type: stack, domain: <tech>)
 ```
 
-## Status: all placeholders
+## Status
 
-Every one of the 10 stack `AGENTS.md` files currently contains the literal
-same stub — verified by reading each file:
+Five stacks have real content; six are still placeholder stubs (an `AGENTS.md`
+containing only a `_TODO` line):
 
-```markdown
-# <Stack> — stack instructions
+| Stack | Path | Status | Rules | Skills |
+|---|---|---|---|---|
+| Godot | `skills/stacks/godot/` | **real** | `gdscript-standards` | `generate-hex-neighbors`, `run-godot-test` |
+| JavaScript / Node (generic) | `skills/stacks/javascript/node/generic/` | **real** | `code-quality`, `typescript-strict` | `type-safely` |
+| JavaScript / Styles | `skills/stacks/javascript/styles/` | **real** | `animation-performance`, `mobile-first` | `build-responsive-layout`, `style-with-tailwind` |
+| JavaScript / Svelte | `skills/stacks/javascript/svelte/` | **real** | `accessibility`, `component-testing`, `use-runes` | `add-seo-metadata`, `create-sveltekit-route`, `write-component-test`, `write-svelte-component` |
+| Python / Django | `skills/stacks/python/django/` | **real** | `django-conventions`, `security` | `create-django-resource` |
+| Bash | `skills/stacks/bash/` | stub | — | — |
+| Git | `skills/stacks/git/` | stub | — | — |
+| Go | `skills/stacks/go/` | stub | — | — |
+| JavaScript / React | `skills/stacks/javascript/react/` | stub | — | — |
+| Python (generic) | `skills/stacks/python/generic/` | stub | — | — |
+| Python / FastAPI | `skills/stacks/python/fastapi/` | stub | — | — |
 
-Conventions, tooling, and defaults for any <stack> project.
+## Naming
 
-_TODO: add conventions for this stack._
-```
+Stack skills are verb-first imperatives (`write-svelte-component`,
+`type-safely`, `run-godot-test`) — unlike dev workflow phase skills, they are
+meant to be matched by description whenever their tech is in play, so their
+names and descriptions lead with the action.
 
-| Stack | Path | Status |
-|---|---|---|
-| Bash | `agents/stacks/bash/` | stub |
-| Git | `agents/stacks/git/` | stub |
-| Go | `agents/stacks/go/` | stub |
-| JavaScript / Node (generic) | `agents/stacks/javascript/node/generic/` | stub |
-| JavaScript / React | `agents/stacks/javascript/react/` | stub |
-| JavaScript / Styles | `agents/stacks/javascript/styles/` | stub |
-| JavaScript / Svelte | `agents/stacks/javascript/svelte/` | stub |
-| Python (generic) | `agents/stacks/python/generic/` | stub |
-| Python / Django | `agents/stacks/python/django/` | stub |
-| Python / FastAPI | `agents/stacks/python/fastapi/` | stub |
+## Why stubs are listed as example ecosystems, not commitments
 
-No `skills/<name>/SKILL.md` exists under any stack yet — only the empty
-`skills/.gitkeep` placeholder, so there are no stack-specific skills to select
-by `description` at this time.
-
-## Why they're listed as example ecosystems, not commitments
-
-The stack names above (Python/Django/FastAPI, JavaScript/Node/React/Svelte/
-Tailwind-family styles, Go, Bash, Git) are placeholder categories the repo has
-already scaffolded folders for — they are not evidence any of them is
-prioritized or "the" supported stack list. Per the `tech-agnostic` universal
-rule (`agents/rules/tech-agnostic.md`), any technology named in a skill body is
+The stub stack names are placeholder categories the repo has scaffolded
+folders for — they are not evidence any of them is prioritized or "the"
+supported stack list. Per the `tech-agnostic` universal rule
+(`rules/tech-agnostic.md`), any technology named in a skill body is
 illustrative only; real stack conventions belong exclusively in
-`agents/stacks/<tech>/` once written.
+`skills/stacks/<tech>/` once written.
 
 ## Adding real content to a stack
 
-Per the contribution convention (`agents/README.md`, summarized in
-[`conventions.md`](conventions.md#contribution-convention)): fill in the
-stack's `AGENTS.md` with real conventions/tooling defaults, and add
-`skills/<name>/SKILL.md` files with `type: stack`, `domain: <tech>` frontmatter
-as needed — into `agents/stacks/<tech>/` directly, never into `tools/`.
+Per the contribution convention
+([`conventions.md`](conventions.md#contribution-convention)): fill in the
+stack's `AGENTS.md` with real conventions/tooling defaults, add
+`rules/<name>.md` files for always-on constraints, and add
+`skills/<name>/SKILL.md` files with `type: stack`, `domain: <tech>`
+frontmatter as needed — into `skills/stacks/<tech>/` directly.
