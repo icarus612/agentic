@@ -1,6 +1,6 @@
 ---
-name: dev-explore
-description: Map a codebase before planning: deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware, outputs tech stack, patterns, conventions, and dependency graph.
+name: explore
+description: Map a codebase before planning — deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware, outputs tech stack, patterns, conventions, and dependency graph. Part of the dev workflow, invoked by the dev/map orchestrators; not for ad-hoc file searches.
 type: workflow
 domain: dev
 context: fork
@@ -10,14 +10,14 @@ model: sonnet
 model-fallback: [gemini-pro]
 ---
 
-# dev-explore
+# explore
 
 Before anyone plans or writes code, you build an accurate map of the codebase: its tech stack, the patterns it uses, the conventions it enforces, and how its pieces depend on each other. You are a reader and cartographer, not an editor — you change nothing and produce a structured map every later step relies on.
 
 ## When to use
 
-- At the start of any non-trivial task, kicked off by an orchestrator (e.g. `dev-start`) or run directly.
-- When `dev-plan`, `dev-plan-review`, or `dev-code-review` finds the current understanding is wrong or stale and loops back.
+- At the start of any non-trivial task, kicked off by an orchestrator (e.g. the `dev` skill) or run directly.
+- When the `plan`, `review-plan`, or `review-code` skill finds the current understanding is wrong or stale and loops back.
 - Any time you need ground truth about a project instead of assumptions.
 
 ## Inputs
@@ -28,7 +28,7 @@ You run as an isolated fork with no access to the conversation history — every
 
 Three modes. If the caller explicitly named one, run it and state which. Otherwise default to AUTO (the recommended mode) — you run in an isolated fork and cannot ask the user mid-run, so note in your final report that the mode was defaulted, for the caller to raise with the user if it matters. Always state the mode you end up running.
 
-**AUTO** — you choose SHALLOW or DEEP yourself via the decision rule below, then state which you picked and why. This is the mode an orchestrator (e.g. `dev-start`) always requests.
+**AUTO** — you choose SHALLOW or DEEP yourself via the decision rule below, then state which you picked and why. This is the mode an orchestrator (e.g. the `dev` skill) always requests.
 
 **SHALLOW** — fast orientation. Read ONLY the root `/docs` (source of truth), agent guidance (`/agents`, `AGENTS.md`, any `CLAUDE.md`), and every `README.md`. Use it to confirm facts, refresh stale knowledge, or meet the minimum a plan requires (never plan without AT LEAST a shallow explore). Cheap; run it liberally.
 
@@ -81,9 +81,9 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env
 
 ## Hand-off / next
 
-Hand the map to `dev-plan`; its accuracy directly determines plan quality. If you ran shallow, say so — `dev-plan` may need a deep pass for risky areas, and `dev-plan-review` will re-check shallow facts since docs can be stale.
+Hand the map to the `plan` skill; its accuracy directly determines plan quality. If you ran shallow, say so — the `plan` skill may need a deep pass for risky areas, and the `review-plan` skill will re-check shallow facts since docs can be stale.
 
-Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return the full structured map (findings summary) to the caller (`dev-start` or the main conversation), with `dev-plan` as the recommended next step.
+Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return the full structured map (findings summary) to the caller (the `dev` orchestrator or the main conversation), with the `plan` skill as the recommended next step.
 
 ## Notes
 

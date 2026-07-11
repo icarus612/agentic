@@ -5,7 +5,7 @@
 #   workflow-setup.sh [--name <name>] [--base <branch>] [--type <type>] [--reuse]
 #
 # DESCRIPTION
-#   Invoked by orchestrator skills (dev-start, dev-map), NOT a hook. Worktrees
+#   Invoked by orchestrator skills (dev, map), NOT a hook. Worktrees
 #   go in .workflows/, or in CLAUDE_WORKFLOWS_DIR if that env var is set (via
 #   the project's .claude/settings.json env block). Makes sure the dir is
 #   gitignored and creates a worktree on branch <type>/<name> off the base

@@ -6,8 +6,8 @@
 # straight from git diff (committed since base + staged + unstaged) — no
 # per-session state, no locking, no PostToolUse recorder.
 #
-# Wired via frontmatter hooks on the dev-start skill (Stop) and the
-# dev-builder agent (Stop → SubagentStop), so it only runs while the dev
+# Wired via frontmatter hooks on the dev skill (Stop) and the
+# builder agent (Stop → SubagentStop), so it only runs while the dev
 # workflow is active.
 #
 # EXIT CODES

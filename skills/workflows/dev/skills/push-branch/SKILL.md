@@ -1,6 +1,6 @@
 ---
-name: dev-finish
-description: Terminal phase: commit and push the workflow branch (always asking for confirmation first), then tear down the workflow worktree once everything is published. Never force-pushes, never pushes main.
+name: push-branch
+description: Terminal phase of the dev workflow — commit and push the workflow branch (always asking for confirmation first), then tear down the workflow worktree once everything is published. Never force-pushes, never pushes main. Invoked by the dev/map orchestrators.
 type: workflow
 domain: dev
 context: fork
@@ -9,15 +9,15 @@ model: sonnet
 model-fallback: [gemini-pro]
 ---
 
-# dev-finish
+# push-branch
 
 You close out a completed workflow run. Your job is to make sure every artifact is committed on the workflow branch, publish that branch, and remove the worktree so the workflows dir stays clean. You run as an isolated fork.
 
 ## When to use
 
-- Only after the full workflow has completed: dev-document has run and dev-code-review is clean.
+- Only after the full workflow has completed: the document phase has run and the `review-code` gate is clean.
 - Standalone, to publish and tear down a workflow worktree that already finished but was left in place.
-- NEVER mid-workflow — if dev-document or dev-code-review hasn't finished, this is the wrong phase.
+- NEVER mid-workflow — if the document phase or the `review-code` gate hasn't finished, this is the wrong phase.
 
 ## Inputs
 
@@ -32,7 +32,7 @@ You run as an isolated fork with no access to the conversation history — every
 
 ## Hand-off / next
 
-dev-finish ends the workflow — nothing follows. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made.
+The `push-branch` skill ends the workflow — nothing follows. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made.
 
 ## Notes
 

@@ -1,6 +1,6 @@
 ---
-name: dev-init
-description: Set up the project toolchain and dependencies inside the workflow worktree (package manager install, language envs) so later phases can build and test.
+name: init-workspace
+description: Set up the project toolchain and dependencies inside the workflow worktree (package manager install, language envs) so later phases can build and test. Part of the dev workflow, invoked by the dev/map orchestrators; not the built-in /init command.
 type: workflow
 domain: dev
 context: fork
@@ -9,13 +9,13 @@ model: sonnet
 model-fallback: [gemini-pro]
 ---
 
-# dev-init
+# init-workspace
 
 You make the project runnable. Before anyone verifies a plan or writes code, you install dependencies and set up language toolchains inside the workflow worktree so plan verification, the build loop, and tests all work. You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args.
 
 ## When to use
 
-- Right after `dev-explore` in the orchestrated workflow (`dev-start`), once the stack is mapped and before `dev-plan`.
+- Right after the `explore` skill in the orchestrated workflow (the `dev` skill), once the stack is mapped and before the `plan` skill runs.
 - Standalone, whenever a fresh checkout or worktree needs its toolchain set up.
 
 ## Inputs
@@ -36,10 +36,10 @@ Detect from the real manifests, don't assume — every tool named below is an ex
 
 ## Hand-off / next
 
-Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return what was detected (stack, versions), what was installed or created (package manager used, versions, `.venv` path, etc.), and anything that failed or was skipped and why. Recommended next step: `dev-plan` (orchestrated) or whatever the caller was doing.
+Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return what was detected (stack, versions), what was installed or created (package manager used, versions, `.venv` path, etc.), and anything that failed or was skipped and why. Recommended next step: the `plan` skill (orchestrated) or whatever the caller was doing.
 
 ## Notes
 
 - Never modify manifests or lockfiles — setup only, no upgrades, no regeneration.
 - Never install global tools without flagging it clearly in your report.
-- If the stack can't be determined from the manifests, say so plainly and recommend a deeper `dev-explore` rather than guessing at a toolchain.
+- If the stack can't be determined from the manifests, say so plainly and recommend a deeper run of the `explore` skill rather than guessing at a toolchain.
