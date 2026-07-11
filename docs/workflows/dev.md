@@ -37,7 +37,7 @@ when something is off, then resume forward.
 | `dev-code-review` | sonnet → gemini-pro | fork | **Human gate.** Same no-assumptions discipline as plan-review; may loop back to **any** earlier phase. |
 | `dev-document` | sonnet → gemini-pro | fork | Writes technical docs into root `/docs` (mirroring project structure); optional changelog via `git add`+`git commit` (never push) and/or `docs/changelog`. This page and the rest of `agentic`'s own `/docs` tree were produced by this skill, in map-driven mode. |
 | `dev-finish` | sonnet → gemini-pro | fork | Terminal phase: commits stragglers, pushes the workflow branch (always asks first, never force-pushes, never pushes main), tears down the worktree. |
-| `dev-map` | opus → sonnet → gemini-pro | inline (small orchestrator) | Side-orchestrator for **doc-only** runs: forces `dev-explore` to DEEP mode, then invokes `dev-document` in map-driven mode (no plan, no diff — the map is ground truth). Not for documenting a change already built through the pipeline. |
+| `dev-map` | opus → sonnet → gemini-pro | inline (small orchestrator) | Side-orchestrator for **doc-only** runs: sets up a worktree on the fixed branch `feature/map-repo` (bootstrap) or `feature/remap-repo` (refresh) via `workflow-setup.sh --reuse` off a user-chosen base (main or current branch), forces `dev-explore` to DEEP mode, runs `dev-init`, invokes `dev-document` in map-driven mode (no plan, no diff — the map is ground truth), then `dev-finish` publishes and tears down. Not for documenting a change already built through the pipeline. |
 
 The `dev-code`/`dev-debug`/`dev-test` triad runs **inline inside one shared
 context** — the `dev-builder` sub-agent (`agents/workflows/dev/agents/dev-builder.md`)
@@ -49,12 +49,14 @@ handoff. It carries the same `Stop` hook as `dev-start`.
 Both are POSIX-ish Bash (`set -uo pipefail`), no dependency beyond common
 Unix tools, and apply to a **consuming** project, not to `agentic` itself:
 
-- **`workflow-setup.sh`** — invoked by `dev-start` (step 0), not a hook
-  itself. Creates a git worktree in `.workflows/` (or `CLAUDE_WORKFLOWS_DIR`),
-  ensures that dir is gitignored, and creates it on branch `<type>/<name>`
-  (`type` ∈ `feature|bug|hotfix`, default `feature`) off the base branch
-  (`--base`, else `main`, else `origin/HEAD`). Prints machine-readable
-  `WORKTREE`/`BRANCH`/`BASE` lines.
+- **`workflow-setup.sh`** — invoked by orchestrator skills (`dev-start` step 0,
+  `dev-map`), not a hook itself. Creates a git worktree in `.workflows/` (or
+  `CLAUDE_WORKFLOWS_DIR`), ensures that dir is gitignored, and creates it on
+  branch `<type>/<name>` (`type` ∈ `feature|bug|hotfix`, default `feature`)
+  off the base branch (`--base`, else `main`, else `origin/HEAD`). With
+  `--reuse`, an existing branch is picked up instead of erroring and the base
+  is merged into it (conflicts abort the setup cleanly). Prints
+  machine-readable `WORKTREE`/`BRANCH`/`BASE`/`REUSED` lines.
 - **`workflow-diff-check.sh`** — wired via frontmatter `hooks:` on `dev-start`
   (`Stop`) and `dev-builder` (`Stop`/`SubagentStop`). Diffs the workflow
   branch against its merge-base (committed + staged + unstaged + untracked),

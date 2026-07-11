@@ -108,8 +108,10 @@ This is a documentation/prompt dependency graph, not a code import graph —
   `dev-code` ⇄ `dev-debug` ⇄ `dev-test` loop (only `dev-test` breaks it) →
   `dev-code-review` (human gate, loops to any earlier phase) → `dev-document`
   → `dev-finish` (push + `workflow-diff-check.sh`-gated teardown).
-  `dev-map` is a side-orchestrator chaining only `dev-explore` (forced DEEP) →
-  `dev-document` (map-driven) for doc-only bootstrap/refresh runs — this docs
+  `dev-map` is a side-orchestrator for doc-only bootstrap/refresh runs:
+  `workflow-setup.sh --reuse` (worktree on the fixed branch `feature/map-repo`
+  or `feature/remap-repo`, base merged in on reuse) → `dev-explore` (forced
+  DEEP) → `dev-init` → `dev-document` (map-driven) → `dev-finish` — this docs
   tree was produced by exactly that path.
 - **`delivery` workflow** wraps `dev`: `delivery-start` → `delivery-connect` →
   `delivery-pre-requirements` → **`dev-start`** (the full dev pipeline
