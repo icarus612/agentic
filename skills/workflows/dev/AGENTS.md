@@ -38,9 +38,14 @@ when something is off, then resume forward.
    - The `test` skill is the only skill that can break the loop.
 6. **`review-code`** — verify the implementation (same no-assumptions
    discipline). May loop back to **any** earlier phase.
-7. **`document-local`** — write technical docs into root `/docs` (single source
-   of truth; in-project paths symlink in). Optional changelog: `git add` + `git
-   commit` only — never push.
+7. **`document-local`** / **`document-confluence`** — the documentation phase,
+   dispatched by `CLAUDE_DOCS_DIR`. A local path (default `/docs`) →
+   `document-local` writes technical docs into root `/docs` (single source of
+   truth; in-project paths symlink in; optional changelog: `git add` + `git
+   commit` only — never push). A Confluence location → `document-confluence`
+   publishes the story + technical page, changelog page, and bidirectional
+   Jira links there (Confluence is the source of truth; large artifacts go to
+   Google Drive per `external-storage-cap`).
 8. **`push-pr`** — terminal phase: commit stragglers, push the workflow
    branch and open a pull request against the base branch (always asking
    first), tear down the worktree.
@@ -56,11 +61,15 @@ when something is off, then resume forward.
   `init-workspace`, a map-driven `document-local`, then `push-pr`, on a
   dedicated `feature/{re,}map-repo` branch.
 
-> Story/narrative documentation and ticket linking are **not** here — that's the
-> [`delivery`](../delivery/AGENTS.md) workflow, which brackets this one.
+> Story/narrative capture and ticket linking live in the Confluence path: the
+> `dev` orchestrator captures requirements up front when `CLAUDE_DOCS_DIR`
+> names a Confluence location, and `document-confluence` publishes and links
+> them at the end.
 
 Rules: the artifact conventions this workflow relies on — `artifact-locations`
-(where docs/plans/worktrees live), `plan-format`, and `doc-format` (how they are
-named and structured) — are universal rules in [`../../rules/`](../../rules/);
-the workflow has no dev-scoped rules of its own. Each skill lists the rules it
-needs in its `rules:` frontmatter.
+(where docs/plans/worktrees live, and the docs-target dispatch), `plan-format`,
+and `doc-format` (how they are named and structured) — are universal rules in
+[`../../../rules/`](../../../rules/). One workflow-scoped rule lives in
+[`rules/`](rules/): `external-storage-cap` (Atlassian holds text + links only;
+bytes go to Google Drive), used by `document-confluence`. Each skill lists the
+rules it needs in its `rules:` frontmatter.

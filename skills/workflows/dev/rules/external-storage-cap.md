@@ -2,7 +2,7 @@
 name: external-storage-cap
 description: Large/binary artifacts go to Google Drive; Jira/Confluence keep only text + links.
 type: rule
-domain: delivery
+domain: dev
 ---
 
 # External storage cap
