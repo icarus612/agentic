@@ -1,6 +1,6 @@
 ---
 name: dev
-description: Entry-point orchestrator for the dev workflow — drives the full explore→plan→review-plan→code/debug/test→review-code→document→push-branch pipeline and manages context. Invoke as /dev to run the whole workflow on a feature, fix, or project.
+description: Entry-point orchestrator for the dev workflow — drives the full explore→plan→review-plan→code/debug/test→review-code→document→push-pr pipeline and manages context. Invoke as /dev to run the whole workflow on a feature, fix, or project.
 type: workflow
 domain: dev
 rules: [verify-dont-assume, model-policy, artifact-locations]
