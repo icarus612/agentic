@@ -25,16 +25,24 @@ agentic/
 Every skill and rule declares exactly one field, and its value is what the
 thing is bound to:
 
-| `domain:` | Bound to | Installs to |
-|---|---|---|
-| `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (or `.agent/`) |
-| `<tech>` (`svelte`, `django`, `confluence`, …) | that one technology or service | **project level**: the consuming project's `.claude/` or `.agent/` |
+| `domain:` | Bound to | Lives in | Installs to |
+|---|---|---|---|
+| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.claude/` (or `.agent/`) |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.claude/` / `.agent/` |
+| `<project-name>` (`mythic-made`, …) | one project — its brand tokens, its layout | **that project only** | it's already there |
 
 Everything in `orchestrators/` and `generic/` is `domain: universal` — it goes
 in once, globally, and is available everywhere. Everything under
 `tool-based/<tech>/` is `domain: <tech>` — it ships with the projects that
 actually use that tech, discovered from real manifests, never assumed
 (`tech-agnostic`).
+
+`domain: <project-name>` is the escape hatch for what is genuinely irreducible —
+a brand's colour tokens, a monorepo's own directory layout. **This repo never
+contains it**; the value exists so project-local content is still classified
+rather than unlabelled. If something with a project domain turns out to be a
+reusable pattern, that's a signal to promote it to a `<tech>` layer here and
+leave only the residue behind.
 
 The install target is **flat** (`skills/<name>/SKILL.md`), so this repo's
 folders do not survive it. That's the point of `domain:` — it is the only thing

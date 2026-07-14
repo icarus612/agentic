@@ -14,8 +14,14 @@ the thing is bound to, and that decides where it installs:
   phase skill, every always-on rule. Installs at **user level** (`~/.claude/`
   or `.agent/`).
 - **`domain: <tech>`** — bound to one technology or service (`svelte`,
-  `tailwind`, `typescript`, `django`, `godot`, `confluence`, …). Installs at
-  **project level**, with the project that uses that tech.
+  `tailwind`, `typescript`, `django`, `godot`, `medusa`, `confluence`, …).
+  Installs at **project level**, with the project that uses that tech.
+- **`domain: <project-name>`** — bound to one project (`mythic-made`, …). Its
+  brand tokens, its own directory layout — content that can never be reused.
+  **This repo never contains it**; it lives only in that project's `.agent/`.
+  The value exists so project-local content is classified rather than
+  unlabelled. If something carrying a project domain turns out to be a reusable
+  pattern, promote it to a `<tech>` layer here and leave only the residue.
 
 There is no `type:` field. It was removed because it could only ever restate
 what the folder already said — and the folder does not survive the install,

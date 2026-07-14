@@ -12,7 +12,8 @@ decides where it installs:
 | `domain:` | Bound to | Installs to |
 |---|---|---|
 | `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (or `.agent/`) |
-| `<tech>` (`svelte`, `django`, `confluence`, …) | one technology or service | **project level**: that project's `.claude/` / `.agent/` |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | **project level**: that project's `.claude/` / `.agent/` |
+| `<project-name>` (`mythic-made`, …) | one project — brand tokens, its own layout | lives only in that project; **never in this repo** |
 
 `domain:` is the only classifier, and it's the only one that survives: the
 install target is flat (`skills/<name>/SKILL.md`), so this repo's folders
@@ -85,9 +86,11 @@ behaves identically across platforms with zero tooling.
 ## Contributing
 
 - Edit **here first**, never in `~/.claude/` — that's an install, not the source.
-- A skill is bound to nothing (`domain: universal`, goes in `orchestrators/` or
-  `generic/`) or to exactly one tech (`domain: <tech>`, goes in
-  `tool-based/<tech>/`). There is no third option.
+- A skill in THIS repo is bound to nothing (`domain: universal`, goes in
+  `orchestrators/` or `generic/`) or to exactly one tech (`domain: <tech>`, goes
+  in `tool-based/<tech>/`). A third value, `domain: <project-name>`, exists for
+  irreducibly project-local content — but that never lives here, only in the
+  project itself.
 - Every skill declares `description`, `domain`, `model` + `model-fallback`, and
   the `rules:` it depends on.
 - Keep rules short — they're always-on context.

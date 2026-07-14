@@ -1,6 +1,10 @@
 ---
 name: medusa-api
-description: Integrate with MedusaJS 2.x storefront API for products, cart, checkout, and authentication
+description: Integrate with the MedusaJS 2.x storefront API — products, cart, checkout, and authentication via the JS SDK. Use when wiring a storefront to a Medusa backend.
+domain: medusa
+rules: []
+model: sonnet
+model-fallback: [gemini-pro]
 ---
 
 # MedusaJS 2.x Storefront API

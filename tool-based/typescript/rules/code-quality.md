@@ -48,3 +48,11 @@ domain: typescript
 3. Relative imports (`./`, `../`).
 
 Separate each group with a blank line.
+
+## Import laws
+
+- **No deep relative paths.** Never climb more than one level (`../../../…`).
+  Use the project's path alias instead — that's what it exists for.
+- **No circular imports.** If two modules need each other, the shared logic
+  belongs in a third module. A cycle is a design error, not a bundler quirk to
+  work around.

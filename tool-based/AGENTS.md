@@ -24,11 +24,12 @@ tool-based/<tech>/
 
 | Tech | Rules | Skills |
 |---|---|---|
-| **`svelte`** | `use-runes`, `accessibility`, `component-testing` | `write-svelte-component`, `create-sveltekit-route`, `write-component-test`, `add-seo-metadata` |
+| **`svelte`** | `use-runes`, `accessibility`, `component-testing`, `server-boundaries` | `write-svelte-component`, `create-sveltekit-route`, `write-component-test`, `add-seo-metadata` |
 | **`tailwind`** | `mobile-first`, `animation-performance` | `style-with-tailwind`, `build-responsive-layout` |
 | **`typescript`** | `typescript-strict`, `code-quality` | `type-safely` |
 | **`django`** | `django-conventions`, `security` | `create-django-resource` |
 | **`godot`** | `gdscript-standards` | `generate-hex-neighbors`, `run-godot-test` |
+| **`medusa`** | — | `medusa-api` — MedusaJS 2.x storefront integration (products, cart, checkout, auth) |
 | **`confluence`** | `external-storage-cap` | `document-confluence` — the documentation phase when the docs target is a Confluence location: publishes the story + technical page and the changelog, links Jira bidirectionally, offloads large artifacts to Google Drive. Drives the Atlassian + Google Drive MCP servers. |
 
 ## Stubs (scaffolded, unwritten)
