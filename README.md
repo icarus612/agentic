@@ -1,107 +1,94 @@
 # agentic
 
-A **library** of AI-agent instructions and skills — a single source of truth you
-copy into your projects. It is **not** a project you run. Nothing here executes;
-you take pieces from it and drop them where your tool expects them (Claude Code
-first: `~/.claude/` or a project's `.claude/`).
+A **library** of AI-agent skills, rules, and hooks — a single source of truth
+you install into Claude Code. It is **not** a project you run. Nothing here
+executes; you copy pieces of it to where the tool expects them.
 
-## Two principles
+## The one question
 
-### 1. One source of truth, copy-paste distribution
+Everything is classified by **what it is bound to** — and that answer also
+decides where it installs:
 
-All content lives in this repo, organized by kind — `rules/`, `hooks/`, and
-`skills/` — and is **edited here only**. Consumers copy what they need into
-their tool's locations: skills into `~/.claude/skills/` (or a project's
-`.claude/skills/`), rules and the `AGENTS.md` guides into `CLAUDE.md`, hooks
-into `~/.claude/hooks/` (installed automatically by Nix home-manager in this
-user's setup). Copy-paste is intentional — chosen over symlinks or a setup
-script so it behaves identically on Linux, macOS, and Windows with zero tooling.
+| `domain:` | Bound to | Installs to |
+|---|---|---|
+| `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (or `.agent/`) |
+| `<tech>` (`svelte`, `django`, `confluence`, …) | one technology or service | **project level**: that project's `.claude/` / `.agent/` |
 
-### 2. Layered scope
-
-Content composes in layers, broadest to narrowest:
-
-```
-universal  ⊕  workflow(s)  ⊕  stack(s)  ⊕  project
-```
-
-- **universal** — applies everywhere (`AGENTS.md`, `rules/`)
-- **workflow** — a process you run (`skills/workflows/dev`)
-- **stack** — applies to a tech (`skills/stacks/python/…`, `…/javascript/svelte`)
-- **project** — applies to one repo; **lives in that repo**, not here
-
-To set up a project you pull in the universal rules + the workflow(s) and
-stack(s) you need, then add project-specific instructions locally.
+`domain:` is the only classifier, and it's the only one that survives: the
+install target is flat (`skills/<name>/SKILL.md`), so this repo's folders
+vanish. Nothing inside a skill or rule may reference this repo's layout.
 
 ## Directory map
 
 ```
 agentic/
-├── AGENTS.md                        # universal index + pointers
-├── rules/                           # universal rules (type: rule) — always-on context
-├── hooks/                           # generic quality hooks (smart-lint, smart-test, …)
-├── skills/
-│   ├── workflows/
-│   │   └── dev/                     # the build pipeline
-│   │       ├── AGENTS.md            # workflow guide
-│   │       ├── rules/               # workflow-scoped rules (external-storage-cap)
-│   │       ├── agents/              # builder (the build-loop sub-agent)
-│   │       ├── hooks/               # workflow-setup.sh, workflow-diff-check.sh
-│   │       └── skills/  → dev (/dev) and map (/map) orchestrate:
-│   │                     explore → init-workspace → plan → review-plan →
-│   │                     code ⇄ debug ⇄ test → review-code →
-│   │                     document-local | document-confluence → push-pr (⇢ review-pr)
-│   ├── stacks/                      # tech-specific layers (type: stack)
-│   │   ├── python/{generic,fastapi,django}/
-│   │   ├── javascript/{node/generic,react,svelte,styles}/
-│   │   └── godot/  go/  bash/  git/
-│   └── singletons/                  # standalone skills (orchestrate)
-└── docs/                            # meta-docs about this repo itself
+├── AGENTS.md                  # the index — read this first
+├── orchestrators/             # ENTRY POINTS the user invokes        (domain: universal)
+│   ├── skills/                #   dev (/dev), map (/map), orchestrate (/orchestrate)
+│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh
+│   └── agents/                #   builder.md — the build-loop sub-agent
+├── generic/                   # GLOBAL: bound to no technology       (domain: universal)
+│   ├── rules/                 #   the always-on set
+│   ├── skills/                #   explore, plan, code, debug, test, review-*, document-local, push-pr, …
+│   └── hooks/                 #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
+├── tool-based/                # bound to ONE technology              (domain: <tech>)
+│   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
+│       ├── rules/
+│       └── skills/
+└── docs/                      # meta-docs about this repo itself
 ```
 
-## Skills, rules, and hooks
+## The dev pipeline
 
-Three content kinds with a crisp separation (full spec:
-[`docs/conventions.md`](docs/conventions.md), rationale:
-[`docs/architecture.md`](docs/architecture.md)):
+`/dev` orchestrates the whole thing; every phase is a universal skill it
+invokes by name:
 
-- **Skills** — on-demand procedures (`skills/<name>/SKILL.md`, full
-  frontmatter). Entry-point orchestrators are user-invoked (`/dev`, `/map`,
-  `/orchestrate`); phase skills are invoked by name by an orchestrator and
-  their descriptions say so, so they never auto-fire on keyword overlap.
-- **Rules** — always-on constraints (`rules/<name>.md`, short,
-  frontmatter-light). Universal rules apply everywhere; workflow-scoped rules
-  live with their workflow.
-- **Hooks** — deterministic mechanical enforcement (shell, no judgment).
+```
+explore → init-workspace → plan → review-plan ⇄ (gate)
+   → code ⇄ debug ⇄ test → review-code ⇄ (gate)
+   → document-local | document-confluence → push-pr (⇢ review-pr)
+```
+
+Only `test` can break the build loop. Both gates can loop back to any earlier
+phase. `/map` runs the documentation-only variant. Details:
+[`orchestrators/AGENTS.md`](orchestrators/AGENTS.md).
+
+## Skills, rules, hooks
+
+- **Skills** — on-demand procedures. Selected by `description` or an explicit
+  `/name`, never by folder. Universal *phase* skills are invoked by name by an
+  orchestrator, so their descriptions say so — that guard is what stops
+  single-word skills (`plan`, `code`, `test`) auto-firing on a stray keyword.
+  Tech skills *are* meant to match whenever their tech is in play.
+- **Rules** — always-on constraints. Short, no procedure. If it must hold even
+  when nothing was invoked, it's a rule.
+- **Hooks** — deterministic mechanical enforcement (shell, no model judgment).
   Skill-scoped hooks wire via a skill's `hooks:` frontmatter; global quality
   hooks wire via `settings.json`.
 
-An agent selects a skill by `description`, **not** by folder — folders exist for
-**composition** (what you copy into a project) and **maintenance**. The `domain`
-field mirrors the folder.
+Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
+every time, mechanically"* → hook.
 
-## Usage (copy-paste)
+## Install
 
-1. Clone or download this repo.
-2. Copy the root `AGENTS.md`, the universal `rules/`, plus the
-   `skills/workflows/<wf>/AGENTS.md` and `skills/stacks/<tech>/AGENTS.md`
-   guides you need into your `CLAUDE.md` (project `./CLAUDE.md` or personal
-   `~/.claude/CLAUDE.md`).
-3. Copy the skill directories you want into `~/.claude/skills/<name>/` (or the
-   project's `.claude/skills/`), and `skills/workflows/dev/agents/builder.md`
-   into `~/.claude/agents/`.
-4. Hooks (`hooks/` and `skills/workflows/dev/hooks/`) install to
-   `~/.claude/hooks/` — automated via Nix home-manager in this setup; copy them
-   manually otherwise.
+1. Copy `orchestrators/skills/*` and `generic/skills/*` into `~/.claude/skills/`,
+   `orchestrators/agents/builder.md` into `~/.claude/agents/`, and
+   `generic/rules/*` into your `CLAUDE.md` context.
+2. Copy each `tool-based/<tech>/` layer your project uses into that **project's**
+   `.claude/` (or `.agent/`).
+3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` —
+   automated by Nix home-manager in this setup; copy them manually otherwise.
+
+Distribution is deliberately copy-paste, not symlinks or a setup script, so it
+behaves identically across platforms with zero tooling.
 
 ## Contributing
 
-- Edit content **here first**, never in `~/.claude/` — this repo is the source
-  of truth; installs are copies.
-- A process goes under `skills/workflows/<wf>/`, a tech under
-  `skills/stacks/<tech>/`, a standalone skill under `skills/singletons/`,
-  universal rules in `rules/`.
-- Give each skill a clear `description` (phase skills must name their workflow
-  in it), a `type` + `domain`, a `model` + `model-fallback`, and a `rules:`
-  list of the rules it depends on.
-- Keep rules short and frontmatter-light (they're always-on context).
+- Edit **here first**, never in `~/.claude/` — that's an install, not the source.
+- A skill is bound to nothing (`domain: universal`, goes in `orchestrators/` or
+  `generic/`) or to exactly one tech (`domain: <tech>`, goes in
+  `tool-based/<tech>/`). There is no third option.
+- Every skill declares `description`, `domain`, `model` + `model-fallback`, and
+  the `rules:` it depends on.
+- Keep rules short — they're always-on context.
+- Never let a skill or rule reference this repo's directory layout.

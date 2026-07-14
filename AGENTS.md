@@ -1,76 +1,72 @@
-# Agent instructions (universal)
+# Agent instructions (index)
 
-The index for this layer. Universal rules apply to **every** project, workflow,
-and stack; workflow and stack layers add to them, they never replace them.
-
-## Library layout
+The library is split by **what a thing is bound to** — nothing, or one
+technology. That single question also decides where it installs.
 
 ```
 agentic/
-├── AGENTS.md                  ← this file: index + pointers
-├── rules/                     ← universal rules (type: rule, domain: universal)
-├── hooks/                     ← generic quality hooks (smart-lint, smart-test, …)
-└── skills/
-    ├── workflows/<wf>/        ← process skills + rules (type: workflow)
-    │   ├── AGENTS.md          ← that workflow's guide
-    │   ├── rules/             ← workflow-scoped rules
-    │   ├── agents/            ← sub-agent definitions
-    │   ├── hooks/             ← workflow hook/helper scripts
-    │   └── skills/
-    ├── stacks/<tech>/         ← stack skills + rules (type: stack)
-    │   ├── AGENTS.md
-    │   ├── rules/
-    │   └── skills/
-    └── singletons/            ← standalone skills, no workflow/stack (type: singleton)
-        ├── AGENTS.md
-        └── <name>/SKILL.md
+├── AGENTS.md                  ← this file
+├── orchestrators/             ← ENTRY POINTS the user invokes
+│   ├── skills/                dev (/dev), map (/map), orchestrate (/orchestrate)
+│   ├── hooks/                 workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh
+│   └── agents/                builder.md (the build-loop sub-agent)
+├── generic/                   ← GLOBAL: bound to no technology
+│   ├── rules/                 the always-on set (verify-dont-assume, push-policy, …)
+│   ├── skills/                explore, plan, code, debug, test, review-*, document-local, push-pr, …
+│   └── hooks/                 smart-lint.sh, smart-test.sh, … (wired via settings.json)
+└── tool-based/                ← bound to ONE technology or service
+    └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
+        ├── rules/
+        └── skills/
 ```
 
-Each skill is a `skills/<name>/SKILL.md` with frontmatter. `type:` is
-**workflow**, **stack**, or **singleton**; `domain:` is the subcategory (`dev`,
-`python`, `singleton`, …). A skill is selected by its `description` (or an
-explicit `/name`) — folders are for composition and maintenance, not selection.
-Entry-point orchestrators are user-invoked (`/dev`, `/map`); phase skills are
-invoked by name by an orchestrator, and their descriptions say so.
+## `domain:` — the only classifier
 
-Workflows:
-- **`dev`** — explore → plan → review → build → review → document → PR. Two
-  entry points: `/dev` (full pipeline) and `/map` (documentation-only runs).
-  The documentation phase dispatches on `CLAUDE_DOCS_DIR`: local docs via
-  `document-local`, or Confluence publishing (story pages, changelog, Jira
-  links) via `document-confluence`. See
-  [`skills/workflows/dev/AGENTS.md`](skills/workflows/dev/AGENTS.md).
+Every skill and rule declares exactly one field, and its value is what the
+thing is bound to:
 
-Singletons ([`skills/singletons/`](skills/singletons/)) are standalone skills
-that belong to neither a workflow nor a stack — currently **`orchestrate`**, a
-generic task coordinator.
+| `domain:` | Bound to | Installs to |
+|---|---|---|
+| `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (or `.agent/`) |
+| `<tech>` (`svelte`, `django`, `confluence`, …) | that one technology or service | **project level**: the consuming project's `.claude/` or `.agent/` |
 
-## Rules
+Everything in `orchestrators/` and `generic/` is `domain: universal` — it goes
+in once, globally, and is available everywhere. Everything under
+`tool-based/<tech>/` is `domain: <tech>` — it ships with the projects that
+actually use that tech, discovered from real manifests, never assumed
+(`tech-agnostic`).
 
-Behavioral rules are individual files (`type: rule`) loaded as **always-on
-context**. Each declares its scope via `domain`:
+The install target is **flat** (`skills/<name>/SKILL.md`), so this repo's
+folders do not survive it. That's the point of `domain:` — it is the only thing
+that carries the binding once the tree is gone. **Nothing inside a skill or
+rule may reference this repo's layout**; they refer to each other by name and
+to bindings by `domain:`.
 
-- **Universal** ([`rules/`](rules/)) — apply everywhere: `verify-dont-assume`,
-  `respect-versions-and-conventions`, `push-policy`, `model-policy`,
-  `tech-agnostic`, plus the artifact conventions `artifact-locations`,
-  `doc-format`, `plan-format` (where docs/plans/worktrees live and how they
-  are named and structured).
-- **Workflow-scoped** — live with their workflow and apply when it is in play:
-  [`skills/workflows/dev/rules/`](skills/workflows/dev/rules/)
-  (`external-storage-cap`, used by `document-confluence`).
-- **Stack-scoped** — live with their stack under
-  `skills/stacks/<tech>/rules/` and apply when that tech is in play.
+## The three kinds
 
-Each skill names the rules it depends on in its `rules:` frontmatter field, so a
-tool can load them alongside the skill — universal rules are on regardless.
+- **Skills** — on-demand procedures, `skills/<name>/SKILL.md`. Selected by
+  `description` or an explicit `/name`, **never** by folder.
+  - *Orchestrators* are invoked by the user (`/dev`, `/map`, `/orchestrate`).
+  - *Universal phase skills* are invoked **by name by an orchestrator**, so each
+    description states the pipeline it belongs to — that guard is what stops
+    single-word skills (`plan`, `code`, `test`) auto-firing on a stray keyword.
+  - *Tech skills* **are** meant to match by description whenever their tech is
+    in play; their names are verb-first (`write-svelte-component`).
+- **Rules** — always-on constraints, `rules/<name>.md`, short and
+  frontmatter-light. No selection step. If it must hold even when nothing was
+  invoked, it's a rule. `domain: universal` rules are always on; `domain: <tech>`
+  rules are on whenever that tech is in play. Skills name what they need in
+  `rules:` frontmatter.
+- **Hooks** — deterministic mechanical enforcement (shell, no model judgment).
+  Skill-scoped hooks wire via a skill's/agent's `hooks:` frontmatter and run
+  only while that skill is active (`workflow-diff-check.sh`); global quality
+  hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
+  scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
+  the `~/.claude/hooks/` install path but are invoked explicitly, never wired.
 
-## Hooks
+Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
+every time, mechanically"* → hook.
 
-Hooks are deterministic, mechanical enforcement — shell scripts, no model
-judgment. Two wirings: **skill-scoped** hooks via a skill's or agent's `hooks:`
-frontmatter (active only while that skill runs, e.g. `workflow-diff-check.sh`
-on the `dev` skill and `builder` agent), and **global quality** hooks via
-`settings.json` ([`hooks/`](hooks/): `smart-lint.sh`, `smart-test.sh`, …).
-Helper scripts like `workflow-setup.sh` ride along in hook directories to share
-the `~/.claude/hooks/` install path but are invoked explicitly by skills, never
-wired as hooks.
+Guides: [`orchestrators/AGENTS.md`](orchestrators/AGENTS.md) (the dev pipeline),
+[`generic/AGENTS.md`](generic/AGENTS.md) (the global layer),
+[`tool-based/AGENTS.md`](tool-based/AGENTS.md) (the tech layers).
