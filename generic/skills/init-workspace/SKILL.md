@@ -26,7 +26,7 @@ Expect: the worktree/project path to set up, and the explore summary (or a point
 Detect from the real manifests, don't assume — every tool named below is an example only (tech-agnostic rule); use whatever the repo's own files establish.
 
 1. **Identify the stack per project/workspace.** For a monorepo, install once at the workspace root unless a package needs isolated setup.
-2. **Node** — the lockfile decides the package manager: `pnpm-lock.yaml` → `pnpm install`, `package-lock.json` → `npm ci` (fall back to `npm install`), `yarn.lock` → `yarn install`. No lockfile → prefer pnpm. Respect the workspace root; don't install per-package in a monorepo that hoists.
+2. **Node** — always `pnpm install`, per the typescript domain's `package-manager` rule. If the project already has a `package-lock.json` or `yarn.lock` instead of `pnpm-lock.yaml`, flag it and get confirmation before converting (removing the old lockfile and generating `pnpm-lock.yaml`) — don't silently delete a committed lockfile. Respect the workspace root; don't install per-package in a monorepo that hoists.
 3. **Go** — `go mod download`; note the Go version required by `go.mod` (and its `toolchain` directive if present).
 4. **Python** — create a `.venv` inside the project and install from `pyproject.toml`/`requirements.txt` via whichever tool the repo's own config indicates (uv, poetry, pip) — don't introduce a different one.
 5. **Other stacks** — follow whatever the repo's docs/manifests establish; if genuinely undetectable, say so rather than guessing.

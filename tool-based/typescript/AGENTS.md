@@ -14,6 +14,9 @@ unions; magic numbers become named constants.
   UPPER_SNAKE_CASE / kebab-case files); constants over magic numbers; handle
   errors at boundaries; no commented-out code or stray `console.log`; import
   ordering.
+- **package-manager** — pnpm only, always; never npm or yarn, even when an
+  existing lockfile says otherwise (flag and convert, don't defer — confirm
+  first on an established project).
 
 ## Skills
 - **type-safely** — procedures and examples for type guards, discriminated
