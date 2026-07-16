@@ -72,17 +72,24 @@ technical detail.
   workflows dir and base-branch resolution; `dev`/`map`/`sync-status` call it
   directly for the docs (and, for `sync-status`, plans) dir.
 - **`workflow-diff-check.sh`** — a real hook, wired via frontmatter `hooks:` on
-  the `dev` skill (`Stop`) and the `builder` agent (`Stop`/`SubagentStop`).
-  Diffs the workflow branch against its merge-base and runs the project's own
-  checks on the changed files; exit 2 blocks the stop until they pass.
+  the `dev` skill (`Stop`) only. Diffs the workflow branch against its
+  merge-base and runs the project's own checks on the changed files; exit 2
+  blocks the stop until they pass. Deliberately NOT wired on the `builder`
+  agent: builders run in parallel lanes sharing one worktree, so a
+  whole-worktree diff at one builder's stop would block on siblings' in-flight
+  changes — `dev` runs the checks per wave and at integration instead.
 
 ## Agents
 
-- **`builder`** — the build-loop sub-agent. Preloads `code`, `debug`, and
-  `test` so the handoff rules are in context before the first handoff, and runs
-  the triad **inline in one shared context** — the shared working state (edits,
-  errors, test output) surviving across handoffs is the whole point. Spawned by
-  `dev` via the Agent tool.
+- **`builder`** — the build-loop sub-agent, one per plan **lane**. Preloads
+  `code`, `debug`, and `test` so the handoff rules are in context before the
+  first handoff, and runs the triad **inline in one shared context** — the
+  shared working state (edits, errors, test output) surviving across handoffs
+  is the whole point. Spawned by `dev` via the Agent tool, in parallel waves
+  scheduled from the plan's syllabus (one builder per lane, cap 5 per wave);
+  each builder owns its lane's subphases and file scope, never touches files
+  outside it, and never edits the plan file — `dev` ticks the syllabus from
+  builder reports.
 
 Rules: the always-on set lives in [`../generic/rules/`](../generic/rules/)
 (`artifact-locations` for where docs/plans/worktrees live and how the docs

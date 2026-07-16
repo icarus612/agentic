@@ -97,8 +97,9 @@ off to" or "is composed with."
 - **`dev`** (`/dev`) resolves the docs target, captures the story when it names
   Confluence, creates a worktree via `workflow-setup.sh`, then drives:
   `explore` → `init-workspace` → `plan` → `review-plan` (gate; loops to
-  explore/plan) → a `builder` sub-agent wrapping `code` ⇄ `debug` ⇄ `test`
-  (only `test` breaks it) → `review-code` (gate; loops to any earlier phase) →
+  explore/plan) → `builder` sub-agents each wrapping `code` ⇄ `debug` ⇄ `test`
+  (only `test` breaks it), one per plan lane, dispatched in parallel waves from
+  the syllabus → `review-code` (gate; loops to any earlier phase) →
   `document-local` **or** `document-confluence` → `push-pr` (push + PR +
   `workflow-diff-check.sh`-gated teardown), with `review-pr` as an optional
   independent pass.
