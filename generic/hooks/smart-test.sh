@@ -30,11 +30,48 @@ source "${SCRIPT_DIR}/common-helpers.sh"
 # SETUP FUNCTIONS
 # ============================================================================
 
+# Some environments put a `go` on PATH that silently no-ops or segfaults
+# instead of running the real toolchain (e.g. a broken snap wrapper). Detect
+# that and, if broken, prepend a working install's bin dir onto PATH so both
+# bare `go` and gotestsum (which execs `go` via PATH internally) pick it up.
+ensure_working_go_on_path() {
+    local out
+    if command -v go >/dev/null 2>&1; then
+        out=$(go version 2>/dev/null)
+        if [[ $? -eq 0 ]] && [[ "$out" == go\ version* ]]; then
+            return 0
+        fi
+    fi
+
+    if [[ "${CLAUDE_HOOKS_DEBUG:-0}" == "1" ]]; then
+        echo "DEBUG: 'go' on PATH is missing or broken (no 'go version' output); searching known install locations" >&2
+    fi
+
+    local candidate
+    for candidate in /snap/go/current/bin/go /usr/local/go/bin/go /usr/lib/go/bin/go "$HOME/go/bin/go" "$HOME/.local/go/bin/go"; do
+        if [[ -x "$candidate" ]]; then
+            out=$("$candidate" version 2>/dev/null)
+            if [[ $? -eq 0 ]] && [[ "$out" == go\ version* ]]; then
+                export PATH="$(dirname "$candidate"):$PATH"
+                if [[ "${CLAUDE_HOOKS_DEBUG:-0}" == "1" ]]; then
+                    echo "DEBUG: Using working go binary: $candidate" >&2
+                fi
+                return 0
+            fi
+        fi
+    done
+
+    echo -e "${YELLOW}⚠️  No working 'go' binary found (PATH's go is broken and no fallback worked)${NC}" >&2
+    return 1
+}
+
 # Set up the Go test command based on available tools
 setup_go_test_command() {
     local base_cmd=""
     local race_flag=""
-    
+
+    ensure_working_go_on_path
+
     # Set up base command
     if command -v gotestsum >/dev/null 2>&1; then
         # Use gotestsum with dots format for clean output
