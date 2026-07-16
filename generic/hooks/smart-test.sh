@@ -95,7 +95,7 @@ load_config() {
 # Check if we have input (hook mode) or running standalone (CLI mode)
 if [ -t 0 ]; then
     # No input on stdin - CLI mode
-    FILE_PATH="./.."
+    FILE_PATH="./..."
 else
     # Read JSON input from stdin
     INPUT=$(cat)
@@ -129,7 +129,7 @@ else
         fi
     else
         # Not valid JSON - treat as CLI mode
-        FILE_PATH="./.."
+        FILE_PATH="./..."
     fi
 fi
 
@@ -211,8 +211,8 @@ run_go_tests() {
     local base=""
     local test_file=""
     
-    if [[ "$target" == "./.." ]] || [[ "$target" =~ ^\.(/|$) ]] || [[ ! "$target" =~ \.go$ ]]; then
-        # It's a package path (like ./.., ., ./pkg, etc.)
+    if [[ "$target" == "./..." ]] || [[ "$target" =~ ^\.(/|$) ]] || [[ ! "$target" =~ \.go$ ]]; then
+        # It's a package path (like ./..., ., ./pkg, etc.)
         is_package_path=true
         dir="$target"
     else
@@ -312,7 +312,7 @@ run_go_tests() {
                 tests_run=$((tests_run + 1))
                 
                 local test_output
-                if ! test_output=$($GO_TEST_CMD -short "./.." 2>&1); then
+                if ! test_output=$($GO_TEST_CMD -short "./..." 2>&1); then
                     failed=1
                     echo -e "${RED}❌ Project tests failed${NC}" >&2
                     echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -646,7 +646,7 @@ main() {
     if [[ "$FILE_PATH" =~ \.go$ ]]; then
         # Specific Go file
         run_go_tests "$FILE_PATH" || failed=1
-    elif [[ "$FILE_PATH" == "./.." ]] && [[ -f "go.mod" || -f "go.sum" ]]; then
+    elif [[ "$FILE_PATH" == "./..." ]] && [[ -f "go.mod" || -f "go.sum" ]]; then
         # Only run Go tests if it's actually a Go project
         run_go_tests "$FILE_PATH" || failed=1
     elif [[ "$FILE_PATH" =~ \.py$ ]]; then
