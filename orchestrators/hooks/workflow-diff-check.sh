@@ -6,9 +6,12 @@
 # straight from git diff (committed since base + staged + unstaged) — no
 # per-session state, no locking, no PostToolUse recorder.
 #
-# Wired via frontmatter hooks on the dev skill (Stop) and the
-# builder agent (Stop → SubagentStop), so it only runs while the dev
-# workflow is active.
+# Wired via a frontmatter hook on the dev skill (Stop) only, so it runs
+# while the dev workflow is active. Deliberately NOT wired on the builder
+# agent: builders run in parallel lanes sharing one worktree, so a
+# whole-worktree diff at one builder's stop would see siblings' in-flight
+# changes and block on failures that aren't its own. The dev orchestrator
+# runs the project's checks per wave and at integration instead.
 #
 # EXIT CODES
 #   0 - checks passed, nothing changed, or nothing runnable (never blocks

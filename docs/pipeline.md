@@ -39,10 +39,16 @@ dev (/dev) ─drives─▶  explore → init-workspace → plan → review-plan 
 | `push-pr` | sonnet | fork | Terminal phase: commits stragglers, pushes the workflow branch, opens a PR against the base branch (always asks first; never force-pushes, never pushes main), tears down the worktree. |
 | `review-pr` | sonnet | fork | Reviews a GitHub PR — the one `push-pr` opened, or any the user points at. Posts comments only on explicit instruction; never merges or approves. |
 
-The `code`/`debug`/`test` triad runs **inline inside one shared context** — the
-`builder` sub-agent preloads all three so the handoff rules are in context
-before the first handoff, and the shared working state (edits, errors, test
-output) survives across handoffs. It carries the same `Stop` hook as `dev`.
+The `code`/`debug`/`test` triad runs **inline inside one shared context per
+`builder` sub-agent** — each builder preloads all three so the handoff rules
+are in context before the first handoff, and the shared working state (edits,
+errors, test output) survives across handoffs. `dev` dispatches builders from
+the plan's syllabus: one builder per **lane** (a chain of subphases with only
+internal dependencies), lanes running concurrently in dependency-ordered
+**waves** (cap 5 per wave; a single-lane plan gets one builder). Each builder
+owns its lane's file scope and never edits the plan file — `dev` ticks the
+syllabus and runs the project's checks between waves and at a final
+integration pass.
 
 ## Loop-breaking invariant
 
@@ -101,8 +107,10 @@ Both are POSIX-ish Bash and apply to a **consuming** project, not to `agentic`:
   lines. `--reuse` picks up an existing branch and merges the base into it
   (conflicts abort cleanly).
 - **`workflow-diff-check.sh`** — a real hook, wired via frontmatter on the `dev`
-  skill (`Stop`) and the `builder` agent (`Stop`/`SubagentStop`). Diffs the
-  workflow branch against its merge-base, buckets changed files by extension,
-  and runs vitest/`go test`/pytest if present. Exit 0 when nothing is runnable;
-  exit 2 with a stderr report when changed-file tests fail, blocking the stop
-  until fixed.
+  skill (`Stop`) only. Diffs the workflow branch against its merge-base, buckets
+  changed files by extension, and runs vitest/`go test`/pytest if present. Exit
+  0 when nothing is runnable; exit 2 with a stderr report when changed-file
+  tests fail, blocking the stop until fixed. Deliberately not wired on the
+  `builder` agent: parallel builders share one worktree, so a whole-worktree
+  diff at one builder's stop would block on siblings' in-flight changes — `dev`
+  runs the checks per wave instead.

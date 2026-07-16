@@ -126,11 +126,15 @@ repo has none, so this `/docs` tree uses the plain defaults.
 
 ## Plan format
 
-Filename `<feature-slug>-MM-DD-YY.md`; phase syllabus first (one checkbox per
-phase); required sections — goal & scope, stack & MAJOR versions (with the
-manifest each was verified from), conventions to enforce, phased tasks numbered
-`<phase>.<task>`, risks/open questions/decision points, skill mapping; a living
-document (syllabus checked off as phases complete); **never** time estimates.
+Filename `<feature-slug>-MM-DD-YY.md`; phase syllabus first — title-only, one
+nested checkbox per subphase under its phase header (every phase decomposes
+into `<phase>.<subphase>` entries), with optional `(after: <ids>)` dependency
+and `(lane <X>)` annotations that let the `dev` orchestrator dispatch parallel
+builders; required sections — goal & scope, stack & MAJOR versions (with the
+manifest each was verified from), conventions to enforce, subphase detail
+blocks (each naming its file scope; independent lanes' scopes must be
+disjoint), risks/open questions/decision points, skill mapping; a living
+document (syllabus checked off per subphase); **never** time estimates.
 In Confluence mode the `dev` orchestrator also writes a sibling story file
 (`<feature-slug>-MM-DD-YY.story.md`) with the verbatim ask, narrative,
 acceptance criteria, and Jira keys.
