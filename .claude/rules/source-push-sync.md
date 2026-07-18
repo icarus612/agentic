@@ -1,0 +1,7 @@
+# Source, push, sync (this repo only)
+
+This repo is the single source of truth for agent skills, rules, and hooks — `~/.claude/` is an install of it, never an editing target. Every change follows this flow, in order:
+
+1. **Edit here.** Make all changes in this repo's source dirs (`orchestrators/`, `generic/`, `tool-based/`) — never directly in `~/.claude/`.
+2. **Push up.** Land the change by committing on `main` and pushing, via the `push-main` skill — this repo uses NO workflow worktrees and NO PRs. This intentionally overrides the global `push-policy` rule's "never push main" clause FOR THIS REPO ONLY; its other clauses still hold (never force-push). The `worktree-reminder` SessionStart nag does not apply here.
+3. **Sync the install.** Immediately after the push, copy the changed files to their `~/.claude/` install locations (`skills/<name>/SKILL.md`, `rules/<name>.md`, `hooks/<file>`, `agents/<file>`) — but ONLY universal-domain content (`domain: universal`, i.e. everything under `orchestrators/` and `generic/`). Tool-specific content (`domain: <tech>`, under `tool-based/`) installs into the projects that use that tech, never into `~/.claude/`. Project-scoped content (like this rule and the `push-main` skill, which live only in this repo's `.claude/`) is never synced anywhere. Syncing is not optional and needs no extra confirmation — a push that lands without the install sync is an incomplete change.
