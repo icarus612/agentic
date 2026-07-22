@@ -15,6 +15,7 @@ scripts in [`hooks/`](hooks/), and the build-loop sub-agent in
 | **`map`** | `/map` | Documentation-only runs — a deep `explore`, `init-workspace`, a map-driven document phase, then `push-pr`, on a fixed `feature/{re,}map-repo` branch. For when there is no code change to record. |
 | **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents (parallel where independent), verify and synthesize. Not tied to the dev pipeline. |
 | **`sync-status`** | `/sync-status` | Reconciles ALREADY-SHIPPED work against its `/project-plans/` plan and/or Jira ticket — verifies what's done, checks off the plan syllabus, updates/transitions the ticket, refreshes docs, reports a diff against the base branch. Reuses `map`'s worktree/push-pr scaffolding; truth source is the plan/ticket, not a blind sweep. |
+| **`diagnose`** | `/diagnose` | Root-cause investigation for an unclear bug — diffs the suspect work (live branch OR already-merged), explores DEEP only if the diff doesn't localize it, and produces a RANKED candidate-cause report graded by likelihood × ease-of-fix. Gates on the user's pick, then drives only the chosen fixes through `builder` → `review-code` → `push-pr`. Reuses `sync-status`'s worktree scaffolding and `dev`'s fix loop; the ranked report is the deliverable, not a phased plan. Carries the same `Stop`→`workflow-diff-check.sh` hook as `dev`. |
 
 ## The dev pipeline
 
