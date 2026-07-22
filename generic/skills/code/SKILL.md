@@ -15,7 +15,7 @@ You implement the approved plan — one of three tightly-coupled skills (`code`,
 
 - The plan cleared the `review-plan` gate and the workflow is in build mode.
 - A unit of work needs implementing or extending for the first time.
-- The `debug` skill hands back a fix to apply, or the `test` skill asks for missing implementation.
+- The `debug` skill hands back a diagnosis to implement, or the `test` skill asks for missing implementation.
 
 Not for investigating failures (the `debug` skill) or writing/running verification (the `test` skill).
 
@@ -41,7 +41,7 @@ When a unit is implemented you ALWAYS hand off, never stop:
 - Ready to verify, or needs tests written/run → the **`test`** skill (the only skill that can break the build loop).
 - An error, unexpected behavior, failing build, or anything you can't cleanly resolve → the **`debug`** skill.
 
-After investigating, the `debug` skill prefers to hand back to you (apply the fix) or to the `test` skill (verify). The loop: `code` → (`debug` | `test`); `debug` → prefers `code`/`test`; `test` → only loop-breaker. Feeling "done" means hand to the `test` skill, not exit.
+After investigating, the `debug` skill reports a diagnosis and hands it back to you to implement the fix (it never writes the fix itself), or hands to the `test` skill to verify when there is nothing to fix. The loop: `code` → (`debug` | `test`); `debug` → never writes, routes to `code`/`test`; `test` → only loop-breaker. Feeling "done" means hand to the `test` skill, not exit.
 
 ## Notes
 

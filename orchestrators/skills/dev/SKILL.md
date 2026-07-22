@@ -72,7 +72,7 @@ Drive these phases in order. "Repeat" means you may loop back to ANY earlier ste
    - **After the final wave:** run one integration pass — the full test suite plus the plan's cross-lane acceptance criteria (each builder's `test` skill only verified its own slice). Spawn one last `builder` for this when the plan has an integration subphase; otherwise run the suite yourself and route failures to a builder.
    Respect the loop rules exactly inside every builder:
    - The **`code`** skill NEVER exits on its own — it always hands off to **`debug`** or **`test`**.
-   - The **`debug`** skill MAY exit, but PREFERABLY hands to **`code`** or **`test`** when finished.
+   - The **`debug`** skill NEVER writes the fix — it diagnoses, reports the root cause, and hands to **`code`** (to implement) or **`test`** (to verify when there is nothing to fix); it may advance only when there is nothing left to build or verify.
    - The **`test`** skill is the ONLY skill that can break the loop.
    Let each subagent run its loop; only surface blockers or the completion summaries back to yourself.
 9. **Code review.** Invoke the **`review-code`** skill directly via the Skill tool — it is a `context: fork` skill that runs in its own subagent. Pass the plan path and the build summary as args. Same verify-don't-assume rigor as the plan review. The fork returns a structured verdict report; present it to the user, collect approve/revise, and from here you may loop back to ANY previous phase (code/debug/test, plan, or explore) if something feels off — re-invoke the earlier skill yourself with the corrections as args. Repeat until the review is clean.

@@ -31,7 +31,7 @@ dev (/dev) ─drives─▶  explore → init-workspace → plan → review-plan 
 | `plan` | opus → sonnet | fork | Turns explore's findings into an ordered plan in the plans dir. Requires at least a shallow explore; pins MAJOR versions; conventions as hard constraints. |
 | `review-plan` | sonnet | fork | **Human gate** before any code. Verifies every claim, asks when unsure, returns a structured verdict (it cannot talk to the user itself). Loops back to `explore`/`plan`. |
 | `code` | sonnet | inline (shared loop) | Implements one planned unit. **Never exits on its own.** |
-| `debug` | sonnet | inline (shared loop) | Finds the real root cause and fixes it. May exit, but prefers handing off. |
+| `debug` | sonnet | inline (shared loop) | Finds the real root cause and reports it with a fix recommendation — never writes the fix. Routes to `code` (implement) or `test` (verify). |
 | `test` | sonnet | inline (shared loop) | Verifies against the plan. **The only skill that can break the loop.** |
 | `review-code` | sonnet | fork | **Human gate** before any docs. Same discipline as `review-plan`; may loop back to **any** earlier phase. (Named noun-last — `code-review` collides with a built-in.) |
 | `document-local` | sonnet | fork | Documentation phase when the docs target is a local path: writes into the docs root (mirroring project structure); optional changelog via `git add`+`git commit`, never a push. |

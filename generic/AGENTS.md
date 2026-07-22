@@ -41,7 +41,7 @@ keyword match.
 | `plan` | Turn explore's findings into an ordered, convention-grounded plan in the plans dir. |
 | `review-plan` | Human gate before any code. Verifies every claim; asks when unsure; loops back to `explore`/`plan`. |
 | `code` | Implement one planned unit. **Never exits on its own.** |
-| `debug` | Find the real root cause and fix it. May exit, but prefers handing off. |
+| `debug` | Find the real root cause and report it with a fix recommendation — never writes the fix. Routes to `code` (implement) or `test` (verify). |
 | `test` | Verify against the plan. **The only loop-breaker.** |
 | `review-code` | Human gate before any docs. May loop back to **any** earlier phase. |
 | `document-local` | Documentation phase when the docs target is a local path: write into the docs root, the single source of truth; optional changelog commit (never a push). |
