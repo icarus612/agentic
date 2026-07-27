@@ -1,5 +1,11 @@
 # Agent Skills Architecture — Open Items
 
+> **Implementation plan:** the workers-and-gates redesign (planner/builder workers, dev
+> stage table, map/sync-status/diagnose consolidation) is planned in
+> [`../workers-and-gates-redesign-07-26-26.md`](../workers-and-gates-redesign-07-26-26.md),
+> which adopts items 2 (partially), 4, and 9 (for `dev`) below and re-scopes item 1.
+> Item 8 remains a separate migration.
+
 Gap analysis of the original skills-architecture conversation against the repo as of 2026-07-22. Items the repo already implements (role-based grouping, forked review gates, hook enforcement, `--worktree resume` resumability, conditional debug, orchestrated-use trigger phrasing, parallel builder lanes) have been dropped; external-marketplace material is out of scope. What remains is every item with a real gap, each stated as **current** (verified against the actual files) vs **proposed**. Items 8 and 9 are **decided** (adopt): item 8 carries a full repo-sweep catalog of scriptable prose (2026-07-22), item 9 the target skill-directory structure; the two share one migration.
 
 ---
