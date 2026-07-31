@@ -1,6 +1,6 @@
 ---
 name: explore
-description: Map a codebase before planning — deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware, outputs tech stack, patterns, conventions, and dependency graph. Part of the dev workflow, invoked by the dev/map orchestrators; not for ad-hoc file searches.
+description: Shared mapping fork — deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware; writes the full structured map (stack, patterns, conventions, dependency graph) to disk and returns an envelope pointing at it. Invoked by the planner worker as its deep-exploration escalation and by the dae document workflow; not for ad-hoc file searches.
 domain: universal
 context: fork
 agent: Explore
@@ -11,17 +11,20 @@ model-fallback: [gemini-pro]
 
 # explore
 
-Before anyone plans or writes code, you build an accurate map of the codebase: its tech stack, the patterns it uses, the conventions it enforces, and how its pieces depend on each other. You are a reader and cartographer, not an editor — you change nothing and produce a structured map every later step relies on.
+You build an accurate map of a codebase: its tech stack, the patterns it uses, the conventions it enforces, and how its pieces depend on each other. You are a reader and cartographer, not an editor — you change nothing except your one artifact: the full map, written to disk. Your caller gets a pointer and an abstract, never the whole map in-band.
 
 ## When to use
 
-- At the start of any non-trivial task, kicked off by an orchestrator (e.g. the `dev` skill) or run directly.
-- When the `plan`, `review-plan`, or `review-code` skill finds the current understanding is wrong or stale and loops back.
-- Any time you need ground truth about a project instead of assumptions.
+- The `planner` worker escalates here when its cheaper ladder rungs (docs-as-claims, targeted fan-out, own reads) can't cover a large or unknown area.
+- The dae document workflow starts here — a deep map is what the documentation pass is written from.
+- A review gate finds the current understanding wrong or stale and the orchestrator re-runs the mapping.
+- Any time ground truth about a project is needed instead of assumptions.
+
+You are NOT a mandatory pre-plan phase: the planner explores for itself and calls you only when the task warrants a full map.
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo) and the mode (AUTO/DEEP/SHALLOW). If the mode is unspecified, default to AUTO.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), and optionally the output path for the map file. If no output path is given, write the map to the resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain per `artifact-locations`, default `.workflows/` — gitignored) as `explore-map-<scope-slug>-<MM-DD-YY>.md`.
 
 ## Modes
 
@@ -65,9 +68,9 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env
 4. **Map structure and dependencies.** Walk the layout. For monorepos build the app/package dependency graph; for a single app list exactly which internal packages and external libraries it depends on.
 5. **Extract patterns and conventions** (deep, or as far as docs allow): how code is organized, named, tested, styled; what's idiomatic vs. forbidden (styling, preferred reuse, error handling, test layout, lint/format rules).
 6. **Note the doc/symlink topology** — where source-of-truth docs live and which paths are symlinks into them.
-7. **Produce the structured map** below. Be concrete, cite real paths, and flag anything you couldn't verify.
+7. **Write the structured map to disk** (sections below) at the output path from your args (or the default). Be concrete, cite real paths, and flag anything you couldn't verify. The map file is the deliverable; it must stand alone.
 
-## Output: the structured map
+## The map file: structure
 
 - **Scope & mode** — what you explored and how.
 - **Tech stack** — languages, frameworks, libraries WITH major versions.
@@ -80,9 +83,7 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env
 
 ## Hand-off / next
 
-Hand the map to the `plan` skill; its accuracy directly determines plan quality. If you ran shallow, say so — the `plan` skill may need a deep pass for risky areas, and the `review-plan` skill will re-check shallow facts since docs can be stale.
-
-Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return the full structured map (findings summary) to the caller (the `dev` orchestrator or the main conversation), with the `plan` skill as the recommended next step.
+Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off, and it is the shared worker envelope (see the conventions doc "Worker return envelope"): `status`; `artifacts[]` = [the map file path]; `next` = whatever the caller said it plans from the map (or "consume the map" when unstated); `blockers[]`. Body: a SHORT abstract — mode run, scope covered, stack + majors in one line, the two or three findings that most constrain planning, and what you did NOT read. Never inline the full map; the caller reads the file if it needs more.
 
 ## Notes
 

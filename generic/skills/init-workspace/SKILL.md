@@ -14,7 +14,7 @@ You make the project runnable. Before anyone verifies a plan or writes code, you
 
 ## When to use
 
-- Right after the `explore` skill in the orchestrated workflow (the `dev` skill), once the stack is mapped and before the `plan` skill runs.
+- Fired by the dae orchestrator for the run's parent worktree in parallel with planning, and by each `builder` for its own child worktree (a fresh worktree shares git history, not toolchains).
 - Standalone, whenever a fresh checkout or worktree needs its toolchain set up.
 
 ## Inputs
@@ -35,7 +35,7 @@ Detect from the real manifests, don't assume — every tool named below is an ex
 
 ## Hand-off / next
 
-Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return what was detected (stack, versions), what was installed or created (package manager used, versions, `.venv` path, etc.), and anything that failed or was skipped and why. Recommended next step: the `plan` skill (orchestrated) or whatever the caller was doing.
+Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off. Return what was detected (stack, versions), what was installed or created (package manager used, versions, `.venv` path, etc.), and anything that failed or was skipped and why. The caller joins on this report before running anything in the worktree.
 
 ## Notes
 
