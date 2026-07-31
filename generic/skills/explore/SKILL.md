@@ -30,7 +30,7 @@ You run as an isolated fork with no access to the conversation history — every
 
 Three modes. If the caller explicitly named one, run it and state which. Otherwise default to AUTO (the recommended mode) — you run in an isolated fork and cannot ask the user mid-run, so note in your final report that the mode was defaulted, for the caller to raise with the user if it matters. Always state the mode you end up running.
 
-**AUTO** — you choose SHALLOW or DEEP yourself via the decision rule below, then state which you picked and why. This is the mode an orchestrator (e.g. the `dev` skill) always requests.
+**AUTO** — you choose SHALLOW or DEEP yourself via the decision rule below, then state which you picked and why. This is the mode callers request when they have no reason to force one.
 
 **SHALLOW** — fast orientation. Read ONLY the root `/docs` (source of truth), agent guidance (`/agents`, `AGENTS.md`, any `CLAUDE.md`), and every `README.md`. Use it to confirm facts, refresh stale knowledge, or meet the minimum a plan requires (never plan without AT LEAST a shallow explore). Cheap; run it liberally.
 

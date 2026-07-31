@@ -1,6 +1,6 @@
 ---
 name: init-workspace
-description: Set up the project toolchain and dependencies inside the workflow worktree (package manager install, language envs) so later phases can build and test. Part of the dev workflow, invoked by the dev/map orchestrators; not the built-in /init command.
+description: Set up the project toolchain and dependencies inside the workflow worktree (package manager install, language envs) so later phases can build and test. Part of the dae workflow, invoked by the dae orchestrator and by builder agents for their child worktrees; not the built-in /init command.
 domain: universal
 context: fork
 rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic]

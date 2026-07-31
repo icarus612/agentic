@@ -26,26 +26,25 @@ a rule.
 | `doc-format` | How docs are structured and placed. |
 | `plan-format` | How plans are named, phased, and kept current. |
 
-## `skills/` — the tech-agnostic phase skills
+## `skills/` — the tech-agnostic forks and gates
 
-Invoked **by name by an orchestrator** (or preloaded into the `builder` agent),
-not matched from a user request — which is why each description names the
-pipeline it belongs to. Several are single words (`plan`, `code`, `test`,
-`debug`, `explore`); that guard is what stops them auto-firing on an incidental
-keyword match.
+Invoked **by name by an orchestrator or worker**, not matched from a user
+request — which is why each description names the pipeline it belongs to and
+who invokes it (the guard that stops a single-word name like `explore`
+auto-firing on an incidental keyword match). All are cold forks: isolated
+context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
+`blockers[]` — see the conventions doc). The old build-loop trio
+(`code`/`debug`/`test`) and the `plan` skill are gone — absorbed into the
+`builder` and `planner` workers in `../orchestrators/agents/`.
 
 | Skill | Role |
 |---|---|
-| `explore` | Read-only codebase map: stack + MAJOR versions, structure, dependency graph, patterns, conventions. Shallow or deep; monorepo-aware. |
-| `init-workspace` | Install dependencies and set up toolchains inside the worktree so later phases can build and test. (Verbose name — `init` collides with a Claude Code built-in.) |
-| `plan` | Turn explore's findings into an ordered, convention-grounded plan in the plans dir. |
-| `review-plan` | Human gate before any code. Verifies every claim; asks when unsure; loops back to `explore`/`plan`. |
-| `code` | Implement one planned unit. **Never exits on its own.** |
-| `debug` | Find the real root cause and report it with a fix recommendation — never writes the fix. Routes to `code` (implement) or `test` (verify). |
-| `test` | Verify against the plan. **The only loop-breaker.** |
-| `review-code` | Human gate before any docs. May loop back to **any** earlier phase. |
-| `document-local` | Documentation phase when the docs target is a local path: write into the docs root, the single source of truth; optional changelog commit (never a push). |
-| `push-pr` | Terminal phase: commit stragglers, push the workflow branch, open a PR, tear down the worktree. Always asks first. |
+| `explore` | The shared mapping fork: full structured map (stack + MAJOR versions, structure, dependency graph, patterns, conventions) written to disk, envelope pointer back. Invoked by the planner's escalation and the dae document workflow — NOT a mandatory pre-plan phase. |
+| `init-workspace` | Install dependencies and set up toolchains inside a worktree (the run's parent, or a builder's child) so later stages can build and test. (Verbose name — `init` collides with a Claude Code built-in.) |
+| `review-plan` | Cold gate before any code. `scripts/validate-plan.sh` owns the schema half; the fork verifies claims against reality; envelope verdict to the caller's human gate. |
+| `review-code` | Cold gate before any docs. Envelope verdict whose `next` carries the kickback reason code (`impl-wrong` \| `plan-wrong` \| `map-wrong`) the dae router routes on. |
+| `document-local` | Record stage when the docs target is a local path: write into the docs root, the single source of truth; optional changelog commit (never a push). |
+| `push-pr` | Terminal ship stage: commit stragglers, push the workflow branch, open a PR, tear down the worktree. Always asks first. |
 | `review-pr` | Review a GitHub PR against its diff, plan, and conventions. Posts comments only on explicit instruction. |
 
 ## `hooks/` — global quality enforcement

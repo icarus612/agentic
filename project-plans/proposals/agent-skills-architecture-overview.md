@@ -1,3 +1,17 @@
+> **DISPOSITION (2026-07-30, via `master-redesign-07-26-26.md`, executed):**
+> item 2 (artifact-on-disk) generalized through item 3's envelope — landed in
+> `docs/conventions.md` + `explore`; item 3 (shared return envelope) landed
+> repo-wide; item 4 (gate caps + escalate-to-human) landed in the `dae` router;
+> item 5 (kickback reason codes) landed at the code gate; item 6 (scoped writes)
+> landed as `scope-writes.sh` (orchestrator config; builder config retired —
+> worktree isolation replaced it); item 8 adopted as principle only — landed
+> scripts: `sync-install.sh`, `validate-plan.sh`, `mark-syllabus.sh`,
+> `verify-scope.sh`, `scope-writes.sh`, `workflow-setup.sh --type/--parent`; the
+> remaining catalog is deferred to a fresh post-landing sweep; item 9 landed for
+> `dae` (router + sibling files + scripts/); item 1 dissolved by mode
+> consolidation; item 7 re-evaluate post-consolidation; items 10–13 deferred.
+> This file is a record; consult the master plan for what shipped.
+
 # Agent Skills Architecture — Open Items
 
 > **Implementation plan:** the workers-and-gates redesign (planner/builder workers, dev

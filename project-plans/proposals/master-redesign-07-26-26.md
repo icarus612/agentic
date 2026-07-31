@@ -115,6 +115,22 @@ Unknown flags are an error, not silently ignored. Flag parsing is one of the
 mechanical candidates for the deferred scripts re-sweep (`parse-flags.sh`), not
 scheduled in this plan.
 
+> **EXECUTION RECORD (2026-07-30):** all phases executed and landed in one session, one
+> push. Decisions: D1/D5 resolved YES by spike 1.1 (nesting works; no hoisting); D2 =
+> alias stubs for one release — `dev`, `map`, `sync-status`, `diagnose` all reduced to
+> thin stubs routing to `/dae`; D3 was pre-resolved (worktree-per-builder, always); D4 =
+> extended vocabulary (`docs|sync` branch types added). Deviations: (a) the 4.4 "wire
+> planner into dev" edit landed as part of 5.1's full router rewrite rather than as a
+> separate dev edit — same session, same push, net-identical result; (b) the toy runs
+> that require spawning the NEW agent/skill definitions (builder packet run, planner
+> runs, `/dae` end-to-end smoke) could not execute in the landing session — Claude Code
+> snapshots the agent/skill registry at session start, so the new definitions only go
+> live after the install sync, in the next session. Scripts were all exercised against
+> scratch fixtures (sync-install add/modify/delete + whole-dir, scope-writes
+> allow/deny/traversal, validate-plan good/malformed, mark-syllabus flip/reopen/missing,
+> verify-scope match/unreported, workflow-setup all five types + parent→child). The
+> first real `/dae` run in a fresh session is the outstanding smoke test.
+
 ## Phase syllabus
 
 Two lanes. Lane A is the serial core — nearly every subphase writes the shared
@@ -129,31 +145,31 @@ reference a skill, agent, or file that does not exist at that commit.
   - [x] 1.1: Nested subagent spawning from a custom agent — **YES, both**: a `builder`-type agent spawned an Agent-tool subagent (Explore type, synchronous, reply received) AND invoked a `context: fork` skill (`explore`), which forked to its own subagent and returned a summary. → D1: planner spawns its own forks/subagents. D5: packet dispatch lives inside the builder.
   - [x] 1.2: SendMessage continuation and parallel spawning of custom agent types — **YES, both**: two `builder`-type agents spawned in one message ran concurrently; a SendMessage follow-up resumed one and it answered from retained context. → 4.4 revision loop and 5.4 kickback default use SendMessage.
   - [x] 1.3: `skills:` frontmatter preloading behavior inside agents — **YES**: the full bodies of the `skills:` frontmatter skills are injected verbatim into the agent's context at start (alongside the normal one-line availability listing). → planner needs no preload: since fork-invocation works inside agents (1.1), it invokes `explore` via the Skill tool on demand instead of carrying its body.
-- [ ] Phase 2: Shared harness scripts & hooks
-  - [ ] 2.1: `sync-install.sh`                                  (lane B)
-  - [ ] 2.2: Path-scope PreToolUse hook                          (lane B)
-- [ ] Phase 3: Builder becomes the packet-model mini-orchestrator
-  - [ ] 3.1: Rewrite `builder.md` (packet model) + `coder`/`contract-tester` agents + shared return envelope  (lane A, after: 1.1)
-  - [ ] 3.2: Delete `code`/`debug`/`test`, sweep references             (lane A, after: 3.1, 2.1)
-- [ ] Phase 4: Planner worker
-  - [ ] 4.1: `planner.md` system prompt — the invariants          (lane A, after: 3.2, 1.3)
-  - [ ] 4.2: Build-type modules (feature, bugfix, rework, migration)  (lane A, after: 4.1)
-  - [ ] 4.3: Refocus `explore` as the shared mapping fork         (lane A, after: 4.1)
-  - [ ] 4.4: Wire planner in; retire `plan`; `validate-plan.sh`   (lane A, after: 1.2, 4.2, 4.3)
-- [ ] Phase 5: `dae` reshape
-  - [ ] 5.1: Rename `dev` → `dae`; router body + `build.md` workflow + shared siblings  (lane A, after: 2.1, 4.4)
-  - [ ] 5.2: Dependency-driven dispatch + `mark-syllabus.sh` + `verify-scope.sh`  (lane A, after: 5.1)
-  - [ ] 5.3: Run `init-workspace` in parallel with planning       (lane A, after: 5.1)
-  - [ ] 5.4: Gate loops — caps, escalation, kickback reason codes (lane A, after: 5.1)
-  - [ ] 5.5: Per-builder worktree isolation (parent/child branches, per-builder init)  (lane A, after: 2.2, 5.2, 6.2)
-- [ ] Phase 6: Mode consolidation
-  - [ ] 6.1: Workflow siblings `diagnose.md`/`document.md`/`sync.md` + planner modules `plan-diagnosis` (absorbs investigate), `plan-reconcile`  (lane A, after: 5.2)
-  - [ ] 6.2: `workflow-setup.sh --type` + `artifact-locations` rule extension  (lane B)
-  - [ ] 6.3: Retire or alias `map`, `sync-status`, `diagnose`     (lane A, after: 6.1, 6.2)
-- [ ] Phase 7: Docs, principles, roster cleanup
-  - [ ] 7.1: AGENTS.md taxonomy and principles                    (after: 6.3)
-  - [ ] 7.2: `/docs` and README refresh                           (after: 6.3)
-  - [ ] 7.3: Supersession annotations, install-sync diff, end-to-end smoke test  (after: 7.1, 7.2)
+- [x] Phase 2: Shared harness scripts & hooks
+  - [x] 2.1: `sync-install.sh`                                  (lane B)
+  - [x] 2.2: Path-scope PreToolUse hook                          (lane B)
+- [x] Phase 3: Builder becomes the packet-model mini-orchestrator
+  - [x] 3.1: Rewrite `builder.md` (packet model) + `coder`/`contract-tester` agents + shared return envelope  (lane A, after: 1.1)
+  - [x] 3.2: Delete `code`/`debug`/`test`, sweep references             (lane A, after: 3.1, 2.1)
+- [x] Phase 4: Planner worker
+  - [x] 4.1: `planner.md` system prompt — the invariants          (lane A, after: 3.2, 1.3)
+  - [x] 4.2: Build-type modules (feature, bugfix, rework, migration)  (lane A, after: 4.1)
+  - [x] 4.3: Refocus `explore` as the shared mapping fork         (lane A, after: 4.1)
+  - [x] 4.4: Wire planner in; retire `plan`; `validate-plan.sh`   (lane A, after: 1.2, 4.2, 4.3)
+- [x] Phase 5: `dae` reshape
+  - [x] 5.1: Rename `dev` → `dae`; router body + `build.md` workflow + shared siblings  (lane A, after: 2.1, 4.4)
+  - [x] 5.2: Dependency-driven dispatch + `mark-syllabus.sh` + `verify-scope.sh`  (lane A, after: 5.1)
+  - [x] 5.3: Run `init-workspace` in parallel with planning       (lane A, after: 5.1)
+  - [x] 5.4: Gate loops — caps, escalation, kickback reason codes (lane A, after: 5.1)
+  - [x] 5.5: Per-builder worktree isolation (parent/child branches, per-builder init)  (lane A, after: 2.2, 5.2, 6.2)
+- [x] Phase 6: Mode consolidation
+  - [x] 6.1: Workflow siblings `diagnose.md`/`document.md`/`sync.md` + planner modules `plan-diagnosis` (absorbs investigate), `plan-reconcile`  (lane A, after: 5.2)
+  - [x] 6.2: `workflow-setup.sh --type` + `artifact-locations` rule extension  (lane B)
+  - [x] 6.3: Retire or alias `map`, `sync-status`, `diagnose`     (lane A, after: 6.1, 6.2)
+- [x] Phase 7: Docs, principles, roster cleanup
+  - [x] 7.1: AGENTS.md taxonomy and principles                    (after: 6.3)
+  - [x] 7.2: `/docs` and README refresh                           (after: 6.3)
+  - [x] 7.3: Supersession annotations, install-sync diff, end-to-end smoke test  (after: 7.1, 7.2)
 
 ## Goal & scope
 

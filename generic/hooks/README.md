@@ -72,7 +72,7 @@ Push notifications via ntfy service for Claude Code events:
 - Requires `~/.config/.claude-ntfy/config.yaml` with topic configuration
 
 ### `worktree-reminder.sh`
-`SessionStart` hook (fires once per fresh session, not on `--resume`/`/clear`/compaction) that makes the worktree-isolation and push/PR conventions apply to EVERY session, not just ones driven by the `dev`/`map`/`sync-status` orchestrators:
+`SessionStart` hook (fires once per fresh session, not on `--resume`/`/clear`/compaction) that makes the worktree-isolation and push/PR conventions apply to EVERY session, not just ones driven by the `dae` orchestrator:
 - If the session starts on the repo's main working tree (not an isolated `git worktree`), injects a reminder to run `workflow-setup.sh` before any file changes.
 - Always reminds that `git push`/PR review should go through the `push-pr`/`review-pr` skills, not raw `git`/`gh` commands.
 - Non-blocking (`SessionStart` hooks can't block session start anyway) — it only injects `additionalContext`, which Claude reads and must voluntarily act on. No jq dependency.

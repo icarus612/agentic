@@ -61,11 +61,11 @@ A skill's body loads on demand — the model reads `description` to decide
 whether to pull it in, so the description has to earn its tokens. Three
 description conventions are load-bearing:
 
-- **Orchestrators** say how to invoke them (`/dev`, `/map`) — the user-facing
+- **Orchestrators** say how to invoke them (`/dae`, `/orchestrate`) — the user-facing
   surface.
 - **Universal phase skills** state the pipeline they belong to and who invokes
-  them ("Part of the dev workflow, invoked by the dev orchestrator…"). Several
-  are single words (`plan`, `code`, `test`, `debug`, `explore`); this guard is
+  them ("Part of the dae workflow, invoked by the dae orchestrator…"). Several
+  are single words (`explore`); this guard is
   what keeps them from auto-firing on an incidental keyword match in the flat
   `~/.claude/skills/` namespace.
 - **Tech skills** lead with the action (`write-svelte-component`,
@@ -74,7 +74,7 @@ description conventions are load-bearing:
 
 Optional frontmatter: `context: fork` (runs in an isolated subagent; inputs
 arrive via invocation args only), `agent:` (a specific agent type for the fork),
-`hooks:` (skill-scoped hook wiring, e.g. the `Stop` hook on `dev`).
+`hooks:` (skill-scoped hook wiring, e.g. the `Stop` hook on `dae`). A skill may also carry sibling detail files and a `scripts/` dir next to its SKILL.md — siblings load only when the router activates them; scripts are run, never loaded.
 
 ## Rule file format
 
@@ -124,7 +124,7 @@ a convention violation.
 Every skill declares `model:` plus an ordered `model-fallback:` ending in
 `gemini-pro` (the cross-vendor backstop):
 
-- **Orchestration/planning** (`dev`, `map`, `plan`, `orchestrate`) → `opus →
+- **Orchestration/planning** (`dae`, `orchestrate`, the `planner` agent) → `opus →
   sonnet → gemini-pro`.
 - **Everything else** → `sonnet → gemini-pro`.
 
@@ -150,13 +150,13 @@ repo has none, so this `/docs` tree uses the plain defaults.
 Filename `<feature-slug>-MM-DD-YY.md`; phase syllabus first — title-only, one
 nested checkbox per subphase under its phase header (every phase decomposes
 into `<phase>.<subphase>` entries), with optional `(after: <ids>)` dependency
-and `(lane <X>)` annotations that let the `dev` orchestrator dispatch parallel
+and `(lane <X>)` annotations that let the `dae` orchestrator dispatch parallel
 builders; required sections — goal & scope, stack & MAJOR versions (with the
 manifest each was verified from), conventions to enforce, subphase detail
 blocks (each naming its file scope; independent lanes' scopes must be
 disjoint), risks/open questions/decision points, skill mapping; a living
 document (syllabus checked off per subphase); **never** time estimates.
-In Confluence mode the `dev` orchestrator also writes a sibling story file
+In Confluence mode the `dae` orchestrator also writes a sibling story file
 (`<feature-slug>-MM-DD-YY.story.md`) with the verbatim ask, narrative,
 acceptance criteria, and Jira keys.
 

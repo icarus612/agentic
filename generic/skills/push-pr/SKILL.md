@@ -1,6 +1,6 @@
 ---
 name: push-pr
-description: Terminal phase of the dev workflow — commit stragglers, push the workflow branch, and open a pull request against the base branch (always asking for confirmation first), then tear down the workflow worktree. Never force-pushes, never pushes main. Invoked by the dev/map orchestrators.
+description: Terminal ship stage of the dae workflow — commit stragglers, push the workflow branch, and open a pull request against the base branch (always asking for confirmation first), then tear down the workflow worktree. Never force-pushes, never pushes main. Invoked by the dae orchestrator.
 domain: universal
 context: fork
 rules: [verify-dont-assume, artifact-locations, push-policy]

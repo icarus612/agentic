@@ -1,116 +1,106 @@
-# The dev pipeline
+# The dae pipeline
 
 Canonical guide: [`orchestrators/AGENTS.md`](../orchestrators/AGENTS.md). This
-page is the meta-summary; edit pipeline behavior in the payload file, not here.
+page is the meta-summary; edit pipeline behavior in the payload files, not here.
 
-The orchestrators (`domain: universal`) drive it; every phase is a universal
-skill they invoke **by name**. Nothing in the pipeline is bound to a technology
-except the documentation phase, when the docs target is Confluence.
+One entry orchestrator — **`dae`** (`/dae`) — routes every request to exactly
+one workflow and drives two **worker agents** (`planner`, `builder`) through
+**cold gates** to a PR. Nothing in the pipeline is bound to a technology except
+the record stage, when the docs target is Confluence.
 
 ```
-dev (/dev) ─drives─▶  explore → init-workspace → plan → review-plan ─(repeat)─┐
-                                         │ approved                            │
-                                         ▼                                     │
-                     code ⇄ debug ⇄ test ──▶ review-code ─(loop to ANY phase)
-                                         │ clean                               │
-                                         ▼                                     │
-                  document-local | document-confluence (& log) ◀───────────────┘
-                                         │
-                                         ▼
-                               push-pr  (⇢ optional review-pr)
+dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
+                        ▲ SendMessage revisions        │ approved
+                        │                              ▼
+              plan-wrong kickback          builder lanes (event-driven dispatch,
+                        │                  child worktree each, merge-back+cleanup)
+                        │                              │ all lanes merged
+                        └──── review-code gate (human, capped; reason codes
+                              impl-wrong │ plan-wrong │ map-wrong) ◀── integration
+                                               │ clean
+                                               ▼
+                          document-local | document-confluence ─▶ push-pr
 ```
 
-## Skills
+## Workflows (`--type`)
 
-| Skill | Model | Context | Role |
-|---|---|---|---|
-| `dev` | opus → sonnet → gemini-pro | inline (orchestrator) | `/dev` — drives the whole pipeline; resolves the docs target and captures story/requirements up front when it names Confluence; creates the worktree; tracks phase state; surfaces only blockers and summaries. Carries a `Stop` hook wired to `workflow-diff-check.sh`. |
-| `map` | opus → sonnet → gemini-pro | inline (orchestrator) | `/map` — documentation-only runs on a fixed `feature/{re,}map-repo` branch: forced-DEEP `explore` → `init-workspace` → the document phase (map-driven: no plan, no diff — the map is ground truth) → `push-pr`. Not for documenting a change already built through the pipeline. |
-| `explore` | sonnet | fork | Read-only codebase map: stack + MAJOR versions, structure, dependency graph, patterns, conventions. Shallow or deep; monorepo-aware. |
-| `init-workspace` | sonnet | fork | Installs dependencies and sets up toolchains inside the worktree. (Verbose name — `init` collides with a Claude Code built-in.) |
-| `plan` | opus → sonnet | fork | Turns explore's findings into an ordered plan in the plans dir. Requires at least a shallow explore; pins MAJOR versions; conventions as hard constraints. |
-| `review-plan` | sonnet | fork | **Human gate** before any code. Verifies every claim, asks when unsure, returns a structured verdict (it cannot talk to the user itself). Loops back to `explore`/`plan`. |
-| `code` | sonnet | inline (shared loop) | Implements one planned unit. **Never exits on its own.** |
-| `debug` | sonnet | inline (shared loop) | Finds the real root cause and reports it with a fix recommendation — never writes the fix. Routes to `code` (implement) or `test` (verify). |
-| `test` | sonnet | inline (shared loop) | Verifies against the plan. **The only skill that can break the loop.** |
-| `review-code` | sonnet | fork | **Human gate** before any docs. Same discipline as `review-plan`; may loop back to **any** earlier phase. (Named noun-last — `code-review` collides with a built-in.) |
-| `document-local` | sonnet | fork | Documentation phase when the docs target is a local path: writes into the docs root (mirroring project structure); optional changelog via `git add`+`git commit`, never a push. |
-| `document-confluence` | sonnet | fork | Documentation phase when the docs target is Confluence. The one **tech-bound** phase (`domain: confluence`). |
-| `push-pr` | sonnet | fork | Terminal phase: commits stragglers, pushes the workflow branch, opens a PR against the base branch (always asks first; never force-pushes, never pushes main), tears down the worktree. |
-| `review-pr` | sonnet | fork | Reviews a GitHub PR — the one `push-pr` opened, or any the user points at. Posts comments only on explicit instruction; never merges or approves. |
+| `--type` | Workflow file | Middle stages |
+|---|---|---|
+| `feature` / `bugfix` / `rework` / `migration` / `hotfix` | `build.md` | planner (type module) → plan gate → builder lanes → code gate |
+| `diagnose` | `diagnose.md` | planner (`plan-diagnosis`: investigate, rank likelihood × ease) → pick-the-causes gate → fix lanes → code gate |
+| `document` | `document.md` | deep `explore` (map on disk) → map-driven record; no planner |
+| `sync` | `sync.md` | planner (`plan-reconcile`: classify done/partial/dropped/diverged vs the real diff) → confirm-the-diff gate → reconciliation-driven record |
 
-The `code`/`debug`/`test` triad runs **inline inside one shared context per
-`builder` sub-agent** — each builder preloads all three so the handoff rules
-are in context before the first handoff, and the shared working state (edits,
-errors, test output) survives across handoffs. `dev` dispatches builders from
-the plan's syllabus: one builder per **lane** (a chain of subphases with only
-internal dependencies), lanes running concurrently in dependency-ordered
-**waves** (cap 5 per wave; a single-lane plan gets one builder). Each builder
-owns its lane's file scope and never edits the plan file — `dev` ticks the
-syllabus and runs the project's checks between waves and at a final
-integration pass.
+All share the router's **setup** (docs target, Confluence requirements capture,
+parent worktree `<type>/<name>-parent`) and **ship** (record → `push-pr`)
+stages. `bugfix` vs `diagnose`: known cause → bugfix; unknown cause → diagnose.
 
-## Loop-breaking invariant
+## The three tiers
 
-Repeated across the `dev` skill, the `builder` agent, and the three loop
-skills — treat it as load-bearing:
+| Tier | Who | Context |
+|---|---|---|
+| Orchestrator | `dae`, `orchestrate` | the conversation; holds every human gate |
+| Workers | `planner` (opus, warm — revisions via SendMessage), `builder` (sonnet, one per lane) + its `coder`/`contract-tester` sub-agents | own contexts |
+| Cold forks | `explore`, `review-plan`, `review-code`, `init-workspace`, `document-local`/`document-confluence`, `push-pr`, `review-pr` | isolated; envelope return |
 
-> The `code` skill never exits on its own. The `debug` skill may exit but
-> prefers handing off. Only the `test` skill can break the loop with a terminal
-> success.
+Every worker and fork returns the **shared envelope** — `status`,
+`artifacts[]`, `next`, `blockers[]` (defined once in
+[`conventions.md`](conventions.md)) — with the real artifact on disk.
 
-## Naming
+## Inside a builder (the packet model)
 
-The orchestrators are the user-facing surface and get the shortest names
-(`/dev`, `/map`). Phase skills are invoked by name by an orchestrator, so they
-keep generic single-word names where safe (`explore`, `plan`, `code`, `debug`,
-`test`) — with **description guards** ("Part of the dev workflow, invoked by the
-dev orchestrator…") so they never auto-fire on an incidental keyword match —
-and verbose names where a single word would collide with a Claude Code built-in
-(`init-workspace`, `review-code`) or be ambiguous (`document-local` /
-`document-confluence`, `push-pr`, `review-pr`).
+Contract expansion → ONE parallel dispatch wave (per packet: a `coder`, and a
+`contract-tester` when the subphase's declared test oracle is `new contract
+tests`) → pipelined per-packet joins → debug-mediated rework (fresh re-dispatch
+carrying contract + diagnosis, NEVER the opposing artifact's source) → the
+builder's own e2e/functional tail — the sole loop exit, verified against the
+PLAN, which catches a wrong contract that propagated into both code and tests.
+Anti-cheating is structural: the coder never sees tests, the tester never sees
+implementation, and the artifacts an agent could cheat off never enter its
+context.
+
+Each builder works in its own **child worktree** (`workflow-setup.sh --parent`)
+with its own `init-workspace`; on report, `dae` verifies the lane
+(`verify-scope.sh`), merges the child branch into the parent (a conflict IS a
+scope violation), removes the lane's worktree/branch, ticks the syllabus
+(`mark-syllabus.sh`), re-scans the `(after:)` frontier, and dispatches
+immediately — no wave barriers. At run end one worktree/branch remains: the
+parent, which `push-pr` publishes.
+
+## Gates
+
+Both judgment gates are capped (3 loops, then escalate to the human) and
+return envelope verdicts. The code gate's `next` carries a kickback reason
+code: `impl-wrong` → redispatch the lane; `plan-wrong` → message the warm
+planner; `map-wrong` → re-run `explore`, then the planner. Cheapest sufficient
+re-entry always.
 
 ## Documentation dispatch
 
-Per `artifact-locations`, the orchestrators resolve the docs target and
-dispatch on the value's shape:
+Per `artifact-locations`, setup resolves the docs target and the ship stage
+dispatches on its shape: a filesystem path (default `/docs`) →
+**`document-local`** (mirror/symlink rules per `doc-format`); a Confluence
+location → **`document-confluence`** (`domain: confluence` — Confluence is the
+docs source of truth; requirements were captured up front per
+`confluence-mode.md` and persisted as a `.story.md` beside the plan; large
+artifacts go to Google Drive per `external-storage-cap`). Extensible: another
+`<target>:` scheme maps to `document-<target>`.
 
-- **A filesystem path** (default `/docs`) → **`document-local`**
-  (`domain: universal`); the local docs root is the single source of truth and
-  `doc-format`'s mirror/symlink rules apply.
-- **A Confluence location** — an Atlassian wiki URL or `confluence:<SPACE>[/<Parent Page>]`
-  → **`document-confluence`** (`domain: confluence`); Confluence is the docs
-  source of truth and no local `/docs` is maintained. The `dev` orchestrator
-  additionally captures requirements up front (verbatim ask, narrative,
-  acceptance criteria, Jira keys, Drive folder — in conversation, since forks
-  can't converse) and persists them as a `.story.md` beside the plan, so the
-  published page carries the story, not just the technical detail. Large
-  artifacts go to Google Drive per `external-storage-cap`.
-- Extensible: another target maps to the skill named `document-<target>`.
+## Hooks & scripts
 
-Claude Code selects skills by description or explicit name — never by config —
-so the dispatch is the orchestrator's job: it resolves the target and invokes
-the matching skill by name.
+Bash, applying to a **consuming** project, not to `agentic` (except
+`sync-install.sh`):
 
-This absorbed the former `delivery` workflow: its connect preflight, Confluence
-story/changelog publishing, Jira linking, and Drive offload all live in
-`document-confluence`; its requirements capture lives in the `dev` orchestrator.
+- Helpers (invoked, never wired): `workflow-setup.sh` (worktrees; types
+  `feature|bug|hotfix|docs|sync`; `--parent` children; `--reuse` resume),
+  `resolve-config.sh` (CLAUDE_* chain), `mark-syllabus.sh`, `verify-scope.sh`,
+  `sync-install.sh` (this repo → `~/.claude`, deletions included).
+- Wired: `workflow-diff-check.sh` (`Stop` on `dae`), `scope-writes.sh`
+  (`PreToolUse`; orchestrator write-scope config).
 
-## Hooks
+## Naming
 
-Both are POSIX-ish Bash and apply to a **consuming** project, not to `agentic`:
-
-- **`workflow-setup.sh`** — a helper invoked by the orchestrators via Bash, not
-  a hook. Creates the git worktree on branch `<type>/<name>`
-  (`feature|bug|hotfix`), gitignores the worktrees dir, resolves the base
-  branch, and prints machine-readable `WORKTREE`/`BRANCH`/`BASE`/`REUSED`
-  lines. `--reuse` picks up an existing branch and merges the base into it
-  (conflicts abort cleanly).
-- **`workflow-diff-check.sh`** — a real hook, wired via frontmatter on the `dev`
-  skill (`Stop`) only. Diffs the workflow branch against its merge-base, buckets
-  changed files by extension, and runs vitest/`go test`/pytest if present. Exit
-  0 when nothing is runnable; exit 2 with a stderr report when changed-file
-  tests fail, blocking the stop until fixed. Deliberately not wired on the
-  `builder` agent: parallel builders share one worktree, so a whole-worktree
-  diff at one builder's stop would block on siblings' in-flight changes — `dev`
-  runs the checks per wave instead.
+The orchestrator gets the shortest name (`/dae`); deprecated stubs (`/dev`,
+`/map`, `/sync-status`, `/diagnose`) route to it for one release. Forks keep
+guarded generic names (`explore`) or verbose collision-free ones
+(`init-workspace`, `review-code`, `document-local`, `push-pr`, `review-pr`).

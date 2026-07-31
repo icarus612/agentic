@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# workflow-setup.sh — create an isolated git worktree for a dev-pipeline run.
+# workflow-setup.sh — create an isolated git worktree for a dae-pipeline run.
 #
 # SYNOPSIS
 #   workflow-setup.sh [--name <name>] [--base <branch>] [--type <type>] [--parent <branch>] [--reuse]
@@ -92,7 +92,7 @@ case "$wfdir" in
   "$root"/*)
     rel="${wfdir#"$root"/}"
     if ! grep -qxF "$rel/" "$root/.gitignore" 2>/dev/null; then
-      { echo ""; echo "# dev-pipeline worktrees (workflow-setup.sh)"; echo "$rel/"; } >> "$root/.gitignore"
+      { echo ""; echo "# dae-pipeline worktrees (workflow-setup.sh)"; echo "$rel/"; } >> "$root/.gitignore"
     fi
     ;;
 esac

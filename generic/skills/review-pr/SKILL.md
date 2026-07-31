@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review a GitHub pull request with the dev workflow's verify-don't-assume discipline — fetch the real diff, check it against the plan and the project's conventions, and return a structured verdict, optionally posting review comments. Invoked standalone with a PR URL/number, or by the dev orchestrator after push-pr.
+description: Review a GitHub pull request with the dae workflow's verify-don't-assume discipline — fetch the real diff, check it against the plan and the project's conventions, and return a structured verdict, optionally posting review comments. Invoked standalone with a PR URL/number, or by the dae orchestrator after push-pr.
 domain: universal
 context: fork
 rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic]
@@ -16,11 +16,11 @@ You review a pull request the way the `review-code` skill reviews a working tree
 
 - After the `push-pr` skill has opened a PR and the user wants an independent review pass on what was actually published.
 - Standalone, to review any PR the user points you at — their own before requesting human review, or a teammate's.
-- NOT a replacement for the `review-code` gate inside the dev workflow — that gate runs before anything is pushed; this skill reviews what a PR reviewer will actually see.
+- NOT a replacement for the `review-code` gate inside the dae workflow — that gate runs before anything is pushed; this skill reviews what a PR reviewer will actually see.
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the PR URL or number (and repo, if not the current one); optionally the plan path in `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set) when the PR came out of the dev workflow; and whether to post the findings as review comments or only return them. Default to returning them only — posting to a PR is outward-facing and happens solely when the args explicitly request it.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the PR URL or number (and repo, if not the current one); optionally the plan path in `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set) when the PR came out of the dae workflow; and whether to post the findings as review comments or only return them. Default to returning them only — posting to a PR is outward-facing and happens solely when the args explicitly request it.
 
 ## How it works
 

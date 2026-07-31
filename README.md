@@ -24,13 +24,14 @@ vanish. Nothing inside a skill or rule may reference this repo's layout.
 ```
 agentic/
 ├── AGENTS.md                  # the index — read this first
-├── orchestrators/             # ENTRY POINTS the user invokes        (domain: universal)
-│   ├── skills/                #   dev (/dev), map (/map), orchestrate (/orchestrate)
-│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh
-│   └── agents/                #   builder.md — the build-loop sub-agent
+├── orchestrators/             # ENTRY POINTS and WORKERS             (domain: universal)
+│   ├── skills/                #   dae (/dae), orchestrate (/orchestrate), deprecated alias stubs
+│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
+│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
+│   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md, contract-tester.md
 ├── generic/                   # GLOBAL: bound to no technology       (domain: universal)
 │   ├── rules/                 #   the always-on set
-│   ├── skills/                #   explore, plan, code, debug, test, review-*, document-local, push-pr, …
+│   ├── skills/                #   explore, init-workspace, review-*, document-local, push-pr
 │   └── hooks/                 #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
 ├── tool-based/                # bound to ONE technology              (domain: <tech>)
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
@@ -39,28 +40,32 @@ agentic/
 └── docs/                      # meta-docs about this repo itself
 ```
 
-## The dev pipeline
+## The dae pipeline
 
-`/dev` orchestrates the whole thing; every phase is a universal skill it
-invokes by name:
+`/dae` routes every request to exactly one workflow — build
+(`feature|bugfix|rework|migration|hotfix`), `diagnose`, `document`, `sync` —
+and drives two workers through cold gates:
 
 ```
-explore → init-workspace → plan → review-plan ⇄ (gate)
-   → code ⇄ debug ⇄ test → review-code ⇄ (gate)
+planner ‖ init-workspace → review-plan ⇄ (human gate, capped)
+   → builder lanes (each: contract → coder ‖ contract-tester per packet
+     → debug-mediated rework → builder's own e2e exit)
+   → review-code ⇄ (human gate; kickback codes impl-wrong|plan-wrong|map-wrong)
    → document-local | document-confluence → push-pr (⇢ review-pr)
 ```
 
-Only `test` can break the build loop. Both gates can loop back to any earlier
-phase. `/map` runs the documentation-only variant. Details:
+Coders never see tests; contract-testers never see implementation — the
+anti-cheating is structural, not disciplinary. Each builder works in its own
+child worktree and merges back into the run's parent branch. Details:
 [`orchestrators/AGENTS.md`](orchestrators/AGENTS.md).
 
 ## Skills, rules, hooks
 
 - **Skills** — on-demand procedures. Selected by `description` or an explicit
-  `/name`, never by folder. Universal *phase* skills are invoked by name by an
-  orchestrator, so their descriptions say so — that guard is what stops
-  single-word skills (`plan`, `code`, `test`) auto-firing on a stray keyword.
-  Tech skills *are* meant to match whenever their tech is in play.
+  `/name`, never by folder. Universal forks/gates are invoked by name by an
+  orchestrator or worker, so their descriptions say so — that guard is what
+  stops single-word skills (`explore`) auto-firing on a stray keyword. Tech
+  skills *are* meant to match whenever their tech is in play.
 - **Rules** — always-on constraints. Short, no procedure. If it must hold even
   when nothing was invoked, it's a rule.
 - **Hooks** — deterministic mechanical enforcement (shell, no model judgment).
@@ -72,9 +77,10 @@ every time, mechanically"* → hook.
 
 ## Install
 
-1. Copy `orchestrators/skills/*` and `generic/skills/*` into `~/.claude/skills/`,
-   `orchestrators/agents/builder.md` into `~/.claude/agents/`, and
-   `generic/rules/*` into your `CLAUDE.md` context.
+1. Copy `orchestrators/skills/*` and `generic/skills/*` (whole directories —
+   several carry sibling files and `scripts/`) into `~/.claude/skills/`,
+   `orchestrators/agents/*` into `~/.claude/agents/`, and `generic/rules/*`
+   into your `CLAUDE.md` context.
 2. Copy each `tool-based/<tech>/` layer your project uses into that **project's**
    `.claude/` (or `.agent/`).
 3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` —
@@ -82,6 +88,9 @@ every time, mechanically"* → hook.
 
 Distribution is deliberately copy-paste, not symlinks or a setup script, so it
 behaves identically across platforms with zero tooling.
+`orchestrators/hooks/sync-install.sh` automates the universal-domain copy for
+THIS repo's own working copy (it is what the repo-local `push-main` skill runs
+after every landing, deletions included).
 
 ## Contributing
 

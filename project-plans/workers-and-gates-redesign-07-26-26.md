@@ -1,3 +1,9 @@
+> **SUPERSEDED (2026-07-30)** by [`proposals/master-redesign-07-26-26.md`](proposals/master-redesign-07-26-26.md),
+> which carried all of this plan's phases forward (renumbered) and merged in the packet
+> model, the `dae` rename, the shared return envelope, kickback reason codes, scoped
+> writes, and the safety-critical scripts. Executed 2026-07-30 under the master plan —
+> see its syllabus for what actually landed. This file is a record; do not execute it.
+
 # Workers-and-gates redesign
 
 Restructure the agent-skills library around three execution tiers — **main-session

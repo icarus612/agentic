@@ -1,98 +1,97 @@
 # Orchestrators
 
-Entry-point skills the **user** invokes. They own no domain knowledge — they
-drive a pipeline, delegate every real step to `generic/` phase skills (and
-`tool-based/` skills when a technology or service is in play), and manage
-context by passing pointers instead of payloads.
+Entry points and workers. The library runs on a **three-tier execution model**;
+the decision rule for placing anything is *who needs to talk to it while it
+runs*:
 
-Everything an orchestrator owns lives here: the skills, the worktree/gate
-scripts in [`hooks/`](hooks/), and the build-loop sub-agent in
-[`agents/`](agents/).
+| Tier | Talks to | Context | Examples |
+|---|---|---|---|
+| **Main-session orchestrator** | the user | the conversation | `dae`, `orchestrate` |
+| **Worker agent** | its orchestrator (messages) | own, **warm** — survives revision loops | `planner`, `builder` (+ its `coder`/`contract-tester` sub-agents) |
+| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `document-*`, `init-workspace`, `push-pr`, `review-pr` |
+
+**Principles** (each with its enforcement point):
+
+- *Workers warm, gates cold.* A worker survives to be corrected (planner
+  revisions, builder rework); a gate deliberately starts clean so its
+  verification can't be anchored by the reasoning that produced the artifact.
+- *Absorb single-consumer skills into their worker.* The old `code`/`debug`/
+  `test` trio lives inside `builder`; the old `plan` skill inside `planner`;
+  the investigate discipline inside the `plan-diagnosis` module. A skill earns
+  a roster slot only with ≥2 consumers or a user-facing surface.
+- *An agent earns a context only when its state can't be externalized.* Git IS
+  the branch state — hence no branch-manager agent (rejected; see below).
+- *Fork when a summary is the deliverable* — and the full artifact goes to
+  disk: artifact-on-disk, pointer-in-envelope.
+- *Every worker and fork returns the shared envelope* (`status`, `artifacts[]`,
+  `next`, `blockers[]` — see `docs/conventions.md`).
+- *Scripts own the mechanical, prose owns the judgment.* Syllabus ticks,
+  scope checks, plan schema, install sync — all scripted; skills spend their
+  tokens on judgment.
+- *Structural anti-cheating over discipline.* The builder's coder never sees
+  tests; its contract-tester never sees implementation — the artifact an agent
+  would cheat off does not exist in any context it can see.
+
+## Entry points
 
 | Skill | Invoke | What it drives |
 |---|---|---|
-| **`dev`** | `/dev` | The full build pipeline (below). Opus for itself; tracks phase state; surfaces only blockers and completion summaries. Carries a `Stop` hook wired to `workflow-diff-check.sh`. |
-| **`map`** | `/map` | Documentation-only runs — a deep `explore`, `init-workspace`, a map-driven document phase, then `push-pr`, on a fixed `feature/{re,}map-repo` branch. For when there is no code change to record. |
-| **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents (parallel where independent), verify and synthesize. Not tied to the dev pipeline. |
-| **`sync-status`** | `/sync-status` | Reconciles ALREADY-SHIPPED work against its `/project-plans/` plan and/or Jira ticket — verifies what's done, checks off the plan syllabus, updates/transitions the ticket, refreshes docs, reports a diff against the base branch. Reuses `map`'s worktree/push-pr scaffolding; truth source is the plan/ticket, not a blind sweep. |
-| **`diagnose`** | `/diagnose` | Root-cause investigation for an unclear bug — diffs the suspect work (live branch OR already-merged), explores DEEP only if the diff doesn't localize it, and produces a RANKED candidate-cause report graded by likelihood × ease-of-fix. Gates on the user's pick, then drives only the chosen fixes through `builder` → `review-code` → `push-pr`. Reuses `sync-status`'s worktree scaffolding and `dev`'s fix loop; the ranked report is the deliverable, not a phased plan. Carries the same `Stop`→`workflow-diff-check.sh` hook as `dev`. |
+| **`dae`** | `/dae [--type <t>]` | The router: classifies the request into ONE workflow — build (`feature\|bugfix\|rework\|migration\|hotfix`), `diagnose`, `document`, `sync` — and follows that workflow's sibling file. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
+| **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents, verify and synthesize. Not tied to the dae pipeline. |
+| `dev`, `map`, `sync-status`, `diagnose` | — | **Deprecated alias stubs** (one release): route to `/dae`, `/dae --type document`, `/dae --type sync`, `/dae --type diagnose`. |
 
-## The dev pipeline
+## The dae pipeline (build workflow)
 
 ```
-dev (/dev) ─drives─▶  explore → init-workspace → plan → review-plan ─(repeat)─┐
-                                         │ approved                            │
-                                         ▼                                     │
-                     code ⇄ debug ⇄ test ──▶ review-code ─(loop to ANY phase)
-                                         │ clean                               │
-                                         ▼                                     │
-                  document-local | document-confluence (& log) ◀───────────────┘
-                                         │
-                                         ▼
-                               push-pr  (⇢ optional review-pr)
+dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
+                        ▲ SendMessage revisions        │ approved
+                        │                              ▼
+              plan-wrong kickback          builder lanes (event-driven dispatch,
+                        │                  child worktree each, merge-back+cleanup)
+                        │                              │ all lanes merged
+                        └──── review-code gate (human, capped; reason codes
+                              impl-wrong │ plan-wrong │ map-wrong) ◀── integration
+                                               │ clean
+                                               ▼
+                          document-local | document-confluence ─▶ push-pr
 ```
 
-`(repeat)` and the review loop mean any phase can jump **back to any earlier
-phase** when something is off, then resume forward.
+Inside each builder: contract expansion → one parallel wave of `coder` ‖
+`contract-tester` per packet → pipelined joins → debug-mediated rework (fresh
+re-dispatch carrying contract + diagnosis, never the opposing artifact) → the
+builder's own e2e tail, the sole loop exit — verified against the PLAN, which
+catches a wrong contract that propagated into both code and tests.
 
-**Strict loop rule** — repeated verbatim in the `dev` skill, the `builder`
-agent, and the three loop skills; treat it as load-bearing:
+The other workflows swap the middle: `diagnose` (planner ranks causes →
+pick gate → fix lanes), `document` (deep explore → record), `sync` (planner
+reconciles → confirm gate → record). All share setup/ship and the same files
+in `skills/dae/`.
 
-> The `code` skill never exits on its own. The `debug` skill may exit but
-> prefers handing off. Only the `test` skill can break the loop with a terminal
-> success.
+## Hooks (`hooks/`)
 
-The phase skills live in [`../generic/skills/`](../generic/skills/) — they are
-tech-agnostic and usable outside this pipeline. Two human gates (`review-plan`
-before any code, `review-code` before any docs) return structured verdicts; the
-orchestrator holds the actual conversation with the user, because forks can't.
+Helpers, invoked explicitly (never wired): `workflow-setup.sh` (worktrees:
+`--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
+`--reuse` for crash-resume), `resolve-config.sh` (CLAUDE_* settings chain),
+`mark-syllabus.sh` (scripted syllabus ticks), `verify-scope.sh` (reported
+files vs real lane diff), `sync-install.sh` (repo→`~/.claude` install sync,
+deletions included — this repo's `push-main` runs it).
+Wired hooks: `workflow-diff-check.sh` (`Stop`, on `dae` only — builders check
+per lane instead), `scope-writes.sh` (`PreToolUse` deny-outside-allowlist;
+live config = orchestrator scope; the builder-lane config was retired —
+worktree isolation replaced it).
 
-The documentation phase **dispatches on `CLAUDE_DOCS_DIR`**: a local path
-(default `/docs`) → `document-local` (generic); a Confluence location →
-`document-confluence` ([`../tool-based/confluence/`](../tool-based/confluence/)),
-in which case the `dev` orchestrator also captures the story/requirements up
-front, and the published pages carry the ask and narrative, not just the
-technical detail.
+## Agents (`agents/`)
 
-## Hooks
+| Agent | Model | Role |
+|---|---|---|
+| **`planner`** | opus | Explores for itself (ladder: docs-as-claims → fan-out → own reads → `explore` fork), writes the plan/report per `plan-format`, stays warm for revisions. Type modules in `agents/planner/`: `plan-{feature,bugfix,rework,migration,diagnosis,reconcile}.md`. |
+| **`builder`** | sonnet | Per-lane mini-orchestrator of the packet model. Owns its child worktree, the contract, dispatch, debug mediation, and the e2e exit. Writes no implementation and no contract tests. |
+| **`coder`** | sonnet | One packet (≤~5 coupled files) against its contract slice. Never reads or writes tests. |
+| **`contract-tester`** | sonnet | Tests for one contract slice from the contract alone. Never reads the implementation — the blindness is its identity. |
 
-- **`workflow-setup.sh`** — a helper, **not** a hook: the `dev`, `map`, and
-  `sync-status` skills invoke it via Bash. Creates the git worktree in the
-  resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain) on branch
-  `<type>/<name>` (`feature|bug|hotfix`), gitignores that dir, resolves the
-  base branch via `resolve-config.sh` (`CLAUDE_BASE_BRANCH` chain, then a git
-  heuristic), and prints machine-readable `WORKTREE`/`BRANCH`/`BASE`/`REUSED`
-  lines. It rides along in a hooks dir to share the `~/.claude/hooks/`
-  install path.
-- **`resolve-config.sh`** — a helper, **not** a hook: resolves any
-  `CLAUDE_*` config var (docs/plans/worktrees/base-branch) through the
-  project → global → local-default chain described in `artifact-locations`,
-  reading the settings JSON files directly rather than trusting the
-  inherited process environment (Claude Code's `env` block doesn't
-  deep-merge across scopes). `workflow-setup.sh` delegates to it for both the
-  workflows dir and base-branch resolution; `dev`/`map`/`sync-status` call it
-  directly for the docs (and, for `sync-status`, plans) dir.
-- **`workflow-diff-check.sh`** — a real hook, wired via frontmatter `hooks:` on
-  the `dev` skill (`Stop`) only. Diffs the workflow branch against its
-  merge-base and runs the project's own checks on the changed files; exit 2
-  blocks the stop until they pass. Deliberately NOT wired on the `builder`
-  agent: builders run in parallel lanes sharing one worktree, so a
-  whole-worktree diff at one builder's stop would block on siblings' in-flight
-  changes — `dev` runs the checks per wave and at integration instead.
-
-## Agents
-
-- **`builder`** — the build-loop sub-agent, one per plan **lane**. Preloads
-  `code`, `debug`, and `test` so the handoff rules are in context before the
-  first handoff, and runs the triad **inline in one shared context** — the
-  shared working state (edits, errors, test output) surviving across handoffs
-  is the whole point. Spawned by `dev` via the Agent tool, in parallel waves
-  scheduled from the plan's syllabus (one builder per lane, cap 5 per wave);
-  each builder owns its lane's subphases and file scope, never touches files
-  outside it, and never edits the plan file — `dev` ticks the syllabus from
-  builder reports.
-
-Rules: the always-on set lives in [`../generic/rules/`](../generic/rules/)
-(`artifact-locations` for where docs/plans/worktrees live and how the docs
-target dispatches, plus `plan-format`, `doc-format`, `push-policy`, …). Each
-skill names what it needs in its `rules:` frontmatter.
+**Considered and rejected:** a standalone `investigate` skill (single consumer —
+folded into `plan-diagnosis`); a branch-management agent (git is the external
+state store; worktree/branch state needs no context of its own); a builder-lane
+`scope-writes` config (physical worktree isolation made it redundant);
+wave-barrier dispatch (event-driven `(after:)` scheduling replaced it — a
+dependent lane launches the moment its edge ticks).

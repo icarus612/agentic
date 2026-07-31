@@ -1,3 +1,12 @@
+> **SUPERSEDED (2026-07-30)** via `master-redesign-07-26-26.md` (executed): §3-B's
+> isolated parallel authoring was adopted as the DEFAULT at packet granularity (the
+> packet model in `orchestrators/agents/builder.md`); §3-A's sequential single-context
+> loop is superseded; §7's authority split (builder orchestrates, coder writes code,
+> contract-tester writes tests blind, debug never writes, e2e is the sole exit)
+> survives inside the packet model; §4's nesting unknown was resolved YES by spike 1.1;
+> §5's cap/isolation coupling satisfied by per-builder worktrees; §8.1–8.2
+> naming/rename questions mooted by the `dae` rename. This file is a record.
+
 # Builder loop redesign — design summary
 
 Working brief for the dev-workflow build-loop update. Captures the discussion, the

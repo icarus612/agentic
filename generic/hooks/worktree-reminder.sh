@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # worktree-reminder.sh — SessionStart hook: remind every session (not just
 # orchestrator-driven ones) to follow the workflow conventions that used to
-# be documented only inside dev/map/sync-status: isolate file changes in a
+# be documented only inside the dae orchestrator: isolate file changes in a
 # worktree, and route pushes/PR reviews through push-pr/review-pr.
 #
 # WHY A REMINDER, NOT AN ENFORCED WORKTREE OR A BLOCK
@@ -11,7 +11,7 @@
 #   that the model reads and must voluntarily act on, exactly like the
 #   existing skill-driven `cd` pattern (see orchestrators/hooks/workflow-setup.sh).
 #   This hook makes that expectation apply to EVERY session, not just ones
-#   that invoke an orchestrator skill (dev/map/sync-status) — see
+#   that invoke an orchestrator skill (dae) — see
 #   artifact-locations and push-policy.
 #
 # WHY source=startup ONLY
@@ -43,7 +43,7 @@ in_worktree=0
 if [ "$in_worktree" = 1 ]; then
   worktree_msg='This session is already inside an isolated workflow worktree (linked git-dir detected) — no worktree setup needed.'
 else
-  worktree_msg='This session started on the main working tree, not an isolated workflow worktree. Per the artifact-locations rule: before making ANY file changes this session — whether or not an orchestrator skill (dev/map/sync-status) is driving it — set one up first via ~/.claude/hooks/workflow-setup.sh --name <short-task-slug> (global install path; use the project .claude/hooks copy if installed project-specific), then cd into the printed WORKTREE path. Purely conversational or read-only turns do not need this.'
+  worktree_msg='This session started on the main working tree, not an isolated workflow worktree. Per the artifact-locations rule: before making ANY file changes this session — whether or not an orchestrator skill (dae) is driving it — set one up first via ~/.claude/hooks/workflow-setup.sh --name <short-task-slug> (global install path; use the project .claude/hooks copy if installed project-specific), then cd into the printed WORKTREE path. Purely conversational or read-only turns do not need this.'
 fi
 
 push_msg='Before running git push or opening/commenting on/reviewing a pull request in ANY session — not just one driven by an orchestrator — prefer the push-pr/review-pr skills over raw git/gh commands: they enforce push-policy (ask before every push, never force-push, never push main) and the worktree teardown/PR conventions this repo expects.'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# workflow-diff-check.sh — Stop/SubagentStop gate for dev-pipeline worktrees.
+# workflow-diff-check.sh — Stop/SubagentStop gate for dae-pipeline worktrees.
 #
 # Simplified replacement for the record-changed.sh + test-changed.sh pair:
 # the workflow runs on a dedicated worktree branch, so changed files come
@@ -7,10 +7,10 @@
 # per-session state, no locking, no PostToolUse recorder.
 #
 # Wired via a frontmatter hook on the dev skill (Stop) only, so it runs
-# while the dev workflow is active. Deliberately NOT wired on the builder
+# while the dae workflow is active. Deliberately NOT wired on the builder
 # agent: builders run in parallel lanes sharing one worktree, so a
 # whole-worktree diff at one builder's stop would see siblings' in-flight
-# changes and block on failures that aren't its own. The dev orchestrator
+# changes and block on failures that aren't its own. The dae orchestrator
 # runs the project's checks per wave and at integration instead.
 #
 # EXIT CODES

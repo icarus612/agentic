@@ -43,15 +43,18 @@ universal skill is an example only; real tech knowledge belongs to a
 agentic/
 ├── README.md                  # pitch, map, install
 ├── AGENTS.md                  # the index (payload)
-├── orchestrators/             # entry points the user invokes   (domain: universal)
+├── orchestrators/             # entry points + workers          (domain: universal)
 │   ├── AGENTS.md
-│   ├── skills/                #   dev, map, orchestrate
-│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh
-│   └── agents/                #   builder.md
+│   ├── skills/                #   dae (router + workflow siblings + scripts), orchestrate,
+│   │                          #   alias stubs (dev, map, sync-status, diagnose)
+│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
+│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
+│   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
+│                              #   contract-tester.md
 ├── generic/                   # the global layer                (domain: universal)
 │   ├── AGENTS.md
 │   ├── rules/                 #   the always-on set (8)
-│   ├── skills/                #   the 11 tech-agnostic phase skills
+│   ├── skills/                #   the 7 tech-agnostic forks/gates
 │   └── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired)
 ├── tool-based/                # the tech layers                 (domain: <tech>)
 │   ├── AGENTS.md
@@ -62,7 +65,7 @@ agentic/
 └── docs/                      # meta-docs about the repo (this tree)
 ```
 
-See [`pipeline.md`](pipeline.md) for the dev pipeline and
+See [`pipeline.md`](pipeline.md) for the dae pipeline and
 [`tool-based.md`](tool-based.md) for the tech layers.
 
 ## Skills, rules, and hooks — the separation
@@ -74,10 +77,16 @@ See [`pipeline.md`](pipeline.md) for the dev pipeline and
 >
 > **Skills are on-demand procedures.** Selected by `description` or an explicit
 > `/name`, never by folder. Orchestrators are invoked by the user; universal
-> *phase* skills are invoked by name by an orchestrator, so their descriptions
-> say so — the guard that stops single-word skills (`plan`, `code`, `test`)
+> forks/gates are invoked by name by an orchestrator or worker, so their
+> descriptions say so — the guard that stops single-word skills (`explore`)
 > auto-firing on a stray keyword. Tech skills *are* meant to match by
-> description whenever their tech is in play.
+> description whenever their tech is in play. A skill may carry sibling detail
+> files and a `scripts/` dir next to its SKILL.md (the `dae` router's workflow
+> files; `review-plan`'s `validate-plan.sh`).
+>
+> **Worker agents are neither.** `agents/*.md` definitions (`planner`,
+> `builder`, `coder`, `contract-tester`) are spawned via the Agent tool, hold
+> warm contexts, and return the shared envelope (`conventions.md`).
 >
 > **Hooks are deterministic, mechanical enforcement — shell, no judgment.**
 > Skill-scoped hooks wire via a skill's/agent's `hooks:` frontmatter and run
@@ -94,36 +103,33 @@ See [`pipeline.md`](pipeline.md) for the dev pipeline and
 A prompt dependency graph, not a code import graph — "depends on" means "hands
 off to" or "is composed with."
 
-- **`dev`** (`/dev`) resolves the docs target, captures the story when it names
-  Confluence, creates a worktree via `workflow-setup.sh`, then drives:
-  `explore` → `init-workspace` → `plan` → `review-plan` (gate; loops to
-  explore/plan) → `builder` sub-agents each wrapping `code` ⇄ `debug` ⇄ `test`
-  (only `test` breaks it), one per plan lane, dispatched in parallel waves from
-  the syllabus → `review-code` (gate; loops to any earlier phase) →
-  `document-local` **or** `document-confluence` → `push-pr` (push + PR +
-  `workflow-diff-check.sh`-gated teardown), with `review-pr` as an optional
-  independent pass.
-- **`map`** (`/map`) is the doc-only variant: worktree on a fixed
-  `feature/{re,}map-repo` branch → `explore` (forced DEEP) → `init-workspace` →
-  the document phase (map-driven) → `push-pr`. This docs tree was produced by
-  exactly that path.
+- **`dae`** (`/dae`) resolves the docs target, captures the story when it names
+  Confluence, creates the parent worktree via `workflow-setup.sh`, classifies
+  the request into ONE workflow (`build.md` / `diagnose.md` / `document.md` /
+  `sync.md`), then drives: `planner` (‖ `init-workspace`) → `review-plan`
+  (gate; capped; revisions via SendMessage to the warm planner) → `builder`
+  lanes (event-driven dispatch; each in its own child worktree, running the
+  packet model with `coder`/`contract-tester` sub-agents; merge-back + cleanup
+  per lane) → `review-code` (gate; capped; reason-code kickbacks) →
+  `document-local` **or** `document-confluence` → `push-pr`, with `review-pr`
+  as an optional independent pass.
 - **Documentation dispatch** (`artifact-locations`): a local docs path →
   `document-local` (universal); a Confluence location → `document-confluence`
   (`domain: confluence`), which also pulls in `external-storage-cap` and sends
   large artifacts to Google Drive.
 - **Universal rules** are pulled in by nearly every skill via `rules:` —
   `verify-dont-assume` in almost all, `artifact-locations` in most.
-- **Model policy**: orchestration/planning skills (`dev`, `map`, `plan`,
-  `orchestrate`) → `opus → sonnet → gemini-pro`; everything else → `sonnet →
+- **Model policy**: orchestration/planning (`dae`, `orchestrate`, the
+  `planner` agent) → `opus → sonnet → gemini-pro`; everything else → `sonnet →
   gemini-pro`. Claude Code honors only the primary `model:`.
 
 ## Open items
 
-- **Referenced but not yet written**: the `sync-status` orchestrator skill,
-  `orchestrators/hooks/resolve-config.sh`, and
-  `generic/hooks/worktree-reminder.sh` are described in the `AGENTS.md` guides
-  but do not exist as files yet.
 - Six tech layers are placeholder stubs: `bash`, `git`, `go`, `react`,
   `python`, `fastapi` — see [`tool-based.md`](tool-based.md).
 - `model-fallback:` is declarative only — Claude Code reads the single `model:`.
+- The deprecated alias stubs (`dev`, `map`, `sync-status`, `diagnose`) are
+  scheduled for deletion after one release of muscle-memory routing.
+- The item-8 scripts re-sweep (further mechanical extractions) is deliberately
+  deferred until after this redesign settled — sweep against the final tree.
 - No CI, build system, test suite, license, `CONTRIBUTING.md`, or `CHANGELOG`.
