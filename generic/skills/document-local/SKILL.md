@@ -60,7 +60,7 @@ Both shapes also carry whether to record a changelog (commit, `docs/changelog`, 
 
 ## Hand-off / next
 
-The document phase is the last content step of the workflow. Report a concise summary of what was documented (paths under `/docs`), which plan syllabus items were checked off or annotated, any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. the `dev` or `map` skill) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to the `review-code` gate or the `code`/`debug`/`test` loop — rather than papering over it in prose.
+The document phase is the last content step of the workflow. Report a concise summary of what was documented (paths under `/docs`), which plan syllabus items were checked off or annotated, any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (e.g. the `dev` or `map` skill) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to the `review-code` gate or a redispatched `builder` lane — rather than papering over it in prose.
 
 Return contract: as a fork your final report IS the hand-off — return exactly what was written and committed (docs paths, symlinks, changelog/commit outcome) to the caller (the `dev` orchestrator or the main conversation); any loop-back is a recommendation in that report, not a phase you invoke yourself.
 

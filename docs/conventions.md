@@ -98,6 +98,27 @@ The 8 universal rules: `artifact-locations`, `doc-format`, `model-policy`,
 (`use-runes` → svelte, `typescript-strict` → typescript,
 `external-storage-cap` → confluence, …).
 
+## Worker return envelope
+
+Every worker agent and fork skill that reports back to an orchestrator returns
+the SAME envelope, defined once, here:
+
+```
+status:    success | blocked | needs-input | failed
+artifacts: [<path>, …]        # what was written to disk — the real deliverable
+next:      <recommended next step, or a kickback reason code at a gate>
+blockers:  [<blocker>, …]     # empty when none
+```
+
+followed by a worker-specific body (a digest, never the artifact's content —
+artifact-on-disk, pointer-in-envelope). Adopters: the `builder` exit report,
+the `planner` return, the `explore` map summary, both review-gate verdicts
+(`review-plan`, `review-code` — whose `next` carries the kickback reason code
+`plan-wrong | map-wrong | impl-wrong`), and diagnosis investigation subagents
+(body fields: `root_cause`, `evidence`, `likelihood`, `ease`, `proposed_fix`,
+`files`). A worker inventing its own report shape instead of this envelope is
+a convention violation.
+
 ## Model policy
 
 Every skill declares `model:` plus an ordered `model-fallback:` ending in

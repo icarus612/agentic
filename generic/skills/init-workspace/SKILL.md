@@ -10,7 +10,7 @@ model-fallback: [gemini-pro]
 
 # init-workspace
 
-You make the project runnable. Before anyone verifies a plan or writes code, you install dependencies and set up language toolchains inside the workflow worktree so plan verification, the build loop, and tests all work. You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args.
+You make the project runnable. Before anyone verifies a plan or writes code, you install dependencies and set up language toolchains inside the worktree you are pointed at (a run's parent worktree, or a builder's child worktree) so plan verification, the build stage, and tests all work. You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args.
 
 ## When to use
 
