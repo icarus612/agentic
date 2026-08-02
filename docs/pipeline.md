@@ -100,7 +100,7 @@ Bash, applying to a **consuming** project, not to `agentic` (except
 
 ## Naming
 
-The orchestrator gets the shortest name (`/dae`); deprecated stubs (`/dev`,
-`/map`, `/sync-status`, `/diagnose`) route to it for one release. Forks keep
+The orchestrator gets the shortest name (`/dae`); the old entry points (`/dev`,
+`/map`, `/sync-status`, `/diagnose`) are deleted — `/dae --type` covers them. Forks keep
 guarded generic names (`explore`) or verbose collision-free ones
 (`init-workspace`, `review-code`, `document-local`, `push-pr`, `review-pr`).

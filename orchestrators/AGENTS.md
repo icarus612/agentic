@@ -38,7 +38,6 @@ runs*:
 |---|---|---|
 | **`dae`** | `/dae [--type <t>]` | The router: classifies the request into ONE workflow — build (`feature\|bugfix\|rework\|migration\|hotfix`), `diagnose`, `document`, `sync` — and follows that workflow's sibling file. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
 | **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents, verify and synthesize. Not tied to the dae pipeline. |
-| `dev`, `map`, `sync-status`, `diagnose` | — | **Deprecated alias stubs** (one release): route to `/dae`, `/dae --type document`, `/dae --type sync`, `/dae --type diagnose`. |
 
 ## The dae pipeline (build workflow)
 

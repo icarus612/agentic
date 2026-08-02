@@ -7,8 +7,7 @@ technology. That single question also decides where it installs.
 agentic/
 ├── AGENTS.md                  ← this file
 ├── orchestrators/             ← ENTRY POINTS and WORKERS
-│   ├── skills/                dae (/dae — router + workflow siblings), orchestrate (/orchestrate),
-│   │                          deprecated alias stubs (dev, map, sync-status, diagnose)
+│   ├── skills/                dae (/dae — router + workflow siblings), orchestrate (/orchestrate)
 │   ├── hooks/                 workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
 │   │                          sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
 │   └── agents/                planner.md (+ planner/plan-*.md modules), builder.md,

@@ -25,7 +25,7 @@ vanish. Nothing inside a skill or rule may reference this repo's layout.
 agentic/
 ├── AGENTS.md                  # the index — read this first
 ├── orchestrators/             # ENTRY POINTS and WORKERS             (domain: universal)
-│   ├── skills/                #   dae (/dae), orchestrate (/orchestrate), deprecated alias stubs
+│   ├── skills/                #   dae (/dae), orchestrate (/orchestrate)
 │   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
 │   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
 │   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md, contract-tester.md

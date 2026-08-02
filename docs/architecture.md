@@ -45,8 +45,7 @@ agentic/
 ├── AGENTS.md                  # the index (payload)
 ├── orchestrators/             # entry points + workers          (domain: universal)
 │   ├── AGENTS.md
-│   ├── skills/                #   dae (router + workflow siblings + scripts), orchestrate,
-│   │                          #   alias stubs (dev, map, sync-status, diagnose)
+│   ├── skills/                #   dae (router + workflow siblings + scripts), orchestrate
 │   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
 │   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
 │   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
@@ -128,8 +127,6 @@ off to" or "is composed with."
 - Six tech layers are placeholder stubs: `bash`, `git`, `go`, `react`,
   `python`, `fastapi` — see [`tool-based.md`](tool-based.md).
 - `model-fallback:` is declarative only — Claude Code reads the single `model:`.
-- The deprecated alias stubs (`dev`, `map`, `sync-status`, `diagnose`) are
-  scheduled for deletion after one release of muscle-memory routing.
 - The item-8 scripts re-sweep (further mechanical extractions) is deliberately
   deferred until after this redesign settled — sweep against the final tree.
 - No CI, build system, test suite, license, `CONTRIBUTING.md`, or `CHANGELOG`.
