@@ -20,16 +20,16 @@ You are a **router**, not a workflow. Parse the invocation, classify the request
 
 ## Flags
 
-| Flag | Values | Default |
-|---|---|---|
-| `--type` (alias `-t`) | selection table below | infer from the request; `feature` when purely additive |
-| `--explore` (alias `--exp`) | `deep\|shallow\|auto` | `auto` (build); `deep` (diagnose, document) |
-| `--worktree` (alias `--work`) | `new\|resume [<name>]\|none` | `new` — see `worktree-modes.md` |
-| `--ref` | `<branch\|pr\|range>` | resolved conversationally (diagnose: suspect work; sync: shipped work) |
-| `--base` | `<branch>` | `CLAUDE_BASE_BRANCH` chain, resolved silently by `workflow-setup.sh` |
-| `--name` | `<slug>` | derived from the task (overrides, e.g. to join a resumable run) |
+| Flag | Aliases | Values | Default |
+|---|---|---|---|
+| `--type` | `-t` | selection table below | infer from the request; `feature` when purely additive |
+| `--explore` | `--exp`, `-e` | `deep\|shallow\|auto` | `auto` (build); `deep` (diagnose, document) |
+| `--worktree` | `--work`, `-w` | `new\|resume [<name>]\|none` | `new` — see `worktree-modes.md` |
+| `--ref` | `-r` | `<branch\|pr\|range>` | resolved conversationally (diagnose: suspect work; sync: shipped work) |
+| `--base` | `-b` | `<branch>` | `CLAUDE_BASE_BRANCH` chain, resolved silently by `workflow-setup.sh` |
+| `--name` | `-n` | `<slug>` | derived from the task (overrides, e.g. to join a resumable run) |
 
-An unknown flag is an error — say so and stop; never silently ignore one.
+Every alias is interchangeable with its long form. An unknown flag is an error — say so and stop; never silently ignore one.
 
 ## Workflow selection
 
