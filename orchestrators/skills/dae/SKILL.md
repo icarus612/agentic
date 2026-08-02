@@ -1,6 +1,6 @@
 ---
 name: dae
-description: Entry-point orchestrator — routes each request to exactly one workflow (build, diagnose, document, sync), drives the planner and builder workers through cold review gates to a PR, and manages context for the whole run. Invoke as /dae [--type <t>] on a feature, fix, rework, migration, investigation, docs pass, or reconciliation.
+description: Entry-point orchestrator — routes each request to exactly one workflow (build, diagnose, document, sync), drives the planner and builder workers through cold review gates to a PR, and manages context for the whole run. Invoke as /dae [--type|-t <t>] on a feature, fix, rework, migration, investigation, docs pass, or reconciliation.
 domain: universal
 rules: [verify-dont-assume, model-policy, artifact-locations]
 model: opus
@@ -22,7 +22,7 @@ You are a **router**, not a workflow. Parse the invocation, classify the request
 
 | Flag | Values | Default |
 |---|---|---|
-| `--type` | selection table below | infer from the request; `feature` when purely additive |
+| `--type` (alias `-t`) | selection table below | infer from the request; `feature` when purely additive |
 | `--explore` (alias `--exp`) | `deep\|shallow\|auto` | `auto` (build); `deep` (diagnose, document) |
 | `--worktree` (alias `--work`) | `new\|resume [<name>]\|none` | `new` — see `worktree-modes.md` |
 | `--ref` | `<branch\|pr\|range>` | resolved conversationally (diagnose: suspect work; sync: shipped work) |
