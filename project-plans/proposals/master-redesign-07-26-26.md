@@ -129,7 +129,9 @@ scheduled in this plan.
 > scratch fixtures (sync-install add/modify/delete + whole-dir, scope-writes
 > allow/deny/traversal, validate-plan good/malformed, mark-syllabus flip/reopen/missing,
 > verify-scope match/unreported, workflow-setup all five types + parent→child). The
-> first real `/dae` run in a fresh session is the outstanding smoke test.
+> harness picked up the new agent types (`planner`, `coder`, `contract-tester`) and the
+> `/dae` skill after the install sync; the smoke-test item is closed (marked complete
+> 2026-08-02) — the redesign is fully landed and live.
 
 ## Phase syllabus
 
