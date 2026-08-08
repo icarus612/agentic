@@ -115,10 +115,12 @@ every time, mechanically"* → hook.
    worktree happens to be — a project-scoped grant leaves the same prompt
    waiting in the next project.
 
-   Optionally wire `allow-workflow-branch-delete.sh` (installed with the hooks
-   in step 3) so lane cleanup's `git branch -d` of workflow branches stops
-   prompting — it auto-allows only safe deletes tied to the project's
-   workflows dir and has no opinion on anything else:
+   Optionally wire `allow-workflow-cleanup.sh` (installed with the hooks in
+   step 3) so lane cleanup stops prompting — it auto-allows only safe
+   `git branch -d` of workflow-namespace branches tied to the project's
+   workflows dir and plain `git worktree remove` of lane-child worktrees
+   (`-l<n>` under the workflows dir; parent worktrees still prompt), and has
+   no opinion on anything else:
 
    ```jsonc
    "hooks": {
@@ -127,8 +129,11 @@ every time, mechanically"* → hook.
          "matcher": "Bash",
          "hooks": [
            { "type": "command",
-             "command": "~/.claude/hooks/allow-workflow-branch-delete.sh",
-             "if": "Bash(git branch:*)" }
+             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+             "if": "Bash(git branch:*)" },
+           { "type": "command",
+             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+             "if": "Bash(git worktree remove:*)" }
          ]
        }
      ]
