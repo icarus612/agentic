@@ -115,6 +115,26 @@ every time, mechanically"* → hook.
    worktree happens to be — a project-scoped grant leaves the same prompt
    waiting in the next project.
 
+   Optionally wire `allow-workflow-branch-delete.sh` (installed with the hooks
+   in step 3) so lane cleanup's `git branch -d` of workflow branches stops
+   prompting — it auto-allows only safe deletes tied to the project's
+   workflows dir and has no opinion on anything else:
+
+   ```jsonc
+   "hooks": {
+     "PreToolUse": [
+       {
+         "matcher": "Bash",
+         "hooks": [
+           { "type": "command",
+             "command": "~/.claude/hooks/allow-workflow-branch-delete.sh",
+             "if": "Bash(git branch:*)" }
+         ]
+       }
+     ]
+   }
+   ```
+
 Distribution is deliberately copy-paste, not symlinks or a setup script, so it
 behaves identically across platforms with zero tooling.
 `orchestrators/hooks/sync-install.sh` automates the universal-domain copy for
