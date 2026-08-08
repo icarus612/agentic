@@ -4,7 +4,7 @@ Shared by `build.md` (plan syllabus) and `diagnose.md` (approved candidates). Tw
 
 ## Lanes and isolation
 
-A **lane** is a chain of subphases whose only `(after:)` edges are internal (the plan's `(lane X)` annotations name them; an unannotated plan is one lane). Every builder gets its own **child worktree**: its phase 0 runs `workflow-setup.sh --parent <parent-branch> --type <branch-type> --name <name>-<lane-id>` and its own `init-workspace` (worktrees share git history, not toolchains; per-lane init runs concurrently as part of the lane). `<lane-id>` is the lane letter/number or a slugged phase title. This is unconditional — single-lane runs get a child worktree too. With physical isolation, the concurrency cap is a resource knob, not a collision guard: default 5 builders in flight, raise deliberately when the machine allows.
+A **lane** is a chain of subphases whose only `(after:)` edges are internal (the plan's `(lane X)` annotations name them; an unannotated plan is one lane). Every builder gets its own **child worktree**: its phase 0 runs `workflow-setup.sh --parent <parent-branch> --type <branch-type> --name <name>-<child-id>` and its own `init-workspace` (worktrees share git history, not toolchains; per-lane init runs concurrently as part of the lane). `<child-id>` is always `c<n>` — `c1`, `c2`, … assigned by YOU in dispatch order (record the lane↔child-id mapping in the progress log); it names the child's branch (`<branch-type>/<name>-c<n>`), worktree dir, contract, and exit report. This is unconditional — single-lane runs get a child worktree (`c1`) too. With physical isolation, the concurrency cap is a resource knob, not a collision guard: default 5 builders in flight, raise deliberately when the machine allows.
 
 ## Event-driven scheduling (no waves)
 
@@ -17,11 +17,11 @@ The syllabus's `(after:)` edges ARE the schedule. Maintain the frontier: a lane 
 5. **Update the progress log** — rewrite `<run-artifacts>/progress-log.md` with the lane event (merged/failed, exit report path, frontier state) per the router's invariant.
 6. **Re-scan the frontier and dispatch immediately** — a dependent lane launches the moment its edge ticks, never waiting on the slowest unrelated lane.
 
-At run end exactly ONE worktree/branch pair remains — `<branch-type>/<name>-parent` — which the ship stage publishes and tears down.
+At run end exactly ONE worktree/branch pair remains — the parent, `<branch-type>/<name>` — which the ship stage publishes and tears down.
 
 ## Builder dispatch prompt
 
-Each builder gets: the plan path (or diagnosis report path), its lane's subphase/candidate IDs, its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run-artifacts dir (its contract goes to `contracts/<lane-id>.md`, its exit report to `reports/<lane-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
+Each builder gets: the plan path (or diagnosis report path), its lane's subphase/candidate IDs, its **child id** (`c<n>`), its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run-artifacts dir (its contract goes to `contracts/<child-id>.md`, its exit report to `reports/<child-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
 
 ## Failure paths
 

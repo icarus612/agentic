@@ -37,7 +37,7 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
 | `sync` | `sync.md` | planner (`plan-reconcile`: classify done/partial/dropped/diverged vs the real diff) → confirm-the-diff gate → reconciliation-driven record |
 
 All share the router's **setup** (docs target, Confluence requirements capture,
-parent worktree `<type>/<name>-parent`) and **ship** (record → `push-pr`)
+parent worktree `<type>/<name>`) and **ship** (record → `push-pr`)
 stages. `bugfix` vs `diagnose`: known cause → bugfix; unknown cause → diagnose.
 
 ## The three tiers

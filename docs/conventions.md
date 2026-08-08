@@ -127,7 +127,10 @@ Defined by the `run-artifacts` rule. Two homes: **committed review records**
 beside the plan (`<slug>-MM-DD-YY.{story,diagnosis,sync-report,plan-review,code-review,pr-review}.md`),
 and the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
 `progress-log.md` (the orchestrator's live run state, rewritten in place,
-never committed), `contracts/<lane-id>.md`, and `reports/<lane-id>-exit.md`.
+never committed), `contracts/<child-id>.md`, and `reports/<child-id>-exit.md`
+(child ids are always `c1`, `c2`, … in dispatch order, naming each builder's
+branch `<type>/<name>-c<n>`, worktree, contract, and exit report; the parent
+branch is plain `<type>/<name>`).
 
 Review reports append one `## Round <n>` section per gate iteration. The
 verdict vocabulary is enforced by scripts, not prose: `report-verdict.sh` is
