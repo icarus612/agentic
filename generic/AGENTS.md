@@ -26,6 +26,7 @@ a rule.
 | `doc-format` | How docs are structured and placed. |
 | `plan-format` | How plans are named, phased, and kept current. |
 | `run-artifacts` | Where run files live: committed review records beside the plan; the gitignored run dir (progress log, contracts, exit reports). Verdict vocabulary script-enforced. |
+| `cd-then-run` | Never chain `cd` with git/gh in one command — cd separately (cwd persists between calls) or `git -C`; compound cd+git trips the untrusted-hook prompt. |
 
 ## `skills/` — the tech-agnostic forks and gates
 
