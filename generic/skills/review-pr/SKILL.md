@@ -34,13 +34,14 @@ You run as an isolated fork — everything arrives via invocation args. Expect:
 3. **Check completeness against the spec.** Every syllabus subphase / acceptance criterion: shipped, partial, dropped, or diverged — evidenced in the diff, not in commit messages. Silently dropped work and undisclosed scope creep are findings.
 4. **Check conventions and the stack.** The changes use the project's actual patterns and MAJOR-version idioms (verify from manifests and neighboring code, not assumption).
 5. **Check correctness and quality.** Real bugs, unhandled errors, missing edge cases, dead/leftover code, security issues (input validation, secrets in the diff, injection), and tests that exercise the new behavior rather than passing trivially. Run the project's checks when CI hasn't; a red check is evidence.
-6. **Tag every finding** `blocking` (must be fixed before this should merge) or `non-blocking` (worth fixing, doesn't bar the merge). Where you can't verify intent, write a direct, answerable question instead of guessing.
-7. **Write the verdict round.** Open it with `report-verdict.sh <report> <verdict> <next> <blocking> <non-blocking>` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy) — the ONLY way a verdict enters the report; it rejects any status outside the vocabulary:
+6. **Ask the duplication question, both directions.** For each addition: does it re-implement something the codebase already has — an existing helper, component, or utility that should have been called instead? SEARCH before concluding it's genuinely new (similar names, signatures, behavior — neighboring modules and shared/util layers first), and name the existing abstraction in the finding. Inversely: does the diff repeat the same new logic in several places that should have been abstracted once and reused? Reimplementing an existing abstraction is normally a blocking finding when the project's conventions mandate reuse; repeated new logic worth extracting is normally non-blocking — judge by the codebase's own bar, not a style preference.
+7. **Tag every finding** `blocking` (must be fixed before this should merge) or `non-blocking` (worth fixing, doesn't bar the merge). Where you can't verify intent, write a direct, answerable question instead of guessing.
+8. **Write the verdict round.** Open it with `report-verdict.sh <report> <verdict> <next> <blocking> <non-blocking>` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy) — the ONLY way a verdict enters the report; it rejects any status outside the vocabulary:
    - `ready` — mergeable as-is; `next: proceed`.
    - `tentative` — mergeable, but non-blocking findings are worth considering; `next: proceed`.
    - `rejected` — blocking findings exist; `next` names the cheapest sufficient re-entry: `impl-wrong` (code at fault — name the subphases/files), `plan-wrong` (the spec itself is wrong or incomplete), `map-wrong` (the understanding of the project the spec leaned on is false), or `needs-input` (open questions bar a verdict).
    Then append that round's `### Findings` (each `- [blocking]`/`- [non-blocking]` with file:line and evidence) and `### Open questions`.
-8. **Validate before returning.** Run `validate-report.sh <report>`; a FAIL means fix the report, not skip the check. Include its OK line in your return.
+9. **Validate before returning.** Run `validate-report.sh <report>`; a FAIL means fix the report, not skip the check. Include its OK line in your return.
 
 ## Hand-off / next
 
