@@ -97,12 +97,15 @@ every time, mechanically"* → hook.
        "Skill",                                  // or per-skill: "Skill(dae)", "Skill(planner)", …
        "Read(//home/<you>/.claude/skills/**)",   // sibling modules: dae/build.md, dae/sync.md, …
        "Read(//home/<you>/.claude/rules/**)",
-       "Read(//home/<you>/.claude/hooks/**)"
+       "Read(//home/<you>/.claude/hooks/**)",
+       "Read(//home/<you>/.claude/agents/**)",   // planner type modules: agents/planner/plan-*.md
+       "Edit(//home/<you>/<code-root>/**/.workflows/**)"  // workflow worktrees + run dirs
      ],
      "additionalDirectories": [
        "/home/<you>/.claude/skills",
        "/home/<you>/.claude/rules",
-       "/home/<you>/.claude/hooks"
+       "/home/<you>/.claude/hooks",
+       "/home/<you>/.claude/agents"
      ]
    }
    ```
