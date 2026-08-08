@@ -127,10 +127,10 @@ Defined by the `run-artifacts` rule. Two homes: **committed review records**
 beside the plan (`<slug>-MM-DD-YY.{story,diagnosis,sync-report,plan-review,code-review,pr-review}.md`),
 and the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
 `progress-log.md` (the orchestrator's live run state, rewritten in place,
-never committed), `contracts/<child-id>.md`, and `reports/<child-id>-exit.md`
-(child ids are always `c1`, `c2`, … in dispatch order, naming each builder's
-branch `<type>/<name>-c<n>`, worktree, contract, and exit report; the parent
-branch is plain `<type>/<name>`).
+never committed), `contracts/<lane-id>.md`, and `reports/<lane-id>-exit.md`
+(lane ids are always `l1`, `l2`, … — the plan's numbered lanes — naming each
+builder's branch `<type>/<name>-l<n>`, worktree, contract, and exit report;
+the parent branch is plain `<type>/<name>`).
 
 Review reports append one `## Round <n>` section per gate iteration. The
 verdict vocabulary is enforced by scripts, not prose: `report-verdict.sh` is
@@ -172,7 +172,7 @@ repo has none, so this `/docs` tree uses the plain defaults.
 Filename `<feature-slug>-MM-DD-YY.md`; phase syllabus first — title-only, one
 nested checkbox per subphase under its phase header (every phase decomposes
 into `<phase>.<subphase>` entries), with optional `(after: <ids>)` dependency
-and `(lane <X>)` annotations that let the `dae` orchestrator dispatch parallel
+and numbered `(lane <n>)` annotations that let the `dae` orchestrator dispatch parallel
 builders; required sections — goal & scope, stack & MAJOR versions (with the
 manifest each was verified from), conventions to enforce, subphase detail
 blocks (each naming its file scope; independent lanes' scopes must be

@@ -12,7 +12,7 @@ Implementation plans are self-contained markdown files in the plans dir (see `ar
 - **Required sections.**
   - **Phase syllabus** — FIRST section: TITLE ONLY at both levels. One bullet per phase acting as a grouping header, with one nested checkbox per subphase — every subphase in the plan appears here (the checkboxes that matter are the subphase entries; phases are just headers). No task detail — the meat of each subphase lives in its phase section below. Subphase entries carry OPTIONAL annotations, written only when they carry information:
     - `(after: <ids>)` — this subphase depends on the listed subphase IDs. No annotation = independent.
-    - `(lane <X>)` — parallel-lane membership, when the plan declares lanes for concurrent builders. No lanes = one lane, single-builder execution.
+    - `(lane <n>)` — parallel-lane membership, when the plan declares lanes for concurrent builders. Lanes are NUMBERED (`lane 1`, `lane 2`, …) — the number is the lane's identity for the whole run: the dispatcher names that lane's branch `<type>/<name>-l<n>`, its worktree, its contract, and its exit report from it. No lanes = one lane, single-builder execution.
 
     The syllabus exists so anyone can see at a glance which work is complete — subphases are checked off (`- [x]`) as they finish, or annotated in place as `- [done]`/`- [dropped]` when one closes without shipping as planned — and so an orchestrator can dispatch from it: lanes and `after:` edges are the schedule.
   - Goal & scope — what's in, and explicitly what's out.
@@ -29,14 +29,14 @@ A multi-lane syllabus:
 ```markdown
 ## Phase syllabus
 - [ ] Phase 1: Database schema
-  - [ ] 1.1: Add user + session tables        (lane A)
-  - [ ] 1.2: Migration + seed data            (lane A, after: 1.1)
+  - [ ] 1.1: Add user + session tables        (lane 1)
+  - [ ] 1.2: Migration + seed data            (lane 1, after: 1.1)
 - [ ] Phase 2: API endpoints
-  - [ ] 2.1: Auth routes                      (lane B, after: 1.1)
-  - [ ] 2.2: Profile routes                   (lane B, after: 1.1)
+  - [ ] 2.1: Auth routes                      (lane 2, after: 1.1)
+  - [ ] 2.2: Profile routes                   (lane 2, after: 1.1)
 - [ ] Phase 3: Frontend components
-  - [ ] 3.1: Login form                       (lane C)
-  - [ ] 3.2: Profile page shell               (lane C)
+  - [ ] 3.1: Login form                       (lane 3)
+  - [ ] 3.2: Profile page shell               (lane 3)
 - [ ] Phase 4: Integration
   - [ ] 4.1: Wire frontend to API             (after: 2.1, 2.2, 3.1, 3.2)
 ```

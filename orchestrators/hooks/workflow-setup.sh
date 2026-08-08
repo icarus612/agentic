@@ -16,9 +16,9 @@
 #   (default), bug, hotfix, docs, or sync.
 #   With --parent <branch>, the worktree is cut off that branch instead of
 #   the base branch — the parent/child scheme: an orchestrator's run
-#   worktree sits on <type>/<name> off base, and each builder child worktree
-#   sits on <type>/<name>-c<n> off the parent (sequential child ids c1, c2,
-#   ... in dispatch order; the BASE: output line then names the parent).
+#   worktree sits on <type>/<name> off base, and each builder lane's child
+#   worktree sits on <type>/<name>-l<n> off the parent (l<n> = the plan's
+#   lane number; the BASE: output line then names the parent).
 #   With --reuse, an existing <type>/<name> branch is not an error: the
 #   worktree is created on that branch and the start-point branch is merged
 #   into it so the run starts up to date (merge conflicts abort the setup
