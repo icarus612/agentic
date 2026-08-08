@@ -87,7 +87,10 @@ deletions included — this repo's `push-main` runs it).
 Wired hooks: `workflow-diff-check.sh` (`Stop`, on `dae` only — builders check
 per lane instead), `scope-writes.sh` (`PreToolUse` deny-outside-allowlist;
 live config = orchestrator scope; the builder-lane config was retired —
-worktree isolation replaced it).
+worktree isolation replaced it), `allow-workflow-branch-delete.sh`
+(`PreToolUse` on `Bash(git branch -d:*)` — auto-allows safe deletes of
+workflow-namespace branches tied to the project's workflows dir, no opinion
+on everything else).
 
 ## Agents (`agents/`)
 
