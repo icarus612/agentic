@@ -10,7 +10,7 @@ For runs where the task IS the documentation — bootstrapping docs for an undoc
 
 **3. Record** (shared — router, map-driven variant). Invoke the mode's document skill with: the map file path, a statement that this is a **map-driven** run (no plan path, no build summary, no diff — the map is ground truth for what to add, update, and delete), and the changelog preference (ask if unstated and it matters). `document-local` reconciles the root `/docs` tree against the map; `document-confluence` publishes the technical map pages.
 
-**4. Ship** (shared — router). `push-pr` publishes the `docs/` parent branch with the doc changes.
+**4. Ship** (shared — router). The PR gate's spec of record is the **explore map**: the doc changes must reflect it (and `doc-format`), and nothing outside the docs tree, symlinks, and changelog may have changed. Then `push-pr` publishes the `docs/` parent branch with the doc changes.
 
 ## Notes
 

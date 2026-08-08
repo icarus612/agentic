@@ -12,7 +12,7 @@ For work that already shipped (merged, deployed, or on a long-lived branch) whos
 
 **4. Record** (shared — router, reconciliation-driven variant). Invoke the mode's document skill with: the plan path, the report path, a statement that this is a **reconciliation-driven** run (the report stands in for a fresh review gate), and the changelog preference. It ticks/annotates the plan syllabus exactly per the confirmed classification (`- [x]` done, `- [dropped]` dropped, annotations for partial/diverged), refreshes docs to match reality, and — Confluence mode — updates pages and transitions/links the Jira ticket per the outcome.
 
-**5. Ship** (shared — router). `push-pr` publishes the `sync/` parent branch carrying the report, plan ticks, and doc updates.
+**5. Ship** (shared — router). The PR gate's spec of record is the **plan plus the confirmed sync report**: the diff must contain exactly the ticks, annotations, and doc updates the confirmed classification supports — nothing else. Then `push-pr` publishes the `sync/` parent branch carrying the report, plan ticks, and doc updates.
 
 ## Notes
 

@@ -14,7 +14,7 @@ For issues whose cause is UNKNOWN: investigate, rank candidate causes, gate on t
 
 **5. Code gate (human).** `review-code` with the diagnosis report path (the spec of record) and the build summary; route its reason-code verdict per the router.
 
-**6–7. Record, Ship** (shared — router). Record refreshes docs/ticket state per mode; ship publishes fix + report. On a no-fix run, ship still runs — it is what preserves the report (the worktree is torn down); a declined push leaves the report path in your summary.
+**6–7. Record, Ship** (shared — router). Record refreshes docs/ticket state per mode; ship publishes fix + report. The PR gate's spec of record is the **diagnosis report** (plus the Jira key when one sourced the issue): the picked candidates are the acceptance criteria, and nothing outside their cited file scopes may have changed. On a no-fix run, ship still runs — it is what preserves the report (the worktree is torn down); a declined push leaves the report path in your summary.
 
 ## Notes
 
