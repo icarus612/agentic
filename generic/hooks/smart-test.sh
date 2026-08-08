@@ -568,7 +568,7 @@ run_javascript_tests() {
     # Check if we should require tests
     local require_tests=true
     # JS/TS files that typically don't need tests
-    if [[ "$base" =~ ^(index|main|app|config|setup|webpack\.config|rollup\.config|vite\.config)$ ]]; then
+    if [[ "$base" =~ ^(index|main|app|config|setup|.*[.-]config)$ ]]; then
         require_tests=false
     fi
     if [[ "$dir" =~ /(dist|build|node_modules|coverage|docs|examples|scripts)(/|$) ]]; then
