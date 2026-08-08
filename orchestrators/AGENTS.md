@@ -79,7 +79,9 @@ Helpers, invoked explicitly (never wired): `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
 `--reuse` for crash-resume), `resolve-config.sh` (CLAUDE_* settings chain),
 `mark-syllabus.sh` (scripted syllabus ticks), `verify-scope.sh` (reported
-files vs real lane diff), `report-verdict.sh` (the ONLY writer of a verdict
+files vs real lane diff), `verify-run-scope.sh` (whole-run diff vs the union
+of exit reports at the PR gate — unclaimed product changes are blocking),
+`report-verdict.sh` (the ONLY writer of a verdict
 round — enforces `ready|tentative|rejected` + kickback codes at write time),
 `validate-report.sh` (caller-side report schema check, `--kind exit` for
 builder exit reports), `sync-install.sh` (repo→`~/.claude` install sync,

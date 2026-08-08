@@ -18,7 +18,9 @@
 #   the base branch — the parent/child scheme: an orchestrator's run
 #   worktree sits on <type>/<name> off base, and each builder lane's child
 #   worktree sits on <type>/<name>-l<n> off the parent (l<n> = the plan's
-#   lane number; the BASE: output line then names the parent).
+#   lane number; the BASE: output line then names the parent). The workflows
+#   dir always resolves against the MAIN checkout, so children created from
+#   inside the parent worktree land as its siblings, never nested in it.
 #   With --reuse, an existing <type>/<name> branch is not an error: the
 #   worktree is created on that branch and the start-point branch is merged
 #   into it so the run starts up to date (merge conflicts abort the setup
@@ -57,8 +59,13 @@ case "$type" in
   *) err "invalid --type '$type' (must be one of: feature, bug, hotfix, docs, sync)" ;;
 esac
 
-# --- repo root -------------------------------------------------------------
-root=$(git rev-parse --show-toplevel 2>/dev/null) || err "not inside a git repository"
+# --- repo root: the MAIN checkout, never the current worktree ---------------
+# Inside a worktree, --show-toplevel returns the worktree — resolving the
+# workflows dir against it would NEST a child inside its parent (and pollute
+# the parent branch's .gitignore). The main checkout is dirname of the common
+# git dir, from anywhere in the repo.
+git rev-parse --git-dir >/dev/null 2>&1 || err "not inside a git repository"
+root=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 cd "$root"
 
 # --- workflows dir: resolve-config.sh (CLAUDE_WORKFLOWS_DIR chain, default .workflows) ---
