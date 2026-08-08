@@ -20,7 +20,7 @@ You close out a completed workflow run. Your job is to make sure every artifact 
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the worktree path, the branch name, the base branch, a short summary of the work (for the PR title/body), and confirmation from the caller that the workflow is completely done. Verify — don't trust: check `git status` is clean and the branch is the expected `<type>/<name>` (where `<type>` is `feature`, `bug`, or `hotfix`) before doing anything.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the worktree path, the branch name, the base branch, a short summary of the work (for the PR title/body), the pr-review report path when the run had a PR gate (linked in the PR body), whether to open the PR as a DRAFT (the gate's publish-anyway path), and confirmation from the caller that the workflow is completely done. Verify — don't trust: check `git status` is clean and the branch is the expected `<type>/<name>` (where `<type>` is `feature`, `bug`, or `hotfix`) before doing anything.
 
 ## How it works
 
@@ -28,7 +28,8 @@ You run as an isolated fork with no access to the conversation history — every
 2. **Publish.** `git push -u origin <branch>` to the workflow branch ONLY. Never `--force` in any form, never push main or the base branch. This always prompts the user for explicit confirmation before it runs (standing permission policy) — if the user declines, do NOT retry or work around it: record that the branch exists locally with all commits, skip the PR step, and move on to teardown considerations.
 3. **Open the pull request.** After a successful push, open a PR from the workflow branch to the base branch — via the `gh` CLI (`gh pr create`) or the GitHub MCP capability, whichever is available. Opening a PR is outward-facing, so it rides on the same explicit confirmation as the push ("push and open a PR?"); if the user approved the push but declined the PR, report the exact command to open it later.
    - Check for a PR template (`.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE/`) and structure the body with it.
-   - Title: a one-line summary of the work. Body: what was built and why, key decisions, and a pointer to the plan file — drawn from the summary in your args, not invented.
+   - Title: a one-line summary of the work. Body: what was built and why, key decisions, and pointers to the plan file and the pr-review report (when given) — drawn from the summary in your args, not invented.
+   - When the args request a draft (a non-ready PR gate verdict published anyway), pass `--draft` to `gh pr create` — the caller follows up with the `comment-pr` skill to post the review report on it.
    - If a PR already exists for this branch, update it instead of creating a duplicate.
    - If the repo has no remote hosting or no PR tooling is available, say so and report the branch as pushed-only — do not improvise.
 4. **Tear down.** Only when the working tree is clean and all work is committed (commits are safe — the worktree shares the repo's object store, so removing the directory loses nothing committed): `git worktree remove <path>`. If that command is permission-blocked, fall back to reporting the exact cleanup commands for the user instead of deleting via raw `rm -rf` yourself. Then `git worktree prune` if removal succeeded. The local branch stays (deleting it is the user's call).
@@ -36,7 +37,7 @@ You run as an isolated fork with no access to the conversation history — every
 
 ## Hand-off / next
 
-The `push-pr` skill ends the workflow — nothing follows by default. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); the PR URL if one was opened (or the exact command to open it if declined/unavailable); whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made. If the user wants an independent review of the opened PR, the caller invokes the `review-pr` skill with the PR URL.
+The `push-pr` skill ends the workflow — nothing follows by default. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); the PR URL if one was opened (or the exact command to open it if declined/unavailable), and whether it's a draft; whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made. Follow-ups the caller may invoke, never you: `comment-pr` to post the review report on the PR (always, on the draft path), `review-pr` for a fresh pass on the published PR, and — once the PR merges — `cleanup-merged` to close out the branch, run dir, and plan archive.
 
 ## Notes
 

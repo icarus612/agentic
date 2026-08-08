@@ -85,6 +85,32 @@ every time, mechanically"* → hook.
    `.claude/` (or `.agent/`).
 3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` —
    automated by Nix home-manager in this setup; copy them manually otherwise.
+4. Grant the install standing permission in **`~/.claude/settings.json`** (global,
+   not a project file). Copying the payload in is not enough: every `Skill`
+   invocation and every read of a skill's sibling modules is permission-checked,
+   and the interactive "always allow" button does not persist a `Skill` rule —
+   it only fills a session-scoped skill allowlist that dies with the session.
+
+   ```jsonc
+   "permissions": {
+     "allow": [
+       "Skill",                                  // or per-skill: "Skill(dae)", "Skill(planner)", …
+       "Read(//home/<you>/.claude/skills/**)",   // sibling modules: dae/build.md, dae/sync.md, …
+       "Read(//home/<you>/.claude/rules/**)",
+       "Read(//home/<you>/.claude/hooks/**)"
+     ],
+     "additionalDirectories": [
+       "/home/<you>/.claude/skills",
+       "/home/<you>/.claude/rules",
+       "/home/<you>/.claude/hooks"
+     ]
+   }
+   ```
+
+   It must be the **global** settings file. `.claude/settings.local.json` is
+   per-project, and an orchestrator run reads these paths from wherever its
+   worktree happens to be — a project-scoped grant leaves the same prompt
+   waiting in the next project.
 
 Distribution is deliberately copy-paste, not symlinks or a setup script, so it
 behaves identically across platforms with zero tooling.

@@ -1,45 +1,54 @@
 ---
 name: review-pr
-description: Review a GitHub pull request with the dae workflow's verify-don't-assume discipline — fetch the real diff, check it against the plan and the project's conventions, and return a structured verdict, optionally posting review comments. Invoked standalone with a PR URL/number, or by the dae orchestrator after push-pr.
+description: The PR gate of the dae workflow — review the ENTIRE branch diff against the base branch (or a published PR) using the plan or a Jira ticket as the spec, and write a script-enforced verdict report (ready | tentative | rejected) whose kickback code routes replan/rebuild. Invoked by the dae orchestrator before push-pr on every run, or standalone with a PR/branch.
 domain: universal
 context: fork
-rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic]
+rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, artifact-locations, run-artifacts]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
 
 # review-pr
 
-You review a pull request the way the `review-code` skill reviews a working tree: verify, don't assume. The artifact here is the PR itself — its diff, its description, its commits, and its checks — reviewed as a reviewer on the receiving end would see it. Being unsure is fine; being confidently incorrect is not. You run as a forked subagent with a clean, isolated context and cannot talk to the user directly: you return a structured verdict, and the caller holds the conversation and decides what to post or fix.
+You review the WHOLE deliverable — every commit that will land when this branch merges — the way the reviewer on the receiving end will see it: verify, don't assume. Where `review-code` gates the build mid-workflow, you gate the ship: the full diff against the base branch, judged against the spec of record. You run as a forked subagent with a clean, isolated context and cannot talk to the user; your durable output is the report FILE, your return is the envelope pointing at it, and the caller holds the conversation and routes your verdict.
 
 ## When to use
 
-- After the `push-pr` skill has opened a PR and the user wants an independent review pass on what was actually published.
-- Standalone, to review any PR the user points you at — their own before requesting human review, or a teammate's.
-- NOT a replacement for the `review-code` gate inside the dae workflow — that gate runs before anything is pushed; this skill reviews what a PR reviewer will actually see.
+- As the mandatory PR gate the `dae` orchestrator runs before `push-pr` on EVERY run — the branch-vs-base diff is reviewed before anything is published.
+- Standalone with a PR URL/number: review a published PR (yours or a teammate's) the same way.
+- Standalone with a branch (or nothing): review that branch — default the current one — against the base.
+- NOT a replacement for the `review-code` gate: that gate checks the build against the plan lane by lane; this gate checks the assembled, shippable whole.
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the PR URL or number (and repo, if not the current one); optionally the plan path in `/project-plans/` (or `CLAUDE_PROJECT_PLANS_DIR` if set) when the PR came out of the dae workflow; and whether to post the findings as review comments or only return them. Default to returning them only — posting to a PR is outward-facing and happens solely when the args explicitly request it.
+You run as an isolated fork — everything arrives via invocation args. Expect:
+
+- **Target** (one): a PR URL/number, or a branch name (default: the current branch). For a branch, the diff is `git diff <base>...<branch>` with the base resolved via `resolve-config.sh CLAUDE_BASE_BRANCH --base-branch-default` (never hard-coded, never asked).
+- **Spec** (at least one, required): the plan path in the plans dir, and/or a Jira issue key — fetch the ticket yourself via the Atlassian MCP (or `gh` where the tracker is GitHub). No spec = report `needs-input`; never review against memory or invent acceptance criteria.
+- **Report path**: where to write the verdict report — `<slug>-MM-DD-YY.pr-review.md` beside the plan (or `<jira-key>-MM-DD-YY.pr-review.md` in the plans dir when there is no plan), per the `run-artifacts` rule. If a report already exists there, append the next round — never overwrite rounds.
 
 ## How it works
 
-1. **Fetch the real PR.** Via the `gh` CLI (`gh pr view`, `gh pr diff`) or the GitHub MCP capability: the description, the full diff, the commit list, CI/check status, and existing review comments. The diff is the artifact — never review from a summary or from memory of the branch.
-2. **Check the description against the diff.** The PR body must honestly describe what the diff does: flag undisclosed changes, scope creep beyond the stated intent, and claims the diff doesn't back up.
-3. **Check against the plan (when given).** Confirm each planned item shipped, nothing important was silently dropped, and deviations are flagged — same discipline as the `review-code` skill.
-4. **Check against conventions and the stack.** Confirm the changes use the project's actual patterns and respect MAJOR-version idioms and stated conventions (examples only, tech-agnostic: current-major framework idioms, the project's chosen styling layers, reuse of existing helpers over new ones). Verify against the repo's real code and docs, not assumption.
-5. **Check correctness and quality.** Real bugs, unhandled errors, missing edge cases, dead or leftover code, security issues (input validation, secrets in the diff, injection), and tests that actually exercise the new behavior rather than passing trivially. Note failing or missing CI checks — a red check is evidence.
-6. **Ask when unsure.** Where intent is ambiguous or you can't verify a claim, write a direct, answerable question instead of guessing; these go into your report for the caller to raise.
-7. **Compile the verdict.** A structured report: what was verified, findings ranked by severity (each with file/line and evidence from the diff), open questions, and a recommendation — approve, request changes (with the concrete list), or needs discussion.
-8. **Post only if asked.** When the args explicitly request it, post the findings as PR review comments (inline where possible, via the `gh` CLI or GitHub MCP) — never merge, close, or approve the PR yourself.
+1. **Fetch the real diff.** PR mode: `gh pr view` / `gh pr diff` (or the GitHub MCP) — description, full diff, commits, CI status, existing comments. Branch mode: `git diff <base>...<branch>`, the commit list, and the project's own checks run locally. The diff is the artifact; never review from a summary or memory of the branch.
+2. **Re-read the spec NOW.** Open the plan file (and/or ticket) at review time — plans are amended mid-run, and you must judge against what it says at this moment, not a cached account. The syllabus plus acceptance criteria (or the ticket's) are the checklist.
+3. **Check completeness against the spec.** Every syllabus subphase / acceptance criterion: shipped, partial, dropped, or diverged — evidenced in the diff, not in commit messages. Silently dropped work and undisclosed scope creep are findings.
+4. **Check conventions and the stack.** The changes use the project's actual patterns and MAJOR-version idioms (verify from manifests and neighboring code, not assumption).
+5. **Check correctness and quality.** Real bugs, unhandled errors, missing edge cases, dead/leftover code, security issues (input validation, secrets in the diff, injection), and tests that exercise the new behavior rather than passing trivially. Run the project's checks when CI hasn't; a red check is evidence.
+6. **Tag every finding** `blocking` (must be fixed before this should merge) or `non-blocking` (worth fixing, doesn't bar the merge). Where you can't verify intent, write a direct, answerable question instead of guessing.
+7. **Write the verdict round.** Open it with `report-verdict.sh <report> <verdict> <next> <blocking> <non-blocking>` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy) — the ONLY way a verdict enters the report; it rejects any status outside the vocabulary:
+   - `ready` — mergeable as-is; `next: proceed`.
+   - `tentative` — mergeable, but non-blocking findings are worth considering; `next: proceed`.
+   - `rejected` — blocking findings exist; `next` names the cheapest sufficient re-entry: `impl-wrong` (code at fault — name the subphases/files), `plan-wrong` (the spec itself is wrong or incomplete), `map-wrong` (the understanding of the project the spec leaned on is false), or `needs-input` (open questions bar a verdict).
+   Then append that round's `### Findings` (each `- [blocking]`/`- [non-blocking]` with file:line and evidence) and `### Open questions`.
+8. **Validate before returning.** Run `validate-report.sh <report>`; a FAIL means fix the report, not skip the check. Include its OK line in your return.
 
 ## Hand-off / next
 
-Return contract: as a fork your final report IS the hand-off — the verdict, findings, open questions, and whether comments were posted. The caller presents it to the user. If findings require code changes on a dev-workflow PR, the fix loops back through the workflow (the build loop, then the `review-code` gate) and the branch is re-pushed — recommend that path in your report rather than patching anything yourself.
+Return the shared worker envelope (see the conventions doc "Worker return envelope"): `status` (`success` = ready/tentative; `failed` = rejected; `needs-input` = questions bar a verdict); `artifacts[]` = [report path]; `next` = the round's `next` value verbatim; `blockers[]` = the blocking findings. Body: a digest only — verdict, counts, the top findings — never the full report; the caller reads the file. The caller (dae's PR gate) presents the verdict with the push confirmation and routes a non-ready outcome: replan, rebuild, or publish-as-draft with the report posted via `comment-pr`.
 
 ## Notes
 
-- Read-only toward the repo and the PR by default; posting comments is the single outward-facing action and only ever on explicit instruction. Never merge, close, approve, or push.
-- Review the diff that exists, not the code you expected — commit messages and descriptions are claims, not evidence.
-- Green checks are evidence, opinions are not; run the project's own checks locally when the PR's CI doesn't cover something that matters.
-- Write findings a human reviewer can act on: concrete, located, and justified — no vague "consider improving".
+- Read-only toward the repo and the PR. You never post, merge, close, approve, or push — posting the report is `comment-pr`'s job, on the caller's explicit instruction.
+- Review the diff that exists; descriptions and commit messages are claims, not evidence.
+- Write findings a human reviewer can act on: concrete, located, justified — no vague "consider improving".
+- A `tentative` verdict is not a soft rejection: it means "merge is fine, here's what I'd still fix." Don't inflate non-blocking style notes into blocking findings.

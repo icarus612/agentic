@@ -16,7 +16,7 @@ The stage sequence for issue-type runs. Setup and ship are the router's shared s
 
 **6. Record** (shared — router). `document-local` or `document-confluence` per the docs target, passing the plan path, build/review summary, and changelog preference. The document skill also ticks/annotates any syllabus items the build closed differently than planned.
 
-**7. Ship** (shared — router). `push-pr` with the parent worktree path, parent branch, base branch, and a work summary. Not done until it reports.
+**7. Ship** (shared — router). The router's PR gate first — `review-pr` on the parent branch vs the base, verdict presented with the push confirmation, non-ready verdicts routed per the router (replan / rebuild / draft-publish with `comment-pr`). Then `push-pr` with the parent worktree path, parent branch, base branch, a work summary, and the pr-review report path (linked in the PR body; `--draft` if the gate chose it). Not done until it reports.
 
 ## Notes
 

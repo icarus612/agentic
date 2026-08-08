@@ -8,7 +8,7 @@ runs*:
 |---|---|---|---|
 | **Main-session orchestrator** | the user | the conversation | `dae`, `orchestrate` |
 | **Worker agent** | its orchestrator (messages) | own, **warm** — survives revision loops | `planner`, `builder` (+ its `coder`/`contract-tester` sub-agents) |
-| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `document-*`, `init-workspace`, `push-pr`, `review-pr` |
+| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `review-pr`, `document-*`, `init-workspace`, `push-pr`, `comment-pr`, `cleanup-merged` |
 
 **Principles** (each with its enforcement point):
 
@@ -52,7 +52,14 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
                               impl-wrong │ plan-wrong │ map-wrong) ◀── integration
                                                │ clean
                                                ▼
-                          document-local | document-confluence ─▶ push-pr
+                          document-local | document-confluence
+                                               │
+                                               ▼
+                     review-pr gate (branch vs base; ready │ tentative │
+                     rejected → replan / rebuild / draft+comment-pr)
+                                               │
+                                               ▼
+                                            push-pr
 ```
 
 Inside each builder: contract expansion → one parallel wave of `coder` ‖
@@ -72,7 +79,10 @@ Helpers, invoked explicitly (never wired): `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
 `--reuse` for crash-resume), `resolve-config.sh` (CLAUDE_* settings chain),
 `mark-syllabus.sh` (scripted syllabus ticks), `verify-scope.sh` (reported
-files vs real lane diff), `sync-install.sh` (repo→`~/.claude` install sync,
+files vs real lane diff), `report-verdict.sh` (the ONLY writer of a verdict
+round — enforces `ready|tentative|rejected` + kickback codes at write time),
+`validate-report.sh` (caller-side report schema check, `--kind exit` for
+builder exit reports), `sync-install.sh` (repo→`~/.claude` install sync,
 deletions included — this repo's `push-main` runs it).
 Wired hooks: `workflow-diff-check.sh` (`Stop`, on `dae` only — builders check
 per lane instead), `scope-writes.sh` (`PreToolUse` deny-outside-allowlist;

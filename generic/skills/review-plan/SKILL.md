@@ -3,7 +3,7 @@ name: review-plan
 description: Human review gate that verifies the project plan against reality before any code is written. Part of the dae workflow, invoked by the dae orchestrator after the planner worker returns; not the built-in plan mode.
 domain: universal
 context: fork
-rules: [verify-dont-assume, respect-versions-and-conventions, artifact-locations, plan-format]
+rules: [verify-dont-assume, respect-versions-and-conventions, artifact-locations, plan-format, run-artifacts]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -32,14 +32,14 @@ You receive the plan path (`/project-plans/`, or `CLAUDE_PROJECT_PLANS_DIR` if s
 6. **Re-check shallow-explore facts.** Minor assumptions are acceptable ONLY when a shallow explore already verified them in the docs. Even then docs go stale: re-confirm any shallow-explore fact the plan leans on heavily against the actual code, since root `/docs` is the source of truth but can drift from reality.
 7. **Classify each claim** as VERIFIED (observed directly), UNCERTAIN (could not confirm, ask), or WRONG (contradicted by reality). Never silently upgrade UNCERTAIN to VERIFIED.
 8. **Ask when unsure.** For every UNCERTAIN item, write a specific, answerable question rather than guessing; these go into your report for the caller to put to the user. Better to ask than be confidently wrong.
-9. **Compile the verdict for the human gate.** Your final report IS the gate material, returned as the shared worker envelope (see the conventions doc "Worker return envelope"): `status` (`success` = approve-recommended, `needs-input` = open questions block a verdict, `failed` = revise); `artifacts[]` = [the plan path]; `next` = your recommendation — approve, planner revision, or re-explore; `blockers[]` = the WRONG items. Body: the script's structural result, parallelizability findings (scope collisions, hidden dependency edges), verified facts, corrections with evidence, and open questions as specific answerable questions. The caller presents this verdict to the user and collects the decision.
+9. **Write the verdict round to the report file, then compile the envelope.** The durable verdict lives on disk, per the `run-artifacts` rule: `<slug>-MM-DD-YY.plan-review.md` beside the plan, one `## Round <n>` section per gate iteration (the revision-loop history is readable straight from the file). Open the round with `report-verdict.sh <report> <verdict> <next> <blocking> <non-blocking>` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy — it enforces the vocabulary): `verdict` = `ready` (approve-recommended) | `tentative` (approvable; non-blocking notes) | `rejected` (revise); `next` = `proceed`, or for rejections `plan-wrong` (planner revision), `map-wrong` (re-explore the stale foundation, then the planner), or `needs-input` (open questions block a verdict). Append that round's `### Findings` (each `- [blocking]`/`- [non-blocking]` with evidence — the WRONG items are blocking) and `### Open questions`, then run `validate-report.sh <report>` — fix any FAIL before returning. The envelope back: `status` (`success` = ready/tentative, `needs-input`, `failed` = rejected); `artifacts[]` = [the plan path, the report path]; `next` = the round's `next` verbatim; `blockers[]` = the blocking findings. Body: a digest — the script's structural result, parallelizability findings, verified facts, top corrections — never the full report; the caller (and any redispatched worker) reads the file. The caller presents this verdict to the user and collects the decision.
 
 ## Hand-off / next
 
 A fork cannot invoke other skills or hand off on its own; these are recommendations in your envelope, and the caller performs the actual loop or hand-off.
 
 - **Approved:** recommend approval. Once the user signs off at the caller's gate, the caller switches to auto mode and dispatches builder lanes from the syllabus.
-- **Plan needs revision:** recommend a planner revision — the caller messages your corrections and open questions to the warm `planner`.
+- **Plan needs revision:** recommend a planner revision — the caller messages the warm `planner` with the REPORT PATH (the findings file is the hand-off; a paraphrase of it is not) plus any user decisions from the gate.
 - **Missing or stale foundation:** recommend re-exploration of the specific stale area, then a planner revision.
 - The user can reject the plan at the gate at any point; the caller drives that loop, and the gate is capped — after `max_iterations` revision rounds the caller escalates to the human instead of looping again.
 

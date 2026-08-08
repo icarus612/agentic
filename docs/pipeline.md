@@ -19,7 +19,12 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
                               impl-wrong │ plan-wrong │ map-wrong) ◀── integration
                                                │ clean
                                                ▼
-                          document-local | document-confluence ─▶ push-pr
+                          document-local | document-confluence
+                                               ▼
+                        review-pr gate (branch vs base; ready │ tentative │
+                        rejected → replan / rebuild / draft+comment-pr)
+                                               ▼
+                                            push-pr
 ```
 
 ## Workflows (`--type`)
@@ -41,7 +46,7 @@ stages. `bugfix` vs `diagnose`: known cause → bugfix; unknown cause → diagno
 |---|---|---|
 | Orchestrator | `dae`, `orchestrate` | the conversation; holds every human gate |
 | Workers | `planner` (opus, warm — revisions via SendMessage), `builder` (sonnet, one per lane) + its `coder`/`contract-tester` sub-agents | own contexts |
-| Cold forks | `explore`, `review-plan`, `review-code`, `init-workspace`, `document-local`/`document-confluence`, `push-pr`, `review-pr` | isolated; envelope return |
+| Cold forks | `explore`, `review-plan`, `review-code`, `review-pr`, `init-workspace`, `document-local`/`document-confluence`, `push-pr`, `comment-pr`, `cleanup-merged` | isolated; envelope return |
 
 Every worker and fork returns the **shared envelope** — `status`,
 `artifacts[]`, `next`, `blockers[]` (defined once in
@@ -69,11 +74,19 @@ parent, which `push-pr` publishes.
 
 ## Gates
 
-Both judgment gates are capped (3 loops, then escalate to the human) and
-return envelope verdicts. The code gate's `next` carries a kickback reason
-code: `impl-wrong` → redispatch the lane; `plan-wrong` → message the warm
-planner; `map-wrong` → re-run `explore`, then the planner. Cheapest sufficient
-re-entry always.
+All judgment gates are capped (3 loops, then escalate to the human), write
+their verdict rounds to committed report files beside the plan (per the
+`run-artifacts` rule — the verdict vocabulary `ready | tentative | rejected`
+is enforced by `report-verdict.sh`/`validate-report.sh`, and the loop history
+is readable from the file), and return envelope verdicts. The code and PR
+gates' `next` carries a kickback reason code: `impl-wrong` → redispatch the
+lane; `plan-wrong` → message the warm planner; `map-wrong` → re-run `explore`,
+then the planner — the redispatched worker gets the report PATH, never a
+paraphrase. Cheapest sufficient re-entry always. The PR gate runs on EVERY
+run before `push-pr`: the whole branch-vs-base diff against the plan/ticket
+as amended (plans are amendable at any stage; gates re-read the file at
+verdict time). A rejected verdict offers replan / rebuild / publish-as-draft
+(+ `comment-pr` posting the report), `(Recommended)` per its kickback code.
 
 ## Documentation dispatch
 

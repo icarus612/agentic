@@ -2,7 +2,7 @@
 name: dae
 description: Entry-point orchestrator — routes each request to exactly one workflow (build, diagnose, document, sync), drives the planner and builder workers through cold review gates to a PR, and manages context for the whole run. Invoke as /dae [--type|-t <t>] on a feature, fix, rework, migration, investigation, docs pass, or reconciliation.
 domain: universal
-rules: [verify-dont-assume, model-policy, artifact-locations]
+rules: [verify-dont-assume, model-policy, artifact-locations, run-artifacts]
 model: opus
 model-fallback: [sonnet, gemini-pro]
 hooks:
@@ -52,19 +52,22 @@ An unknown flag is an error — say so and stop; never silently ignore one.
 
 Every workflow runs **setup** first and **ship** last; the middle belongs to its file.
 
-- **Setup** — resolve the docs target once (`~/.claude/hooks/resolve-config.sh CLAUDE_DOCS_DIR --default /docs`, or the project's `.claude/hooks/` copy): a path = local mode (`document-local` records), an Atlassian URL / `confluence:` shorthand = Confluence mode (`document-confluence` records; follow `confluence-mode.md` to capture requirements BEFORE exploring). Then establish the run's **parent worktree** per `worktree-modes.md`, on branch `<branch-type>/<name>-parent`.
+- **Setup** — resolve the docs target once (`~/.claude/hooks/resolve-config.sh CLAUDE_DOCS_DIR --default /docs`, or the project's `.claude/hooks/` copy): a path = local mode (`document-local` records), an Atlassian URL / `confluence:` shorthand = Confluence mode (`document-confluence` records; follow `confluence-mode.md` to capture requirements BEFORE exploring). Then establish the run's **parent worktree** per `worktree-modes.md`, on branch `<branch-type>/<name>-parent`, and the run-artifacts dir `<workflows-dir>/<name>-artifacts/` (`mkdir -p`, plus `contracts/` and `reports/`) with an initial `progress-log.md` per the `run-artifacts` rule.
 - **Plan-stage concurrency** — workflows that spawn the planner fire `init-workspace` for the parent worktree in the background at planner spawn, and JOIN on it before the plan gate (gate verification may run commands there).
-- **Ship** — record via the mode's document skill, then invoke `push-pr` (publishes the parent branch, always asks first, tears down). The run is NOT done until `push-pr` reports; a declined push is a valid outcome.
+- **Ship** — record via the mode's document skill, then the **PR gate** (below), then invoke `push-pr` (publishes the parent branch, always asks first, tears down; `--draft` when the gate chose the draft path). The run is NOT done until `push-pr` reports; a declined push is a valid outcome.
+- **PR gate (always, before any push)** — invoke the `review-pr` skill with the parent branch, the plan path (and/or Jira key), and the report path (`<slug>-MM-DD-YY.pr-review.md` beside the plan). It reviews the ENTIRE branch-vs-base diff against the spec as it exists NOW and writes the script-enforced verdict. Present the verdict WITH the push confirmation: `ready` → offer push-pr as normal; `tentative` → same, with the non-blocking findings shown; `rejected` → offer the routing choice — **replan** (`plan-wrong`/`map-wrong` → the kickback table), **rebuild** (`impl-wrong` → redispatch the named lane), or **publish anyway** as a DRAFT PR with the report posted (`push-pr --draft`, then `comment-pr` with the report path) — tagging `(Recommended)` on the option the verdict's `next` code names. A post-kickback rebuild re-enters this gate (new round in the same report file, capped like the other gates).
 
 ## Gates
 
-- Gates are cold forks (`review-plan`, `review-code`) returning the shared worker envelope; you hold the human-gate conversation — never skip it, never flip to auto mode before the user approves.
-- **Cap:** max 3 revision loops per gate; after that, escalate to the human with the loop history instead of iterating again.
-- **Kickback routing (code gate):** the verdict's `next` carries a reason code, routed to the cheapest sufficient re-entry — `impl-wrong` → redispatch the builder lane with the findings; `plan-wrong` → SendMessage the warm planner an amendment (respawn with corrections only if it's gone); `map-wrong` → re-run `explore`, then the planner. Full re-explore ONLY on `map-wrong`.
+- Gates are cold forks (`review-plan`, `review-code`, `review-pr`) returning the shared worker envelope, with the durable verdict written to the gate's report file per the `run-artifacts` rule; you hold the human-gate conversation — never skip it, never flip to auto mode before the user approves.
+- **Cap:** max 3 revision loops per gate; after that, escalate to the human with the loop history (readable from the report file's rounds) instead of iterating again.
+- **Kickback routing (code + PR gates):** the verdict's `next` carries a reason code, routed to the cheapest sufficient re-entry — `impl-wrong` → redispatch the builder lane with the REPORT PATH (the findings file is the hand-off, never your paraphrase of it); `plan-wrong` → SendMessage the warm planner the report path plus gate decisions (respawn with the same pointers only if it's gone); `map-wrong` → re-run `explore`, then the planner. Full re-explore ONLY on `map-wrong`.
 
 ## Invariants (load-bearing — they live here, never in a sibling file)
 
 - You own the plan file during the build: builders never edit it; your syllabus ticks go through `mark-syllabus.sh`.
+- **The plan is amendable at ANY stage.** When the user changes or adds requirements mid-run — any stage, build included — route the change to the warm planner (same plan file, amended in place), re-run `validate-plan.sh`, and re-gate when the change is material. Undispatched work follows the amended plan; already-merged work the amendment contradicts is flagged to the user, never silently kept or silently redone. Every gate re-reads the plan FILE at verdict time, so a review always judges against the plan as it stands now.
+- **Maintain the progress log.** Rewrite `<run-artifacts>/progress-log.md` in place at every state change — stage transitions, gate rounds (count + one-line outcome + report path), lane dispatch/merge events, plan amendments, open questions. All small- and medium-sized run information lands there, not only in chat: it is what a resumed or compacted session reconstructs the run from (with the plan syllabus). Never committed; dies with the run dir at cleanup.
 - Only a builder's own e2e phase exits its build loop; gates judge, workers build — you do neither.
 - Your writes are harness-scoped — the plan file and run artifacts, never the product (`scope-writes.sh` enforces this when wired; its allowlist is exactly those paths).
 - Pass pointers, not payloads: workers and forks get file paths and short summaries; keep raw dumps out of your context. Surface only blockers, gate verdicts, and completion summaries.

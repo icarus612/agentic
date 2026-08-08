@@ -25,6 +25,7 @@ a rule.
 | `artifact-locations` | Where docs, plans, and worktrees live (config-resolved) — and how the docs target selects the documentation skill. |
 | `doc-format` | How docs are structured and placed. |
 | `plan-format` | How plans are named, phased, and kept current. |
+| `run-artifacts` | Where run files live: committed review records beside the plan; the gitignored run dir (progress log, contracts, exit reports). Verdict vocabulary script-enforced. |
 
 ## `skills/` — the tech-agnostic forks and gates
 
@@ -41,11 +42,13 @@ context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
 |---|---|
 | `explore` | The shared mapping fork: full structured map (stack + MAJOR versions, structure, dependency graph, patterns, conventions) written to disk, envelope pointer back. Invoked by the planner's escalation and the dae document workflow — NOT a mandatory pre-plan phase. |
 | `init-workspace` | Install dependencies and set up toolchains inside a worktree (the run's parent, or a builder's child) so later stages can build and test. (Verbose name — `init` collides with a Claude Code built-in.) |
-| `review-plan` | Cold gate before any code. `scripts/validate-plan.sh` owns the schema half; the fork verifies claims against reality; envelope verdict to the caller's human gate. |
-| `review-code` | Cold gate before any docs. Envelope verdict whose `next` carries the kickback reason code (`impl-wrong` \| `plan-wrong` \| `map-wrong`) the dae router routes on. |
+| `review-plan` | Cold gate before any code. `scripts/validate-plan.sh` owns the schema half; the fork verifies claims against reality; verdict round written to the `.plan-review.md` record, envelope verdict to the caller's human gate. |
+| `review-code` | Cold gate before any docs. Verdict round written to the `.code-review.md` record; the envelope `next` carries the kickback reason code (`impl-wrong` \| `plan-wrong` \| `map-wrong` \| `needs-input`) the dae router routes on. |
+| `review-pr` | The PR gate before any push (and standalone on published PRs): the ENTIRE branch-vs-base diff against the plan or Jira ticket; script-enforced `ready \| tentative \| rejected` verdict in the `.pr-review.md` record. Never posts. |
+| `comment-pr` | Post a `.pr-review.md` verdict to GitHub: `scripts/render-pr-comment.sh` renders the last round, `gh` posts it with confirmation. Never reviews. |
 | `document-local` | Record stage when the docs target is a local path: write into the docs root, the single source of truth; optional changelog commit (never a push). |
-| `push-pr` | Terminal ship stage: commit stragglers, push the workflow branch, open a PR, tear down the worktree. Always asks first. |
-| `review-pr` | Review a GitHub PR against its diff, plan, and conventions. Posts comments only on explicit instruction. |
+| `push-pr` | Terminal ship stage: commit stragglers, push the workflow branch, open a PR (draft on the gate's publish-anyway path), tear down the worktree. Always asks first. |
+| `cleanup-merged` | Post-merge closeout: verified-merged branch deleted local+remote, worktrees pruned, run dir removed, plan + review records archived to `completed/`, optional Jira transition. Safe deletes only. |
 
 ## `hooks/` — global quality enforcement
 

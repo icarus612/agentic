@@ -10,17 +10,18 @@ A **lane** is a chain of subphases whose only `(after:)` edges are internal (the
 
 The syllabus's `(after:)` edges ARE the schedule. Maintain the frontier: a lane is dispatchable the moment every subphase it depends on (outside itself) is ticked. Dispatch every dispatchable lane immediately — builders in one batch message when several unblock together — and then, on EACH builder report:
 
-1. **Verify the lane**: `verify-scope.sh <child-worktree> <parent-branch> <reported files…>` — the reported files must match the lane's real diff. UNREPORTED files stop the schedule; resolve before merging.
+1. **Verify the lane**: check the exit report file exists and passes `validate-report.sh --kind exit`, then `verify-scope.sh <child-worktree> <parent-branch>` fed the report's `## Files touched` list — the reported files must match the lane's real diff. A missing/invalid exit report or UNREPORTED files stop the schedule; resolve before merging.
 2. **Merge the child branch into the parent** (from the parent worktree: `git merge <child-branch>`). A merge conflict IS a mechanical scope violation — two lanes touched the same file; stop, surface it, don't force-resolve silently.
 3. **Clean up the lane**: `git worktree remove <child-path>`, `git worktree prune`, delete the child branch. Lanes are ephemeral — merged means gone. Cleanup ONLY after a verified merge.
 4. **Tick its subphases**: `mark-syllabus.sh <plan> <id> <x|done|dropped>` per the report.
-5. **Re-scan the frontier and dispatch immediately** — a dependent lane launches the moment its edge ticks, never waiting on the slowest unrelated lane.
+5. **Update the progress log** — rewrite `<run-artifacts>/progress-log.md` with the lane event (merged/failed, exit report path, frontier state) per the router's invariant.
+6. **Re-scan the frontier and dispatch immediately** — a dependent lane launches the moment its edge ticks, never waiting on the slowest unrelated lane.
 
 At run end exactly ONE worktree/branch pair remains — `<branch-type>/<name>-parent` — which the ship stage publishes and tears down.
 
 ## Builder dispatch prompt
 
-Each builder gets: the plan path (or diagnosis report path), its lane's subphase/candidate IDs, its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), and the hard rules — stay inside the file scope, never edit the plan/report file, report per the shared envelope with every file touched and the acceptance-criteria evidence.
+Each builder gets: the plan path (or diagnosis report path), its lane's subphase/candidate IDs, its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run-artifacts dir (its contract goes to `contracts/<lane-id>.md`, its exit report to `reports/<lane-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
 
 ## Failure paths
 

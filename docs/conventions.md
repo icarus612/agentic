@@ -92,9 +92,9 @@ domain: <universal|svelte|django|…>
 <the rule, in a sentence or two>
 ```
 
-The 8 universal rules: `artifact-locations`, `doc-format`, `model-policy`,
+The 9 universal rules: `artifact-locations`, `doc-format`, `model-policy`,
 `plan-format`, `push-policy`, `respect-versions-and-conventions`,
-`tech-agnostic`, `verify-dont-assume`. Tech-bound rules live with their layer
+`run-artifacts`, `tech-agnostic`, `verify-dont-assume`. Tech-bound rules live with their layer
 (`use-runes` → svelte, `typescript-strict` → typescript,
 `external-storage-cap` → confluence, …).
 
@@ -111,13 +111,31 @@ blockers:  [<blocker>, …]     # empty when none
 ```
 
 followed by a worker-specific body (a digest, never the artifact's content —
-artifact-on-disk, pointer-in-envelope). Adopters: the `builder` exit report,
-the `planner` return, the `explore` map summary, both review-gate verdicts
-(`review-plan`, `review-code` — whose `next` carries the kickback reason code
-`plan-wrong | map-wrong | impl-wrong`), and diagnosis investigation subagents
-(body fields: `root_cause`, `evidence`, `likelihood`, `ease`, `proposed_fix`,
-`files`). A worker inventing its own report shape instead of this envelope is
-a convention violation.
+artifact-on-disk, pointer-in-envelope). Adopters: the `builder` exit report
+(persisted to the run dir and validated by `validate-report.sh --kind exit`),
+the `planner` return, the `explore` map summary, all three review-gate
+verdicts (`review-plan`, `review-code`, `review-pr` — whose `next` carries the
+kickback reason code `plan-wrong | map-wrong | impl-wrong | needs-input`), and
+diagnosis investigation subagents (body fields: `root_cause`, `evidence`,
+`likelihood`, `ease`, `proposed_fix`, `files`). A worker inventing its own
+report shape instead of this envelope is a convention violation.
+
+## Run artifacts & verdict reports
+
+Defined by the `run-artifacts` rule. Two homes: **committed review records**
+beside the plan (`<slug>-MM-DD-YY.{story,diagnosis,sync-report,plan-review,code-review,pr-review}.md`),
+and the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
+`progress-log.md` (the orchestrator's live run state, rewritten in place,
+never committed), `contracts/<lane-id>.md`, and `reports/<lane-id>-exit.md`.
+
+Review reports append one `## Round <n>` section per gate iteration. The
+verdict vocabulary is enforced by scripts, not prose: `report-verdict.sh` is
+the only writer of a round header (`verdict: ready | tentative | rejected`;
+`next: proceed | impl-wrong | plan-wrong | map-wrong | needs-input`) and
+`validate-report.sh` is the caller-side check (enums, cross-field rules,
+finding-count consistency). A report that fails validation is not a report.
+Kickbacks pass the report PATH — the findings file is the hand-off, never a
+paraphrase of it.
 
 ## Model policy
 
