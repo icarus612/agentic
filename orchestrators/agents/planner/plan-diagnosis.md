@@ -1,6 +1,6 @@
 # plan-diagnosis — module for `--type diagnose` (root cause unknown)
 
-Type-specific guidance only; every invariant lives in the planner definition. The deliverable is NOT a phased plan: it is a **ranked candidate-cause report**, written to the plans dir as `<slug>-MM-DD-YY.diagnosis.md`. The report IS the plan; the human gate is picking the cause(s) to fix.
+Type-specific guidance only; every invariant lives in the planner definition. The deliverable is NOT a phased plan: it is a **ranked candidate-cause report**, written as `proposals/<slug>-MM-DD-YY.md` and becoming the run's `plan.md` on promotion. The report IS the plan; the human gate is picking the cause(s) to fix.
 
 ## Investigation discipline
 

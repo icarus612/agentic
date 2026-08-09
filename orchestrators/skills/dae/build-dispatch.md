@@ -21,7 +21,7 @@ At run end exactly ONE worktree/branch pair remains — the parent, `<branch-typ
 
 ## Builder dispatch prompt
 
-Each builder gets: the plan path (or diagnosis report path), its lane's subphase/candidate IDs, its **lane id** (`l<n>`, from the plan's lane number), its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run-artifacts dir (its contract goes to `contracts/<lane-id>.md`, its exit report to `reports/<lane-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
+Each builder gets: the plan path, its lane's subphase/candidate IDs, its **lane id** (`l<n>`, from the plan's lane number), its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run-artifacts dir (its contract goes to `contracts/<lane-id>.md`, its exit report to `reports/<lane-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
 
 ## Failure paths
 

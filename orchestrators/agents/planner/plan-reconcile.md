@@ -1,6 +1,6 @@
 # plan-reconcile — module for `--type sync` (reconcile shipped work against plan/ticket)
 
-Type-specific guidance only; every invariant lives in the planner definition. The deliverable is a **reconciliation report** — `<slug>-MM-DD-YY.sync-report.md` next to the plan it reconciles — not a phased plan and not a repo sweep. The human gate is confirming the diff.
+Type-specific guidance only; every invariant lives in the planner definition. The deliverable is a **reconciliation report** — written as `sync-report.md` inside the reconciled plan's dir — not a phased plan and not a repo sweep. If that plan is already in `completed/`, the caller reopens it first (`plan-lifecycle.sh reopen`) and passes the restored path; the planner never writes into `completed/`. The human gate is confirming the diff.
 
 - **Truth sources:** the plan syllabus and/or the Jira ticket's acceptance criteria (at least one), versus the REAL shipped diff (`git diff <base>...<ref>` over the shipped-work reference you were given). Read the diff yourself; never trust the plan's account of itself. Explore only as supporting evidence — e.g. confirming a claimed pattern is actually in place, not just present in a hunk.
 - **Classify every item** — each syllabus subphase / acceptance criterion becomes exactly one of:
