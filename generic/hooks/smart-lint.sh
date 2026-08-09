@@ -485,12 +485,33 @@ lint_javascript() {
             continue
         fi
 
+        # Scope to the edited file when the hook gave us one. `.` is only for
+        # manual CLI runs — see TARGET_FILE at the bottom of this file.
+        local prettier_target="."
+        if [[ -n "${TARGET_FILE:-}" ]]; then
+            local abs_target abs_dir
+            abs_target=$(cd "$(dirname "$TARGET_FILE")" 2>/dev/null && printf '%s/%s' "$PWD" "$(basename "$TARGET_FILE")") || abs_target=""
+            abs_dir=$(cd "$dir" 2>/dev/null && pwd) || abs_dir=""
+            # Skip dirs the edited file doesn't live under, so a monorepo runs
+            # prettier once, in the right workspace, instead of once per config.
+            if [[ -z "$abs_target" || -z "$abs_dir" || "$abs_target" != "$abs_dir"/* ]]; then
+                continue
+            fi
+            prettier_target="${abs_target#"$abs_dir"/}"
+            # Prettier exits non-zero on a file it has no parser for (.env,
+            # images, lockfiles); that is not a formatting failure.
+            if ! (cd "$dir" && $prettier_cmd --check "$prettier_target" >/dev/null 2>&1) \
+               && (cd "$dir" && $prettier_cmd --check "$prettier_target" 2>&1 | grep -qiE "no parser|ignored"); then
+                continue
+            fi
+        fi
+
         ran_any_js_check=true
         local prettier_output
-        if ! prettier_output=$(cd "$dir" && $prettier_cmd --check . 2>&1); then
+        if ! prettier_output=$(cd "$dir" && $prettier_cmd --check "$prettier_target" 2>&1); then
             # Apply formatting and capture any errors
             local format_output
-            if ! format_output=$(cd "$dir" && $prettier_cmd --write . 2>&1); then
+            if ! format_output=$(cd "$dir" && $prettier_cmd --write "$prettier_target" 2>&1); then
                 add_error "Prettier formatting failed ($dir)"
                 echo "$format_output" >&2
             fi
@@ -638,11 +659,31 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            echo "Unknown option: $1" >&2
-            exit 2
+            # A bare path scopes the run to one file (CLI equivalent of the
+            # hook payload below).
+            if [[ -e "$1" ]]; then
+                TARGET_FILE="$1"
+                shift
+            else
+                echo "Unknown option: $1" >&2
+                exit 2
+            fi
             ;;
     esac
 done
+
+# PostToolUse fires once per edit, so scope formatters to the file that
+# triggered it rather than the whole tree. Repo-wide `--write .` means one
+# disagreement rewrites files the edit never touched, and on a large repo it can
+# exhaust Node's heap outright. Falls back to repo-wide when invoked manually
+# with no path (CLI mode), which is what `--fast` and ad-hoc runs expect.
+if [[ -z "${TARGET_FILE:-}" ]] && [[ ! -t 0 ]]; then
+    _hook_input=$(cat 2>/dev/null || true)
+    if [[ -n "$_hook_input" ]] && command_exists jq && echo "$_hook_input" | jq . >/dev/null 2>&1; then
+        TARGET_FILE=$(echo "$_hook_input" | jq -r '.tool_input.file_path // empty')
+    fi
+fi
+export TARGET_FILE="${TARGET_FILE:-}"
 
 # Print header
 echo "" >&2
