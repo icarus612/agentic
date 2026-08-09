@@ -124,7 +124,7 @@ report shape instead of this envelope is a convention violation.
 
 Defined by the `run-artifacts` rule. Two homes: **committed review records**
 beside the plan (`<slug>-MM-DD-YY.{story,diagnosis,sync-report,plan-review,code-review,pr-review}.md`),
-and the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
+and the **gitignored run dir** `<workflows-dir>/<name>/.artifacts/` — `.artifacts/` at the root of the run's parent worktree, gitignored via a committed `.artifacts/` entry and destroyed with that worktree — holding
 `progress-log.md` (the orchestrator's live run state, rewritten in place,
 never committed), `contracts/<lane-id>.md`, and `reports/<lane-id>-exit.md`
 (lane ids are always `l1`, `l2`, … — the plan's numbered lanes — naming each

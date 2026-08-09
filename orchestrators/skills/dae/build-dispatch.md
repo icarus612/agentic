@@ -14,14 +14,14 @@ The syllabus's `(after:)` edges ARE the schedule. Maintain the frontier: a lane 
 2. **Merge the child branch into the parent** (from the parent worktree: `git merge <child-branch>`). A merge conflict IS a mechanical scope violation — two lanes touched the same file; stop, surface it, don't force-resolve silently.
 3. **Clean up the lane**: `git worktree remove <child-path>`, `git worktree prune`, delete the child branch. Lanes are ephemeral — merged means gone. Cleanup ONLY after a verified merge.
 4. **Tick its subphases**: `mark-syllabus.sh <plan> <id> <x|done|dropped>` per the report.
-5. **Update the progress log** — rewrite `<run-artifacts>/progress-log.md` with the lane event (merged/failed, exit report path, frontier state) per the router's invariant.
+5. **Update the progress log** — rewrite `<run-dir>/progress-log.md` with the lane event (merged/failed, exit report path, frontier state) per the router's invariant.
 6. **Re-scan the frontier and dispatch immediately** — a dependent lane launches the moment its edge ticks, never waiting on the slowest unrelated lane.
 
-At run end exactly ONE worktree/branch pair remains — the parent, `<branch-type>/<name>` — which the ship stage publishes and tears down.
+At run end exactly ONE worktree/branch pair remains — the parent, `<branch-type>/<name>` — which the ship stage publishes and leaves standing; `cleanup-merged` removes it once the PR merges.
 
 ## Builder dispatch prompt
 
-Each builder gets: the plan path, its lane's subphase/candidate IDs, its **lane id** (`l<n>`, from the plan's lane number), its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run-artifacts dir (its contract goes to `contracts/<lane-id>.md`, its exit report to `reports/<lane-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
+Each builder gets: the plan path, its lane's subphase/candidate IDs, its **lane id** (`l<n>`, from the plan's lane number), its file scope (the union of its detail blocks' file lists), the parent branch and branch type (for its phase 0), the run dir `<workflows-dir>/<name>/.artifacts/` as an ABSOLUTE path — it sits in the PARENT worktree, not the builder's child, so a relative path would resolve wrong from inside the child (its contract goes to `contracts/<lane-id>.md`, its exit report to `reports/<lane-id>-exit.md` — per the `run-artifacts` rule), on rework the gate's report path (the findings FILE, never a paraphrase), and the hard rules — stay inside the file scope, never edit the plan/report file, write the exit report file (validated by `validate-report.sh --kind exit`) before returning the envelope that points at it.
 
 ## Failure paths
 

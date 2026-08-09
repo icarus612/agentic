@@ -3,7 +3,7 @@
 # builder exit report.
 #
 # SYNOPSIS
-#   verify-run-scope.sh <parent-worktree> <base-branch> <run-artifacts-dir> [--allow <prefix>[:<prefix>...]]
+#   verify-run-scope.sh <parent-worktree> <base-branch> <run-dir> [--allow <prefix>[:<prefix>...]]
 #
 # DESCRIPTION
 #   The run-level counterpart of verify-scope.sh (which checks ONE lane
@@ -32,9 +32,9 @@ wt="${1:-}"; base="${2:-}"; rundir="${3:-}"; shift 3 2>/dev/null || true
 allow_extra=""
 if [ "${1:-}" = "--allow" ]; then allow_extra="${2:-}"; fi
 [ -n "$wt" ] && [ -n "$base" ] && [ -n "$rundir" ] \
-  || err "usage: verify-run-scope.sh <parent-worktree> <base-branch> <run-artifacts-dir> [--allow <prefix>[:...]]"
+  || err "usage: verify-run-scope.sh <parent-worktree> <base-branch> <run-dir> [--allow <prefix>[:...]]"
 [ -d "$wt" ] || err "parent worktree not found: $wt"
-[ -d "$rundir" ] || err "run-artifacts dir not found: $rundir"
+[ -d "$rundir" ] || err "run dir not found: $rundir (expected <worktree>/.artifacts)"
 git -C "$wt" rev-parse --verify -q "$base" >/dev/null || err "base branch '$base' does not exist"
 
 hookdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
