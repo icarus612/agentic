@@ -15,7 +15,7 @@ You publish a verdict that already exists. The `review-pr` skill wrote a report 
 ## When to use
 
 - By the `dae` orchestrator's PR gate when the user chooses to publish despite a non-ready verdict (draft PR + posted report), or wants a `ready`/`tentative` report on the PR record.
-- Standalone: post any existing `.pr-review.md` report to its PR.
+- Standalone: post any existing `pr-review.md` report to its PR.
 - NEVER to write a review comment from scratch — no report file, no comment.
 
 ## Inputs

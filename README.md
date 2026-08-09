@@ -37,6 +37,7 @@ agentic/
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
 │       └── skills/
+├── tests/                     # plan-lifecycle.sh's fixture test    (repo-root, D4)
 └── docs/                      # meta-docs about this repo itself
 ```
 

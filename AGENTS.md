@@ -16,10 +16,11 @@ agentic/
 │   ├── rules/                 the always-on set (verify-dont-assume, push-policy, …)
 │   ├── skills/                explore, init-workspace, review-*, document-local, push-pr
 │   └── hooks/                 smart-lint.sh, smart-test.sh, … (wired via settings.json)
-└── tool-based/                ← bound to ONE technology or service
-    └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
-        ├── rules/
-        └── skills/
+├── tool-based/                ← bound to ONE technology or service
+│   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
+│       ├── rules/
+│       └── skills/
+└── tests/                     ← plan-lifecycle.sh's fixture test (repo-root, D4)
 ```
 
 ## `domain:` — the only classifier

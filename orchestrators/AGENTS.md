@@ -26,8 +26,8 @@ runs*:
 - *Every worker and fork returns the shared envelope* (`status`, `artifacts[]`,
   `next`, `blockers[]` — see `docs/conventions.md`).
 - *Scripts own the mechanical, prose owns the judgment.* Syllabus ticks,
-  scope checks, plan schema, install sync — all scripted; skills spend their
-  tokens on judgment.
+  scope checks, plan schema, plan lifecycle moves, install sync — all scripted;
+  skills spend their tokens on judgment.
 - *Structural anti-cheating over discipline.* The builder's coder never sees
   tests; its contract-tester never sees implementation — the artifact an agent
   would cheat off does not exist in any context it can see.
@@ -100,7 +100,7 @@ everything else).
 
 | Agent | Model | Role |
 |---|---|---|
-| **`planner`** | opus | Explores for itself (ladder: docs-as-claims → fan-out → own reads → `explore` fork), writes the plan/report per `plan-format`, stays warm for revisions. Type modules in `agents/planner/`: `plan-{feature,bugfix,rework,migration,diagnosis,reconcile}.md`. |
+| **`planner`** | opus | Explores for itself (ladder: docs-as-claims → fan-out → own reads → `explore` fork), writes the plan/report to `proposals/` per `plan-format`, stays warm for revisions. Type modules in `agents/planner/`: `plan-{feature,bugfix,rework,migration,diagnosis,reconcile}.md`. |
 | **`builder`** | sonnet | Per-lane mini-orchestrator of the packet model. Owns its child worktree, the contract, dispatch, debug mediation, and the e2e exit. Writes no implementation and no contract tests. |
 | **`coder`** | sonnet | One packet (≤~5 coupled files) against its contract slice. Never reads or writes tests. |
 | **`contract-tester`** | sonnet | Tests for one contract slice from the contract alone. Never reads the implementation — the blindness is its identity. |
