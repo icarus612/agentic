@@ -1,6 +1,6 @@
 ---
 name: run-artifacts
-description: Where workflow-run files live — committed plan records inside the plan's own dir, a gitignored run dir for the progress log / contracts / builder exit reports — and the scripts that enforce their formats.
+description: Where workflow-run files live — committed plan records inside the plan's own dir, a gitignored .artifacts dir inside the run's worktree for the progress log / contracts / builder exit reports — and the scripts that enforce their formats.
 domain: universal
 ---
 
@@ -12,11 +12,26 @@ Every dae run produces files in exactly two places. Nothing a worker, gate, or o
 
 A run's committed artifacts live in the plan's own directory (`<plans-dir>/<slug>-MM-DD-YY/`, layout per `plan-format`): the spec of record `plan.md`, plus records named for their kind alone — `story.md` (requirements capture), `plan-review.md`, `code-review.md`, `pr-review.md`, `sync-report.md`. There is no `diagnosis` record kind: a diagnose run's ranked candidate report IS its `plan.md`. A run with no plan (a `document` run; a ticket-only `sync` run) still gets a dir under the plans dir for its records; having no `plan.md`, it archives nothing and the dir is removed at closeout. At closeout ONLY `plan.md` is archived — the records stay in git history, not in `completed/`. Review reports are append-per-round: each gate iteration adds a `## Round <n> — <date>` section (the revision-loop history is readable straight from the file), opened by `report-verdict.sh` and checked by `validate-report.sh` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy). The header block's `verdict:` is one of `ready | tentative | rejected` and its `next:` one of `proceed | impl-wrong | plan-wrong | map-wrong | needs-input` — both scripts reject anything else, so the status vocabulary is enforced by code, not prose. A report that fails `validate-report.sh` is not a report.
 
-## The gitignored run dir — `<workflows-dir>/<name>-artifacts/`
+## The gitignored run dir — `<workflows-dir>/<name>/.artifacts/`
 
-Sibling of the run's parent worktree, inside the workflows dir (already gitignored), created at setup, deleted by post-merge cleanup. Never committed. Contents:
+**Inside** the run's parent worktree, at its root, created at setup, removed with the worktree by post-merge cleanup. Never committed. One run dir per run, and it belongs to the PARENT worktree only — a builder's child worktree never gets its own.
+
+Being inside a git checkout, it is kept out of the product branch by an `.artifacts/` entry in the repo's tracked `.gitignore` — one line, committed once per repo, exactly like `.workflows/`. The `<workflows-dir>/` entry does NOT cover it: that entry hides the worktree from the MAIN checkout, whereas the run dir has to be ignored from within a CHECKOUT of the product branch.
+
+**The entry must be COMMITTED.** A worktree checks out a commit, so an uncommitted append to `.gitignore` in the main working tree does not reach it. `workflow-setup.sh` adds the line if it is absent and warns when it is not yet committed on the start-point branch; commit it once and every worktree cut afterwards inherits it. This is also why the rule does NOT live in the common dir's `info/exclude`: that file is repo-global, so it would apply a branch-specific rule to every branch in the repo.
+
+A run dir showing up as untracked in `git status` inside the worktree means the entry is missing or uncommitted on that branch — fix the `.gitignore`, never commit the run dir.
+
+Contents:
 
 - **`progress-log.md`** — the run's live state, owned and REWRITTEN IN PLACE by the orchestrator at every state change (stage transitions, gate rounds, lane events, plan amendments). One per plan/run. ALL small- and medium-sized run information lives here rather than only in chat: current stage, per-gate round counts with one-line outcomes, lane dispatch states, amendment log, open questions, and pointers to every other artifact. A resumed or compacted session reconstructs the run from this file plus the plan syllabus.
-- **`contracts/<lane-id>.md`** — each builder's contract document, keyed by its lane id (`l1`, `l2`, … — the plan's lane number, the same id that names its branch and worktree). This is its defined home: never inside the child worktree (where it would either die with the lane or leak into the product branch).
+- **`contracts/<lane-id>.md`** — each builder's contract document, keyed by its lane id (`l1`, `l2`, … — the plan's lane number, the same id that names its branch and worktree). This is its defined home — the PARENT worktree's run dir, never the builder's own child worktree (where it would either die with the lane or leak into the product branch). A builder is handed the path; it does not create a run dir of its own.
 - **`reports/<lane-id>-exit.md`** — each builder's exit report (envelope header + files touched + per-criterion evidence), written before the builder returns; its envelope points here. `validate-report.sh --kind exit` checks it; `verify-scope.sh` reads its file list per lane, and `verify-run-scope.sh` reads ALL of them at the PR gate — a product change in the run's diff that no exit report claims is a blocking finding (the exit reports are collectively the run's ownership ledger).
-- **`explore-map-<scope-slug>-<MM-DD-YY>.md`** — the `explore` fork's structured map, written to the resolved workflows dir (its default when the caller names no output path). Ephemeral like everything else on this side of the split, and never the plans dir — a map is not a plan record.
+- **`explore-map-<scope-slug>-<MM-DD-YY>.md`** — the `explore` fork's structured map, written to the run dir (its default when the caller names no output path). Ephemeral like everything else on this side of the split, and never the plans dir — a map is not a plan record.
+
+### The run dir's lifetime is the worktree's lifetime
+
+Because it lives inside the worktree, **removing the worktree destroys the run dir with it.** Two consequences that are not optional:
+
+- **Only `cleanup-merged` may remove the worktree**, post-merge and after the plan is archived. `push-pr` deliberately does NOT tear down: at ship time the PR is merely OPEN, and the run dir is still load-bearing — `review-pr` runs `verify-run-scope.sh` over the exit reports on a fresh pass, and a `rejected` verdict routes an `impl-wrong` kickback that redispatches a lane from its contract. Tearing down at ship would delete both.
+- **Never tear down a worktree for a run that is still in flight.** A parked or mid-gate run's progress log is the ONLY copy of its state; deleting the worktree loses it and no resume is possible. If a worktree must be reclaimed early, copy `.artifacts/` out first. Resuming a run whose worktree is gone means reconstructing state from the plan and git history alone.

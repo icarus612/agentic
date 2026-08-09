@@ -127,7 +127,9 @@ inside the plan's own dir (`<plans-dir>/<slug>-MM-DD-YY/` — the spec of record
 `plan.md` plus records named for their kind alone: `story.md`,
 `plan-review.md`, `code-review.md`, `pr-review.md`, `sync-report.md`; there is
 no `diagnosis` kind — a diagnose run's ranked report IS its `plan.md`), and
-the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
+the **gitignored run dir** `<workflows-dir>/<name>/.artifacts/` — `.artifacts/`
+at the root of the run's parent worktree, ignored via a committed `.artifacts/`
+entry and removed with that worktree by post-merge cleanup — holding
 `progress-log.md` (the orchestrator's live run state, rewritten in place,
 never committed), `contracts/<lane-id>.md`, `reports/<lane-id>-exit.md`
 (lane ids are always `l1`, `l2`, … — the plan's numbered lanes — naming each

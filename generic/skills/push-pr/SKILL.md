@@ -1,6 +1,6 @@
 ---
 name: push-pr
-description: Terminal ship stage of the dae workflow — commit stragglers, push the workflow branch, and open a pull request against the base branch (always asking for confirmation first), then tear down the workflow worktree. Never force-pushes, never pushes main. Invoked by the dae orchestrator.
+description: Terminal ship stage of the dae workflow — commit stragglers, push the workflow branch, and open a pull request against the base branch (always asking for confirmation first). Leaves the worktree standing; teardown is cleanup-merged's job after the PR merges. Never force-pushes, never pushes main. Invoked by the dae orchestrator.
 domain: universal
 context: fork
 rules: [verify-dont-assume, artifact-locations, push-policy]
@@ -15,7 +15,7 @@ You close out a completed workflow run. Your job is to make sure every artifact 
 ## When to use
 
 - Only after the full workflow has completed: the document phase has run and the `review-code` gate is clean.
-- Standalone, to publish and tear down a workflow worktree that already finished but was left in place.
+- Standalone, to publish a workflow branch whose run already finished but was left unpushed.
 - NEVER mid-workflow — if the document phase or the `review-code` gate hasn't finished, this is the wrong phase.
 
 ## Inputs
@@ -25,19 +25,18 @@ You run as an isolated fork with no access to the conversation history — every
 ## How it works
 
 1. **Verify completion.** Inside the worktree, confirm the working tree is clean and you're on the expected workflow branch — never main. If straggler artifacts are uncommitted and the caller authorized committing them, commit with a clear message; otherwise stop and report. This includes the plan dir itself (`<plans-dir>/<slug>-MM-DD-YY/`) — a promotion's rename from `proposals/<slug>-MM-DD-YY.md` to `<slug>-MM-DD-YY/plan.md`, and any docs, are exactly the kind of straggler this step must catch.
-2. **Publish.** `git push -u origin <branch>` to the workflow branch ONLY. Never `--force` in any form, never push main or the base branch. This always prompts the user for explicit confirmation before it runs (standing permission policy) — if the user declines, do NOT retry or work around it: record that the branch exists locally with all commits, skip the PR step, and move on to teardown considerations.
+2. **Publish.** `git push -u origin <branch>` to the workflow branch ONLY. Never `--force` in any form, never push main or the base branch. This always prompts the user for explicit confirmation before it runs (standing permission policy) — if the user declines, do NOT retry or work around it: record that the branch exists locally with all commits, skip the PR step, and report — there is no teardown to move on to.
 3. **Open the pull request.** After a successful push, open a PR from the workflow branch to the base branch — via the `gh` CLI (`gh pr create`) or the GitHub MCP capability, whichever is available. Opening a PR is outward-facing, so it rides on the same explicit confirmation as the push ("push and open a PR?"); if the user approved the push but declined the PR, report the exact command to open it later.
    - Check for a PR template (`.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE/`) and structure the body with it.
    - Title: a one-line summary of the work. Body: what was built and why, key decisions, and pointers to the plan file and the pr-review report (when given) — drawn from the summary in your args, not invented.
    - When the args request a draft (a non-ready PR gate verdict published anyway), pass `--draft` to `gh pr create` — the caller follows up with the `comment-pr` skill to post the review report on it.
    - If a PR already exists for this branch, update it instead of creating a duplicate.
    - If the repo has no remote hosting or no PR tooling is available, say so and report the branch as pushed-only — do not improvise.
-4. **Tear down.** Only when the working tree is clean and all work is committed (commits are safe — the worktree shares the repo's object store, so removing the directory loses nothing committed): `git worktree remove <path>`. If that command is permission-blocked, fall back to reporting the exact cleanup commands for the user instead of deleting via raw `rm -rf` yourself. Then `git worktree prune` if removal succeeded. The local branch stays (deleting it is the user's call).
-5. **Verify teardown.** `git worktree list` no longer shows the path; the workflows dir entry is gone.
+4. **Leave the worktree standing.** Do NOT remove it. Per the `run-artifacts` rule the run dir lives at `<worktree>/.artifacts/` — progress log, builder contracts, exit reports — so removing the worktree here destroys the run's state while the PR is still OPEN. That state is still needed: `review-pr` runs `verify-run-scope.sh` against the exit reports on a fresh pass, and a `rejected` verdict routes an `impl-wrong` kickback that redispatches a lane from its contract. Teardown belongs to `cleanup-merged`, after the PR has actually merged and the plan is archived. Report the worktree path as still live and say why.
 
 ## Hand-off / next
 
-The `push-pr` skill ends the workflow — nothing follows by default. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); the PR URL if one was opened (or the exact command to open it if declined/unavailable), and whether it's a draft; whether the worktree was removed or the exact cleanup commands if blocked; and any straggler commits made. Follow-ups the caller may invoke, never you: `comment-pr` to post the review report on the PR (always, on the draft path), `review-pr` for a fresh pass on the published PR, and — once the PR merges — `cleanup-merged` to close out the branch, run dir, and plan archive.
+The `push-pr` skill ends the workflow — nothing follows by default. Return contract: the final report states the branch name; whether it was pushed or declined (with the exact push command if declined); the PR URL if one was opened (or the exact command to open it if declined/unavailable), and whether it's a draft; the worktree path, still live, with its run dir intact for the PR gate and any kickback; and any straggler commits made. Follow-ups the caller may invoke, never you: `comment-pr` to post the review report on the PR (always, on the draft path), `review-pr` for a fresh pass on the published PR, and — once the PR merges — `cleanup-merged` to close out the branch, run dir, and plan archive.
 
 ## Notes
 

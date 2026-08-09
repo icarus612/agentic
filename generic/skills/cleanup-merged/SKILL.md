@@ -20,14 +20,14 @@ You close the loop `push-pr` deliberately leaves open. The ship stage publishes 
 
 ## Inputs
 
-You run as an isolated fork — everything arrives via invocation args. Expect: the branch name (or "sweep" to discover candidates), the plan path when the run had one, the run-artifacts dir path (`<workflows-dir>/<name>-artifacts/`) if it still exists, and the Jira key + desired transition when a ticket should be closed. Verify — don't trust: every deletion below is gated on evidence, not on the args' say-so.
+You run as an isolated fork — everything arrives via invocation args. Expect: the branch name (or "sweep" to discover candidates), the plan path when the run had one, the run dir path (`<workflows-dir>/<name>/.artifacts/`, inside the parent worktree) if it still exists, and the Jira key + desired transition when a ticket should be closed. Verify — don't trust: every deletion below is gated on evidence, not on the args' say-so.
 
 ## How it works
 
 1. **Prove the merge.** `gh pr view <branch> --json state,mergedAt,mergeCommit` (or the GitHub MCP): state must be MERGED. No PR, or state OPEN/CLOSED-unmerged → stop and report; there is nothing safe to clean. In sweep mode, candidates are `<type>/<name>` branches whose PR is MERGED — list them and what would be removed, then proceed per the caller's confirmation.
 2. **Delete the branches.** Remote: `git push origin --delete <branch>` — outward-facing, rides on the permission prompt; a decline is a valid outcome, record the command and continue. Local: `git branch -d <branch>` (safe delete only — if `-d` refuses, the branch holds unmerged commits; STOP and surface that instead of forcing `-D`).
-3. **Prune worktree remnants.** If a worktree for the branch still exists, it should be clean (the work merged); `git worktree remove <path>` then `git worktree prune`. A dirty worktree at this stage means unshipped changes — stop and surface, never remove with force.
-4. **Remove the run dir.** Delete `<workflows-dir>/<name>-artifacts/` (progress log, contracts, exit reports — ephemeral by the `run-artifacts` rule, and the run is over). Skip silently if already gone.
+3. **Prune worktree remnants.** If a worktree for the branch still exists, it should be clean (the work merged); `git worktree remove <path>` then `git worktree prune`. A dirty worktree at this stage means unshipped changes — stop and surface, never remove with force. The run dir inside does NOT interfere: because `.artifacts/` is gitignored, git treats it as ignored, and `git worktree remove` deletes the worktree without complaint and without `--force` (verified). So `--force` is never needed here — if plain `remove` refuses, that is a real modification and a genuine stop signal.
+4. **Confirm the run dir went with it.** The run dir lives at `<workflows-dir>/<name>/.artifacts/`, INSIDE the worktree, so step 3 already removed it (progress log, contracts, exit reports — ephemeral by the `run-artifacts` rule, and the run is over). Verify it is gone rather than deleting separately. Older runs may still have a sibling `<workflows-dir>/<name>-artifacts/` from the previous layout; delete that if present. Skip silently if already gone.
 5. **Archive the plan.** Run `plan-lifecycle.sh check <plans-dir>` first; a
    `FAIL:` line means the layout is already off — surface it and stop rather
    than moving anything. Then `plan-lifecycle.sh archive <plans-dir>/<slug>-MM-DD-YY/`:

@@ -17,7 +17,7 @@
 #   1. ORCHESTRATOR SCOPE (the live consumer): the dae orchestrator delegates
 #      all building; its own writes are limited to run artifacts (and the plan
 #      file until mark-syllabus.sh took over syllabus ticks). Example:
-#        CLAUDE_SCOPE_ALLOW="/path/to/project-plans:/path/to/run-artifacts"
+#        CLAUDE_SCOPE_ALLOW="/path/to/project-plans:/path/to/worktree/.artifacts"
 #   2. BUILDER LANE SCOPE (documented, NOT wired): confine a builder to its
 #      lane's file scope. Retired unneeded — per-builder worktree isolation
 #      makes collisions physically impossible and merge-back is the scope
