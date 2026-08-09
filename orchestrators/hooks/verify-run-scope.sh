@@ -21,12 +21,75 @@
 #   makes the "orchestrator writes are harness-scoped" invariant auditable
 #   after the fact, from artifacts alone.
 #
+#   claims_from_report() below is the single definition of what counts as a
+#   claim line: backticked paths, trailing annotations, trailing commas,
+#   `./` prefixes, and absolute paths are all normalized to one repo-relative
+#   token per bullet. validate-report.sh's own "## Files touched" line count
+#   is deliberately left permissive and is NOT tightened to match this
+#   parser's accepted formats — tightening it would retroactively invalidate
+#   exit reports that already passed and fight the markdown builders
+#   naturally write. This parser, not the validator, is the single place
+#   that defines which claim-line shapes are accepted; a future change
+#   should extend claims_from_report, never validate-report.sh's counter.
+#
 # EXIT CODES
 #   0 - all product changes claimed (or allowed)
 #   1 - usage error, or one or more UNCLAIMED files
 set -uo pipefail
 
 err() { echo "verify-run-scope: $*" >&2; exit 1; }
+
+claims_from_report() {
+  # $1 = exit-report file path, $2 = worktree root (for abs->relative conversion)
+  # prints one repo-relative claimed path per line to stdout
+  # prints "NOTE: ..." to stderr for any multi-backtick bullet
+  local report="$1" root="$2"
+  local resolved_root
+  resolved_root=$(realpath -m -- "$root" 2>/dev/null || printf '%s' "$root")
+  awk '/^## Files touched/{f=1;next} /^## /{f=0} f' "$report" \
+    | grep -E '^[[:space:]]*[-*][[:space:]]+\S' \
+    | while IFS= read -r line; do
+        remainder=$(printf '%s' "$line" | sed -E 's/^[[:space:]]*[-*][[:space:]]+//')
+        backticks=$(printf '%s' "$remainder" | grep -oE '`[^`]+`')
+        bt_count=$(printf '%s\n' "$backticks" | sed '/^$/d' | wc -l | tr -d ' ')
+        if [ "$bt_count" -ge 1 ]; then
+          token=$(printf '%s\n' "$backticks" | head -n1)
+          token="${token#\`}"
+          token="${token%\`}"
+          if [ "$bt_count" -gt 1 ]; then
+            echo "NOTE: ${report}: multiple backticked paths on one bullet, using first: ${remainder}" >&2
+          fi
+        else
+          token=$(printf '%s' "$remainder" | awk '{print $1}')
+          token="${token%,}"; token="${token%;}"; token="${token%:}"
+        fi
+
+        # normalization tail — shared by both extraction branches above
+        tlen=${#token}
+        if [ "$tlen" -ge 2 ]; then
+          first_c="${token:0:1}"; last_c="${token: -1}"
+          if { [ "$first_c" = "'" ] && [ "$last_c" = "'" ]; } || { [ "$first_c" = '"' ] && [ "$last_c" = '"' ]; }; then
+            token="${token:1:tlen-2}"
+          fi
+        fi
+        case "$token" in
+          ./*) token="${token#./}" ;;
+        esac
+        case "$token" in
+          /*)
+            resolved_token=$(realpath -m -- "$token" 2>/dev/null || printf '%s' "$token")
+            case "$resolved_token" in
+              "$resolved_root") token="" ;;
+              "$resolved_root"/*) token="${resolved_token#"$resolved_root"/}" ;;
+              *) token="$resolved_token" ;;
+            esac
+            ;;
+        esac
+
+        [ -n "$token" ] || continue
+        printf '%s\n' "$token"
+      done
+}
 
 wt="${1:-}"; base="${2:-}"; rundir="${3:-}"; shift 3 2>/dev/null || true
 allow_extra=""
@@ -68,7 +131,7 @@ claimed=""
 for r in "$rundir"/reports/*-exit.md; do
   [ -f "$r" ] || continue
   claimed="$claimed
-$(awk '/^## Files touched/{f=1;next} /^## /{f=0} f' "$r" | grep -E '^\s*- \S' | sed -E 's/^\s*- //')"
+$(claims_from_report "$r" "$wt")"
 done
 claimed=$(printf '%s\n' "$claimed" | sed '/^$/d' | sort -u)
 reports=$(ls "$rundir"/reports/*-exit.md 2>/dev/null | wc -l | tr -d ' ')
