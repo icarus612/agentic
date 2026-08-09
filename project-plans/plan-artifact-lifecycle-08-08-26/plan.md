@@ -22,9 +22,11 @@ the convention's consumers are ~20 markdown surfaces plus one new script).
   - [x] 4.2: document-local, push-pr, explore                             (lane 4)
   - [x] 4.3: document-confluence (tool-based domain)                      (lane 4)
 - [ ] Phase 5: Integration
-  - [ ] 5.1: Index tables and repo tree listings   (after: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3)
-  - [ ] 5.2: This repo's own plans dir scaffolding (after: 1.1, 2.1)
-  - [ ] 5.3: Dangling-reference sweep + live `check` run  (after: 5.1, 5.2)
+  - [x] 5.1: Index tables and repo tree listings   (after: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3)
+  - [x] 5.2: This repo's own plans dir scaffolding (after: 1.1, 2.1)
+  - [x] 5.3: Dangling-reference sweep + live `check` run  (after: 5.1, 5.2)
+- [ ] Phase 6: Enforcement-machinery correctness (mid-run discovery)
+  - [x] 6.1: Exit-report claims parser in the scope-verification scripts  (after: 5.3)
 
 ## Goal & scope
 
@@ -34,6 +36,12 @@ the gitignored run dir or a builder contract in the plans dir, (b) the plans dir
 root never accumulates loose files, and (c) an abandoned or superseded plan cannot
 be archived into `completed/` as if it had shipped — the failure that occurred in
 the mythic project's "made images fix" plans.
+
+**Amended mid-run (phase 6).** The integration pass surfaced a defect in the
+scope-verification machinery this plan leans on as its own acceptance evidence. That
+is inside the goal, not adjacent to it: the whole thesis here is that placement rules
+are enforced by scripts rather than by prose, and an enforcement script that reports
+every file as unclaimed enforces nothing. Phase 6 fixes it and nothing else.
 
 **In scope**
 - The three normative rules: `generic/rules/plan-format.md`, `artifact-locations.md`,
@@ -794,6 +802,106 @@ dangling-reference check.
 - **Test approach / oracle:** `equivalence check` — this subphase IS the deletion
   proof that the rework module requires for every replaced structure.
 
+## Phase 6: Enforcement-machinery correctness (mid-run discovery)
+
+Single lane, serialized after the integration sweep. Added after the integration pass
+reproduced the defect live: 26 UNCLAIMED lines on this run, every one false.
+
+**6.1: Exit-report claims parser in the scope-verification scripts.**
+
+- **File scope:** `orchestrators/hooks/verify-run-scope.sh`,
+  `orchestrators/hooks/verify-scope.sh`, `tests/verify-scope-parsing.test.sh` (new,
+  repo root — the `tests/` convention D4 established).
+- **The defect, with the exact current lines.**
+  - `verify-run-scope.sh:71` is the whole parser:
+    `$(awk '/^## Files touched/{f=1;next} /^## /{f=0} f' "$r" | grep -E '^\s*- \S' | sed -E 's/^\s*- //')`.
+    It strips the bullet marker and nothing else, so a claim line yields whatever text
+    followed the dash. `:79` then matches it against the real diff with
+    `printf '%s\n' "$claimed" | grep -qxF "$f"` — an EXACT, whole-line, fixed-string
+    match. A report line ``- `orchestrators/hooks/x.sh` `` therefore produces the
+    claim `` `orchestrators/hooks/x.sh` ``, backticks included, which can never equal
+    the git path `orchestrators/hooks/x.sh`.
+  - The formats real builders write — ``- `path` ``, ``- `path` (new)``,
+    ``- `path` — annotation``, `- ./path`, `- /abs/path` — ALL pass
+    `validate-report.sh --kind exit`, because `validate-report.sh:91` only COUNTS
+    lines matching `^\s*- \S` and never inspects their content. The two scripts
+    disagree about what a claim line is, and the permissive one is the gatekeeper.
+    Net effect: zero claims parse, every changed file reports UNCLAIMED, and the check
+    that is supposed to catch an orchestrator editing the product directly instead
+    produces uniform noise an operator learns to ignore — worse than no check.
+  - **`verify-scope.sh` does NOT share the parser bug**, and this was checked rather
+    than assumed: it takes its reported list from argv or stdin (`:32-35`) and never
+    reads a report file. It shares the *matching* half — `:45` and `:50` use the same
+    exact `grep -qxF` — so it breaks identically whenever its caller feeds it raw
+    bullet text. Its caller is prose: `build-dispatch.md:13` says only "fed the
+    report's `## Files touched` list", leaving the extraction to be improvised per
+    run, which is how the same bug reappears. Hence both scripts are in scope.
+- **Change.**
+  1. Add one shared extractor to `verify-run-scope.sh`, `claims_from_report()`, and
+     use it in the `:68-72` loop. Accepted family, in order: strip the bullet marker
+     (`-` or `*`); if the remainder contains a backticked token, the path is the FIRST
+     one; otherwise the first whitespace-delimited token with trailing `,;:` removed;
+     then strip surrounding quotes, drop a leading `./`, and convert an absolute path
+     to repo-relative against the worktree (`realpath -m`, following
+     `scope-writes.sh:54`'s precedent). Lines yielding an empty token are skipped.
+     Normalize BOTH sides through the same function so the comparison has one
+     definition of a path.
+  2. **First backticked token only, deliberately.** A bullet like
+     ``- `a.sh` — see `b.sh` for rationale`` must claim `a.sh` alone. Claiming every
+     backticked token would let a passing mention silently absorb a real unclaimed
+     file, which is the exact failure this script exists to prevent; over-claiming
+     fails quietly, under-claiming fails loudly. When a bullet holds more than one
+     backticked token, print a `NOTE:` line naming the report and the line so the
+     operator can split it, and carry on with the first.
+  3. Give `verify-scope.sh` an optional `--report <exit-report>` input that reads the
+     section through the identical rules, so both scripts share one definition instead
+     of one of them depending on an improvised pipeline. Purely ADDITIVE: argv and
+     stdin keep working unchanged, so `build-dispatch.md:13`'s current wording stays
+     true and no file outside this scope has to change. It also makes
+     `run-artifacts.md:21`'s existing claim ("`verify-scope.sh` reads its file list
+     per lane") literally accurate for the first time.
+  4. **Do not "fix" this from the other end.** Tightening `validate-report.sh:91` to
+     reject annotated or backticked bullets would retroactively invalidate reports
+     that already passed and fight the markdown builders naturally write. The parser
+     is now the single definition of the accepted family; leave the validator
+     permissive, and say so in the script's DESCRIPTION block so a later agent does
+     not reverse this.
+  5. Frozen: everything else. The allowlist logic (`:42-58`), the harness-owned
+     plans/docs prefixes (`:43-44`), the changed-file computation (`:61-64`), the
+     exit codes, and both scripts' output vocabulary (`UNCLAIMED:`, `UNREPORTED:`,
+     `UNCHANGED:`, `OK:`, `FAIL:`) stay exactly as they are.
+- **Acceptance criteria.**
+  1. Each of these claim formats parses to the same repo-relative path and reports as
+     claimed: `- path`, ``- `path` ``, ``- `path` (new)``, ``- `path` — annotation``,
+     `- path,`, `- ./path`, `- <absolute path inside the worktree>`.
+  2. **False-positive direction still works:** a file changed in the worktree that no
+     exit report names still prints `UNCLAIMED:` and exits 1. The fix must not turn
+     the check into one that passes everything — this criterion is the one that
+     matters most, because a parser that claims too much would look identical to
+     success.
+  3. A multi-backtick bullet claims only the first token and prints the `NOTE:` line.
+  4. Harness-owned paths (plans dir, docs dir, `.gitignore`) remain allowed without
+     being claimed, and `--allow` prefixes still work.
+  5. `verify-scope.sh --report <file>` yields byte-identical results to feeding the
+     same list on stdin; without the flag its behavior is unchanged.
+  6. Re-running `verify-run-scope.sh` over THIS run's parent worktree and run dir
+     reports `OK:` with zero UNCLAIMED — the live reproduction that opened this
+     subphase is the closing evidence for it.
+  7. `bash -n` clean on both scripts; no `jq`; no new dependency.
+- **Test approach / oracle:** `new contract tests`. `tests/verify-scope-parsing.test.sh`
+  builds a throwaway git repo with a run-artifacts dir and synthetic exit reports
+  covering every format in criterion 1, plus a multi-backtick bullet, plus a changed
+  file claimed by nobody. It asserts exit codes and exact output lines in BOTH
+  directions — claimed files parse (no false UNCLAIMED) and an unclaimed file still
+  FAILs (no false OK) — and runs the same fixtures through `verify-scope.sh` via
+  `--report` and via stdin, asserting identical output. Written from this subphase's
+  format list and guard rules alone, never from the finished parser.
+- **Note for the record stage, deliberately out of this scope.** `build-dispatch.md:13`
+  would read better naming `--report` explicitly instead of "fed the report's
+  `## Files touched` list". That is a documentation nicety, not a correctness fix —
+  the additive flag keeps the current sentence true — so it belongs to the doc pass,
+  not here.
+
 ## Hand-off to the record stage (not a build phase)
 
 `/docs` alignment is the run's `document-local` stage. The lines it must reconcile,
@@ -892,6 +1000,7 @@ executor; a subphase that contradicts one of these is wrong, not creative.**
 | 1.1–1.3 rules, 2.2–2.3, 3.x, 4.x, 5.1 wording | `builder` lanes → `coder` sub-agents (markdown only; no contract-tester, oracle is `equivalence check`) |
 | 2.1 `plan-lifecycle.sh` + fixture test | `builder` lane → `coder` for the script, `contract-tester` for the fixture test (oracle `new contract tests`; the tester works from the CLI + guard contract in 2.1, never from the script) |
 | 5.2, 5.3 | `builder` (integration lane, run in the parent) |
+| 6.1 scope-verification parser + test | `builder` lane → `coder` for both scripts, `contract-tester` for `tests/verify-scope-parsing.test.sh` (oracle `new contract tests`; the tester works from 6.1's accepted-format list and guard rules, never from the parser) |
 | Plan gate | `review-plan` (+ `validate-plan.sh`, and `plan-lifecycle.sh check` once 2.1 lands) |
 | Code gate | `review-code` |
 | Docs alignment (out of plan scope) | `document-local` at the record stage, against the line list above |
