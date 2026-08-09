@@ -27,6 +27,8 @@ the convention's consumers are ~20 markdown surfaces plus one new script).
   - [x] 5.3: Dangling-reference sweep + live `check` run  (after: 5.1, 5.2)
 - [ ] Phase 6: Enforcement-machinery correctness (mid-run discovery)
   - [x] 6.1: Exit-report claims parser in the scope-verification scripts  (after: 5.3)
+- [ ] Phase 7: This repo's own branch-and-land policy (user requirement change)
+  - [x] 7.1: source-push-sync + push-main — branch off main, merge locally, push
 
 ## Goal & scope
 
@@ -69,8 +71,10 @@ every file as unclaimed enforces nothing. Phase 6 fixes it and nothing else.
 - Retro-fixing another project's `project-plans/completed/` (mythic). The archive
   guard added here prevents recurrence; cleaning up what already happened there is
   a separate, one-off task.
-- Shipping. This repo uses no workflow worktrees and no PRs; landing is
-  `push-main` + `sync-install.sh`, the orchestrator's job.
+- Shipping THIS run: landing is `push-main` + `sync-install.sh`, the orchestrator's
+  job. **Amended by 7.1**, which rewrites this repo's branch-and-land policy at the
+  user's request. 7.1 changes the policy DOCUMENTS only; it does not retroactively
+  restructure this run, whose commits already sit on `main` under the old rule.
 - Any change to the verdict vocabulary, report round format, lane-id scheme, or
   branch naming. Behavior outside artifact placement is frozen.
 
@@ -902,6 +906,134 @@ reproduced the defect live: 26 UNCLAIMED lines on this run, every one false.
   the additive flag keeps the current sentence true — so it belongs to the doc pass,
   not here.
 
+## Phase 7: This repo's own branch-and-land policy (user requirement change)
+
+Single lane, single subphase, independent of every other phase — it shares no file
+with any of them, so it carries no `after:` edge and can run whenever dispatched.
+
+**7.1: source-push-sync + push-main — branch off main, merge locally, push.**
+
+- **File scope:** `.claude/rules/source-push-sync.md`,
+  `.claude/skills/push-main/SKILL.md`. Nothing else.
+- **Both files are project-scoped and synced NOWHERE.** They live only in this repo's
+  `.claude/`, which `source-push-sync.md:7` itself names as never-synced and which
+  `sync-install.sh`'s `install_path()` (`:74-83`) has no arm for. There is no
+  install-side counterpart to update and no `~/.claude` file to keep in step. A
+  consequence worth expecting rather than debugging: a commit touching only these two
+  files makes `sync-install.sh <range>` print "no universal-domain changes to sync"
+  and exit 0. That is correct, not a failed sync.
+- **The requirement, verbatim from the user:** "remove the no worktree rule for this
+  repo, but we still want to branch off main, and merge locally to main and push (not
+  make gh pr's)".
+- **Target policy.** Edits happen on a workflow branch in a worktree cut off `main`
+  via `workflow-setup.sh` — the standard scheme this repo prescribes for everyone
+  else now applies to it too, `worktree-reminder` nag included. Landing is: merge that
+  branch into `main` LOCALLY, push `main`, then sync the install exactly as before.
+  No GitHub PR is ever opened. `push-policy`'s never-force-push clause holds
+  unchanged; the "never push main" clause stays overridden for this repo only.
+- **Current wording being replaced.**
+  - `source-push-sync.md:6`, step 2, in full: "**Push up.** Land the change by
+    committing on `main` and pushing, via the `push-main` skill — this repo uses NO
+    workflow worktrees and NO PRs. This intentionally overrides the global
+    `push-policy` rule's "never push main" clause FOR THIS REPO ONLY; its other
+    clauses still hold (never force-push). The `worktree-reminder` SessionStart nag
+    does not apply here." — three claims change: no worktrees (now false), commit
+    directly on main (now: merge into main), and the worktree-reminder exemption (now
+    removed). Two survive: the never-push-main override and never-force-push.
+  - `source-push-sync.md:5` (step 1, edit here) and `:7` (step 3, mandatory sync) are
+    CORRECT and must survive verbatim — including `:7`'s "a push that lands without
+    the install sync is an incomplete change".
+  - `push-main/SKILL.md:3` (frontmatter description): "commit on main and push
+    directly to origin/main, then sync universal content to the ~/.claude install. No
+    workflow worktrees, no PRs."
+  - `push-main/SKILL.md:12`: "This repo deliberately skips the worktree/PR machinery
+    its own skills prescribe for other projects: changes are committed straight on
+    `main`…" — the premise is now half wrong: it skips the PR machinery, not the
+    worktree machinery.
+  - `push-main/SKILL.md:21`, step 1, in full: "**Verify.** You are on `main` in the
+    repo root (no worktree — if one exists for this repo, something went wrong; ask).
+    `git status` shows only the intended changes." — this actively inverts the new
+    policy: a worktree is now expected, not a symptom of something gone wrong.
+  - `push-main/SKILL.md:22`, step 2: "**Commit on main.** Stage the intended files
+    explicitly…" — becomes a merge step; the committing happens on the workflow
+    branch, upstream of this skill.
+  - `:23` (push), `:24` (sync), `:25` (report) keep their substance; `:24` in
+    particular is correct as written and must survive.
+- **Change — the new landing sequence in `push-main`.**
+  1. **Verify.** The workflow worktree is clean and everything intended is committed
+     on its `<type>/<name>` branch; the main checkout is on `main` with a clean tree.
+     Record the pre-merge remote tip, `old=$(git rev-parse origin/main)` — the sync
+     range still derives from this, exactly as today.
+  2. **Merge locally, `--no-ff`.** From the main checkout on `main`:
+     `git merge --no-ff <type>/<name>`. **`--no-ff` is the rule, and squash is
+     forbidden.** Rationale to write into the skill so it is not "simplified" later: a
+     merge commit keeps one revert point for a whole change set and keeps visible
+     which commits belonged to one run, while squashing would destroy the per-subphase
+     commit trail that builder exit reports cite as evidence. A fast-forward would be
+     harmless but leaves history indistinguishable from the old commit-straight-on-main
+     flow, which is the thing being replaced.
+  3. **Refuse on conflict.** If the merge conflicts, `git merge --abort` and stop —
+     never resolve conflicts in the terminal landing stage. A conflict means `main`
+     moved under the branch; the fix is to reconcile inside the workflow worktree and
+     re-invoke. Report the exact state, do not improvise around it.
+  4. **Push `main`.** `git push origin main`. Never `--force` in any form. A
+     permission-blocked or declined push stays a valid reported outcome, and — as
+     today — the sync is SKIPPED when the push did not land, so the install can never
+     get ahead of `origin/main`.
+  5. **Retire the branch.** Remove the worktree first (`git worktree remove <path>`,
+     then `git worktree prune`) — a branch checked out in a worktree cannot be
+     deleted — then `git branch -d <type>/<name>`. **`-d` only, never `-D`**, per the
+     safe-deletes convention this repo already enforces in `cleanup-merged/SKILL.md:41`;
+     if `-d` refuses, the merge did not fully land and that refusal is information to
+     surface, not to override.
+  6. **Sync the install**, unchanged: `sync-install.sh <old>..HEAD` from the MAIN
+     CHECKOUT. Verified precondition, not an assumption: `sync-install.sh:67-69`
+     refuses to run inside a linked worktree and requires `HEAD` to be on `main`, so
+     the sync must run after the merge from the repo root — never from the workflow
+     worktree. Worth stating explicitly in the skill, because the new flow makes
+     "finish inside the worktree" the natural habit and that is exactly where the
+     script will refuse. `git diff --name-status <old>..HEAD` compares two commits, so
+     the range works identically across a `--no-ff` merge commit.
+  7. **Report**, as today: what merged, the pushed range, the branch/worktree removed,
+     and the script's `SYNCED:`/`DELETED:` lines.
+- **Change — `source-push-sync.md` step 2.** Rewrite to: land by branching off `main`
+  with `workflow-setup.sh`, working in that worktree, then merging into `main` locally
+  and pushing, via `push-main`; **no PRs, ever** — that is the part of the exemption
+  that stays. Keep the "never push main" override and the never-force-push clause;
+  DELETE the "NO workflow worktrees" claim and the "`worktree-reminder` SessionStart
+  nag does not apply here" sentence, since the nag now applies exactly as it does
+  everywhere else. Steps 1 and 3 are untouched.
+- **Scope boundary — retroactive rebranching is OUT.** This run's commits already sit
+  directly on `main` under the old rule. Nothing in 7.1 rewrites, rebases, or
+  re-homes them; the new policy governs subsequent sessions only. An executor that
+  starts rewriting this run's history has left the subphase.
+- **Not in scope, and deliberately unchanged:** `workflow-setup.sh`,
+  `worktree-reminder.sh`, `cleanup-merged`, `push-pr`, and every universal rule. The
+  worktree machinery already works for this repo — the old policy opted out of it by
+  prose, so restoring it is a prose change, and no script needs to learn anything new.
+  Confirm this rather than assume it: if any of those scripts turns out to special-case
+  this repo, stop and report instead of widening the subphase.
+- **Acceptance criteria.**
+  1. `source-push-sync.md` step 2 describes branch → worktree → local merge → push
+     main → no PRs; the "NO workflow worktrees" claim and the worktree-reminder
+     exemption are gone; steps 1 and 3 are byte-identical to before.
+  2. `push-main` describes the six-step landing sequence above, with `--no-ff`
+     specified, squash forbidden, conflict-abort mandated, `-d`-not-`-D` for the
+     branch, and the sync running from the main checkout.
+  3. No sentence in either file says this repo skips worktrees; every sentence saying
+     it skips PRs survives.
+  4. Never-force-push and the never-push-main override are both still stated.
+  5. Neither file gains an instruction to open, request, or comment on a GitHub PR.
+  6. The frontmatter `description` at `push-main/SKILL.md:3` matches the new flow, and
+     `domain: agentic` (`:4`) is unchanged — the skill stays project-scoped.
+- **Test approach / oracle:** `equivalence check`. There is nothing executable here:
+  the deliverable is two policy documents, and the oracle is a read-through against
+  the target policy plus a dry trace of one landing — branch, work, merge, push,
+  delete, sync — confirming each step names a command that exists and a precondition
+  the real scripts actually enforce (`sync-install.sh:67-69` being the one that bites).
+  The first real landing under the new policy is the live confirmation, and it happens
+  after this run, not inside it.
+
 ## Hand-off to the record stage (not a build phase)
 
 `/docs` alignment is the run's `document-local` stage. The lines it must reconcile,
@@ -1004,4 +1136,5 @@ executor; a subphase that contradicts one of these is wrong, not creative.**
 | Plan gate | `review-plan` (+ `validate-plan.sh`, and `plan-lifecycle.sh check` once 2.1 lands) |
 | Code gate | `review-code` |
 | Docs alignment (out of plan scope) | `document-local` at the record stage, against the line list above |
-| Ship | `push-main` + `sync-install.sh <range>` — orchestrator's job for this repo; no worktree, no PR, no `push-pr`, no `cleanup-merged` |
+| 7.1 branch-and-land policy | `builder` (single lane; two project-scoped markdown files, oracle `equivalence check`) |
+| Ship THIS run | `push-main` + `sync-install.sh <range>` — orchestrator's job for this repo; still no PR and no `push-pr`. This run began under the old no-worktree rule and lands that way; 7.1's branch → local-merge → push flow governs the NEXT session, not a retroactive restructuring of this one. |
