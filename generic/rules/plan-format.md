@@ -1,13 +1,20 @@
 ---
 name: plan-format
-description: How plans are named and structured — dated feature-slug markdown files with a required subphase syllabus, lane/dependency annotations, required sections, self-contained.
+description: How plans are named, structured, and moved through their lifecycle — dated feature-slug markdown files with a required subphase syllabus, lane/dependency annotations, required sections, self-contained, proposals → per-plan directory → completed.
 domain: universal
 ---
 
 # Plan format
-Implementation plans are self-contained markdown files in the plans dir (see `artifact-locations`).
+Implementation plans are self-contained markdown files, named and moved through the lifecycle laid out below, in the plans dir (see `artifact-locations`).
 
-- **Naming.** `<feature-slug>-MM-DD-YY.md` — slug first, then date (e.g. `user-auth-07-06-26.md`). One plan per feature/change; revisions update the same file rather than spawning versioned copies.
+- **Naming.** A plan is identified by `<feature-slug>-MM-DD-YY` — slug first, then date (e.g. `user-auth-07-06-26`). One plan per feature/change; revisions update the same plan rather than spawning versioned copies. That identifier names the proposal file, then the plan's directory, then its archived file — it never changes across the lifecycle.
+- **Where a plan lives, and its lifecycle.** The plans dir root holds NO loose plan files: only the two standing dirs `proposals/` and `completed/`, and one directory per plan.
+  - **Proposal.** An unapproved plan is a single file `<plans-dir>/proposals/<slug>-MM-DD-YY.md`. Records produced before approval — the gate's `<slug>-MM-DD-YY.plan-review.md`, a Confluence-mode `<slug>-MM-DD-YY.story.md` — sit beside it as siblings until it is promoted.
+  - **Active.** On the user's approval at the plan gate the plan gets its own directory `<plans-dir>/<slug>-MM-DD-YY/`, and the proposal file becomes that dir's **`plan.md`** — the run's spec of record, whatever shape the workflow produced (a phased plan; a diagnose run's ranked candidate report). Its proposal siblings move in with it under bare kind names. Every later committed record of the run is written into that same dir; see `run-artifacts` for the kinds.
+  - **Completed.** At post-merge closeout ONLY `plan.md` moves, to `<plans-dir>/completed/<slug>-MM-DD-YY.md` — reclaiming the proposal's name so `completed/` stays a flat, scannable list of what shipped. The rest of the dir is removed; the repo's history keeps the records.
+  - **Superseded or abandoned.** A plan that never shipped NEVER enters `completed/` — `completed/` means shipped, and nothing else. It is DELETED: its proposal file, or its whole plan dir, is removed. There is no archive of abandoned plans, because the repo's history already is one. The obligation that replaces the file is a **supersession note in the successor**: whatever plan takes over MUST state, in its Goal & scope section, which plan it supersedes and why. A plan deleted with nothing naming it is work whose reasoning is lost; a plan kept "just in case" is the clutter this layout exists to remove.
+  - The two standing dirs are never deleted, even when empty.
+  - **The moves are performed by `plan-lifecycle.sh`** (`promote | archive | supersede | reopen | locate | check`; install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy), never by hand. `archive` refuses a plan that did not ship — that refusal, not anyone's good intentions, is what keeps an abandoned plan out of `completed/`. `supersede` is the route that refusal names, and it refuses in turn unless a named successor actually exists and mentions the plan being superseded, so the note is enforced rather than merely requested.
 - **Phases & subphases.** Work is broken into ordered phases, and EVERY phase decomposes into numbered subphases `<phase>.<subphase>` (`4.3` = phase 4, subphase 3) — a phase with no subphase entries is a format violation; a single-item phase still gets a `N.1`. The **subphase is the unit of work, of dispatch, and of check-off**: it's what a builder agent is handed and what gets ticked in the syllabus.
 - **Required sections.**
   - **Phase syllabus** — FIRST section: TITLE ONLY at both levels. One bullet per phase acting as a grouping header, with one nested checkbox per subphase — every subphase in the plan appears here (the checkboxes that matter are the subphase entries; phases are just headers). No task detail — the meat of each subphase lives in its phase section below. Subphase entries carry OPTIONAL annotations, written only when they carry information:
@@ -52,7 +59,7 @@ An equally compliant minimal, single-lane syllabus:
   - [ ] 2.1: Component tests + e2e pass
 ```
 
-- **Living document.** The plan is not write-once: skills that record completed work (e.g. the documenting skill) update the syllabus — `- [x]` per finished subphase, `- [dropped]` for abandoned ones — and annotate dropped or changed subphases in the phase sections, so the syllabus always reflects reality.
+- **Living document.** The plan is not write-once: skills that record completed work (e.g. the documenting skill) update the syllabus — `- [x]` per finished subphase, `- [dropped]` for abandoned ones — and annotate dropped or changed subphases in the phase sections, so the syllabus always reflects reality. An archived plan's syllabus must already reflect that reality by the time `archive` runs, since that subcommand reads it to decide whether the plan shipped.
 - **Self-contained.** Readable without the conversation that produced it; cite the source of every load-bearing fact.
 - **NEVER include time estimates.** No durations, effort estimates, story points, or delivery dates anywhere in a plan — agents always get them wrong. Order and dependencies express sequencing; nothing expresses time.
 

@@ -1,6 +1,6 @@
 ---
 name: artifact-locations
-description: Where docs, plans, worktrees, and the base branch resolve from — project → global → local-default chain via resolve-config.sh; CLAUDE_DOCS_DIR may also name a Confluence location.
+description: Where docs, plans and their records, worktrees, and the base branch resolve from — project → global → local-default chain via resolve-config.sh; CLAUDE_DOCS_DIR may also name a Confluence location.
 domain: universal
 ---
 
@@ -11,7 +11,7 @@ Four artifact kinds, four locations. Each resolves through the SAME chain — pr
   - A filesystem path (or unset → `/docs`): docs live locally at that path, structure per `doc-format`; the documentation phase is `document-local`.
   - A Confluence location — an Atlassian wiki URL (`https://<site>.atlassian.net/wiki/spaces/<SPACE>[/pages/...]`) or the shorthand `confluence:<SPACE>[/<Parent Page>]`: docs live in Confluence at that location, which becomes the source of truth (no local `/docs` is maintained); the documentation phase is `document-confluence`.
   - Extensible: a future `<target>:` scheme maps to the skill named `document-<target>`.
-- **Implementation plans** — `CLAUDE_PROJECT_PLANS_DIR`, local default root `/project-plans/`. Structure per `plan-format`.
+- **Implementation plans and their committed records** — `CLAUDE_PROJECT_PLANS_DIR`, local default root `/project-plans/`. Layout and lifecycle (proposals → per-plan dir → completed) per `plan-format`; the record kinds that live in a plan's dir per `run-artifacts`. Everything here is a COMMITTED repo artifact, and the split with the run dir is absolute in both directions: a progress log, builder contract, or exit report under the plans dir is a misfile, and a plan or any of its records under `<workflows-dir>/` is a misfile the other way.
 - **Workflow worktrees** — `CLAUDE_WORKFLOWS_DIR`, local default root `.workflows/`. Always gitignored; each worktree sits on a `<type>/<name>` branch (`type` ∈ `feature|bug|hotfix|docs|sync`, default `feature`) off the base branch. Runs that dispatch builders use the **parent/child scheme**: the run's parent worktree sits on `<type>/<name>` off the base branch (no suffix — this is the branch the PR publishes), and each builder lane's child worktree sits on `<type>/<name>-l<n>` (`l<n>` = the plan's lane number: `l1`, `l2`, …) cut off the parent branch via `workflow-setup.sh --parent` (modes without builders create the parent only). Children are ephemeral — merged back into the parent and removed lane by lane; only the parent branch is ever published.
 - **Base branch** — `CLAUDE_BASE_BRANCH`, local default resolved by a git heuristic (`main` if it exists, else the short name of `origin/HEAD`). What a workflow worktree is created off of, and what a diff/reconciliation report compares against. Resolved SILENTLY by `workflow-setup.sh` (which delegates to `resolve-config.sh CLAUDE_BASE_BRANCH --base-branch-default`) whenever an orchestrator doesn't pass `--base` explicitly — NEVER asked of the user conversationally, and NEVER read from CLAUDE.md prose.
 
