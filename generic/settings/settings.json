@@ -1,0 +1,176 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm:*)",
+      "Bash(grep:*)",
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(pwd:*)",
+      "Bash(which:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash(tree:*)",
+      "Bash(du:*)",
+      "Bash(df:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(cut:*)",
+      "Bash(diff:*)",
+      "Bash(realpath:*)",
+      "Bash(dirname:*)",
+      "Bash(basename:*)",
+      "Bash(printenv:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Read",
+      "Bash(docker ps:*)",
+      "Bash(kubectl get:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.*)",
+      "Bash(go test:*)",
+      "LS",
+      "Glob",
+      "Grep",
+      "Skill",
+      "Read(//home/icarus64/.claude/skills/**)",
+      "Read(//home/icarus64/.claude/rules/**)",
+      "Read(//home/icarus64/.claude/hooks/**)",
+      "Read(//home/icarus64/.claude/agents/**)",
+      "Read(//home/icarus64/repos/**)",
+      "Edit(//home/icarus64/repos/**/.workflows/**)",
+      "Bash(cd:*)",
+      "Bash(pushd:*)",
+      "Bash(popd:*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(jq:*)",
+      "Bash(node_modules/.bin/:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh search:*)",
+      "Bash(gh auth status:*)"
+    ],
+    "deny": [
+      "Bash(git clean -f:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push -f:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git branch --delete --force:*)",
+      "Bash(git config:*)",
+      "Bash(git remote:*)",
+      "Bash(git tag -d:*)",
+      "Bash(git tag --delete:*)",
+      "Bash(git rebase --abort:*)",
+      "Bash(git reflog expire:*)",
+      "Bash(git gc --prune:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git push origin --delete:*)",
+      "Bash(git reset --mixed HEAD~:*)",
+      "Bash(git reset --soft HEAD~:*)",
+      "Bash(git submodule deinit:*)",
+      "Bash(git rm --cached:*)",
+      "Bash(git update-ref -d:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(sed -i:*)",
+      "Bash(sed --in-place:*)",
+      "Bash(awk -i:*)",
+      "Bash(awk --in-place:*)",
+      "Bash(git worktree remove:*)"
+    ],
+    "additionalDirectories": [
+      "/home/icarus64/.claude/skills",
+      "/home/icarus64/.claude/rules",
+      "/home/icarus64/.claude/hooks",
+      "/home/icarus64/.claude/agents"
+    ]
+  },
+  "model": "fable",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/worktree-reminder.sh"
+          },
+          {
+            "type": "command",
+            "command": "cd ~/repos/agentic 2>/dev/null && ~/.claude/hooks/sync-install.sh --check >&2 || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+            "if": "Bash(git branch:*)"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+            "if": "Bash(git worktree remove:*)"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/smart-lint.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/smart-test.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/claude-install-drift.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/ntfy-notifier.sh notification"
+          }
+        ]
+      }
+    ]
+  },
+  "alwaysThinkingEnabled": true,
+  "tui": "fullscreen",
+  "skipWorkflowUsageWarning": true,
+  "agentPushNotifEnabled": true,
+  "includeCoAuthoredBy": false
+}

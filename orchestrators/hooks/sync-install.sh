@@ -15,6 +15,12 @@
 #     {generic,orchestrators}/rules/<name>.md   -> ~/.claude/rules/<name>.md
 #     orchestrators/agents/<name>.md            -> ~/.claude/agents/<name>.md
 #     orchestrators/agents/<dir>/**             -> ~/.claude/agents/<dir>/    (whole directory)
+#     generic/settings/settings.json            -> ~/.claude/settings.json
+#
+#   settings.json is the one unit the INSTALL side also mutates: Claude Code
+#   appends "always allow" grants to the live file. --check reports that as
+#   STALE; fold wanted grants back into generic/settings/settings.json before
+#   the next push, or the sync will overwrite them.
 #
 #   Files named AGENTS.md and .gitkeep are repo documentation/scaffolding and
 #   are skipped. Skill and agent directories sync as WHOLE directories (the
@@ -87,6 +93,7 @@ install_path() {
     generic/hooks/*|orchestrators/hooks/*)       echo "hooks/${p#*/hooks/}" ;;
     generic/rules/*|orchestrators/rules/*)       echo "rules/${p#*/rules/}" ;;
     orchestrators/agents/*)                      echo "agents/${p#orchestrators/agents/}" ;;
+    generic/settings/settings.json)              echo "settings.json" ;;
   esac
 }
 
@@ -111,6 +118,7 @@ source_of() {
     hooks/*)  for cand in "generic/$unit" "orchestrators/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
     rules/*)  for cand in "generic/$unit" "orchestrators/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
     agents/*) cand="orchestrators/$unit"; [ -e "$cand" ] && echo "$cand" ;;
+    settings.json) cand="generic/settings/settings.json"; [ -e "$cand" ] && echo "$cand" ;;
   esac
 }
 
@@ -139,7 +147,8 @@ sync_unit() {
 # all_source_files -> every mappable source file, one per line.
 all_source_files() {
   find generic orchestrators -type f ! -name AGENTS.md ! -name .gitkeep \
-    \( -path '*/skills/*' -o -path '*/hooks/*' -o -path '*/rules/*' -o -path '*/agents/*' \) \
+    \( -path '*/skills/*' -o -path '*/hooks/*' -o -path '*/rules/*' -o -path '*/agents/*' \
+       -o -path 'generic/settings/*' \) \
     | sort
 }
 

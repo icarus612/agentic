@@ -32,7 +32,8 @@ agentic/
 ├── generic/                   # GLOBAL: bound to no technology       (domain: universal)
 │   ├── rules/                 #   the always-on set
 │   ├── skills/                #   explore, init-workspace, review-*, document-local, push-pr
-│   └── hooks/                 #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
+│   ├── hooks/                 #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
+│   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # bound to ONE technology              (domain: <tech>)
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
