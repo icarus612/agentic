@@ -10,7 +10,10 @@
 #     1. The FIRST section heading is '## Phase syllabus'.
 #     2. Every syllabus phase bullet has at least one subphase checkbox.
 #     3. Subphase IDs are checkbox <-> detail-block 1:1 (every syllabus ID
-#        has exactly one '**<id>:' detail block below, and vice versa).
+#        has exactly one detail block below, and vice versa). A detail block
+#        opens with its id in either markup the plans in the wild use — a bold
+#        lead-in ('**<id>:') or a markdown heading ('### <id> — Title').
+#        plan-format fixes the ID, not the markup around it, so both count.
 #     4. Every '(after: ...)' reference names a real subphase ID.
 #     5. The (after:) dependency graph is acyclic.
 #   Lane file-scope disjointness is NOT machine-checked (scopes are prose in
@@ -58,19 +61,29 @@ syl_ids=$(echo "$syllabus" | grep -oE '^\s+- \[[^]]*\]\s+[0-9]+\.[0-9]+:' \
   | grep -oE '[0-9]+\.[0-9]+' | sort -u)
 [ -n "$syl_ids" ] || say_fail "no '<phase>.<subphase>:' checkbox entries found in the syllabus"
 
-# --- collect detail-block IDs ('**N.M:' bold lines below the syllabus) -----
-detail_ids=$(awk '/^## Phase syllabus/{f=1;next} /^## /{f=0} !f' "$plan" \
-  | grep -oE '^\*\*[0-9]+\.[0-9]+:' | grep -oE '[0-9]+\.[0-9]+' | sort -u)
+# --- collect detail-block IDs (below the syllabus) --------------------------
+# A detail block opens with its subphase id in either of the two markups the
+# plans in the wild use: a bold lead-in ('**N.M:') or a markdown heading
+# ('### N.M — Title'). plan-format fixes the ID, not the markup, so accept
+# both — matching only one of them fails every plan written in the other.
+# The trailing class stops '1.1' from also matching '1.10'.
+detail_open='^(\*\*|#{2,6}[[:space:]]+)'
+detail_close='([[:space:]]|:|$)'
 
 # --- 3. 1:1 checkbox <-> detail block --------------------------------------
+detail_ids=$(awk '/^## Phase syllabus/{f=1;next} /^## /{f=0} !f' "$plan" \
+  | grep -oE "${detail_open}[0-9]+\.[0-9]+${detail_close}" \
+  | grep -oE '[0-9]+\.[0-9]+' | sort -u)
+
 for id in $syl_ids; do
-  echo "$detail_ids" | grep -qx "$id" || say_fail "syllabus subphase $id has no '**$id:' detail block"
+  echo "$detail_ids" | grep -qx "$id" \
+    || say_fail "syllabus subphase $id has no detail block ('**$id:' or '### $id ...')"
 done
 for id in $detail_ids; do
   echo "$syl_ids" | grep -qx "$id" || say_fail "detail block $id has no syllabus checkbox"
 done
 for id in $syl_ids; do
-  n=$(grep -cE "^\*\*${id//./\\.}:" "$plan")
+  n=$(grep -cE "${detail_open}${id//./\\.}${detail_close}" "$plan")
   [ "$n" -le 1 ] || say_fail "subphase $id has $n detail blocks (must be exactly 1)"
 done
 
