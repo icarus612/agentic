@@ -22,9 +22,13 @@ the convention's consumers are ~20 markdown surfaces plus one new script).
   - [x] 4.2: document-local, push-pr, explore                             (lane 4)
   - [x] 4.3: document-confluence (tool-based domain)                      (lane 4)
 - [ ] Phase 5: Integration
-  - [ ] 5.1: Index tables and repo tree listings   (after: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3)
-  - [ ] 5.2: This repo's own plans dir scaffolding (after: 1.1, 2.1)
-  - [ ] 5.3: Dangling-reference sweep + live `check` run  (after: 5.1, 5.2)
+  - [x] 5.1: Index tables and repo tree listings   (after: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3)
+  - [x] 5.2: This repo's own plans dir scaffolding (after: 1.1, 2.1)
+  - [x] 5.3: Dangling-reference sweep + live `check` run  (after: 5.1, 5.2)
+- [ ] Phase 6: Enforcement-machinery correctness (mid-run discovery)
+  - [x] 6.1: Exit-report claims parser in the scope-verification scripts  (after: 5.3)
+- [ ] Phase 7: This repo's own branch-and-land policy (user requirement change)
+  - [x] 7.1: source-push-sync + push-main — branch off main, merge locally, push
 
 ## Goal & scope
 
@@ -34,6 +38,12 @@ the gitignored run dir or a builder contract in the plans dir, (b) the plans dir
 root never accumulates loose files, and (c) an abandoned or superseded plan cannot
 be archived into `completed/` as if it had shipped — the failure that occurred in
 the mythic project's "made images fix" plans.
+
+**Amended mid-run (phase 6).** The integration pass surfaced a defect in the
+scope-verification machinery this plan leans on as its own acceptance evidence. That
+is inside the goal, not adjacent to it: the whole thesis here is that placement rules
+are enforced by scripts rather than by prose, and an enforcement script that reports
+every file as unclaimed enforces nothing. Phase 6 fixes it and nothing else.
 
 **In scope**
 - The three normative rules: `generic/rules/plan-format.md`, `artifact-locations.md`,
@@ -61,8 +71,10 @@ the mythic project's "made images fix" plans.
 - Retro-fixing another project's `project-plans/completed/` (mythic). The archive
   guard added here prevents recurrence; cleaning up what already happened there is
   a separate, one-off task.
-- Shipping. This repo uses no workflow worktrees and no PRs; landing is
-  `push-main` + `sync-install.sh`, the orchestrator's job.
+- Shipping THIS run: landing is `push-main` + `sync-install.sh`, the orchestrator's
+  job. **Amended by 7.1**, which rewrites this repo's branch-and-land policy at the
+  user's request. 7.1 changes the policy DOCUMENTS only; it does not retroactively
+  restructure this run, whose commits already sit on `main` under the old rule.
 - Any change to the verdict vocabulary, report round format, lane-id scheme, or
   branch naming. Behavior outside artifact placement is frozen.
 
@@ -794,6 +806,234 @@ dangling-reference check.
 - **Test approach / oracle:** `equivalence check` — this subphase IS the deletion
   proof that the rework module requires for every replaced structure.
 
+## Phase 6: Enforcement-machinery correctness (mid-run discovery)
+
+Single lane, serialized after the integration sweep. Added after the integration pass
+reproduced the defect live: 26 UNCLAIMED lines on this run, every one false.
+
+**6.1: Exit-report claims parser in the scope-verification scripts.**
+
+- **File scope:** `orchestrators/hooks/verify-run-scope.sh`,
+  `orchestrators/hooks/verify-scope.sh`, `tests/verify-scope-parsing.test.sh` (new,
+  repo root — the `tests/` convention D4 established).
+- **The defect, with the exact current lines.**
+  - `verify-run-scope.sh:71` is the whole parser:
+    `$(awk '/^## Files touched/{f=1;next} /^## /{f=0} f' "$r" | grep -E '^\s*- \S' | sed -E 's/^\s*- //')`.
+    It strips the bullet marker and nothing else, so a claim line yields whatever text
+    followed the dash. `:79` then matches it against the real diff with
+    `printf '%s\n' "$claimed" | grep -qxF "$f"` — an EXACT, whole-line, fixed-string
+    match. A report line ``- `orchestrators/hooks/x.sh` `` therefore produces the
+    claim `` `orchestrators/hooks/x.sh` ``, backticks included, which can never equal
+    the git path `orchestrators/hooks/x.sh`.
+  - The formats real builders write — ``- `path` ``, ``- `path` (new)``,
+    ``- `path` — annotation``, `- ./path`, `- /abs/path` — ALL pass
+    `validate-report.sh --kind exit`, because `validate-report.sh:91` only COUNTS
+    lines matching `^\s*- \S` and never inspects their content. The two scripts
+    disagree about what a claim line is, and the permissive one is the gatekeeper.
+    Net effect: zero claims parse, every changed file reports UNCLAIMED, and the check
+    that is supposed to catch an orchestrator editing the product directly instead
+    produces uniform noise an operator learns to ignore — worse than no check.
+  - **`verify-scope.sh` does NOT share the parser bug**, and this was checked rather
+    than assumed: it takes its reported list from argv or stdin (`:32-35`) and never
+    reads a report file. It shares the *matching* half — `:45` and `:50` use the same
+    exact `grep -qxF` — so it breaks identically whenever its caller feeds it raw
+    bullet text. Its caller is prose: `build-dispatch.md:13` says only "fed the
+    report's `## Files touched` list", leaving the extraction to be improvised per
+    run, which is how the same bug reappears. Hence both scripts are in scope.
+- **Change.**
+  1. Add one shared extractor to `verify-run-scope.sh`, `claims_from_report()`, and
+     use it in the `:68-72` loop. Accepted family, in order: strip the bullet marker
+     (`-` or `*`); if the remainder contains a backticked token, the path is the FIRST
+     one; otherwise the first whitespace-delimited token with trailing `,;:` removed;
+     then strip surrounding quotes, drop a leading `./`, and convert an absolute path
+     to repo-relative against the worktree (`realpath -m`, following
+     `scope-writes.sh:54`'s precedent). Lines yielding an empty token are skipped.
+     Normalize BOTH sides through the same function so the comparison has one
+     definition of a path.
+  2. **First backticked token only, deliberately.** A bullet like
+     ``- `a.sh` — see `b.sh` for rationale`` must claim `a.sh` alone. Claiming every
+     backticked token would let a passing mention silently absorb a real unclaimed
+     file, which is the exact failure this script exists to prevent; over-claiming
+     fails quietly, under-claiming fails loudly. When a bullet holds more than one
+     backticked token, print a `NOTE:` line naming the report and the line so the
+     operator can split it, and carry on with the first.
+  3. Give `verify-scope.sh` an optional `--report <exit-report>` input that reads the
+     section through the identical rules, so both scripts share one definition instead
+     of one of them depending on an improvised pipeline. Purely ADDITIVE: argv and
+     stdin keep working unchanged, so `build-dispatch.md:13`'s current wording stays
+     true and no file outside this scope has to change. It also makes
+     `run-artifacts.md:21`'s existing claim ("`verify-scope.sh` reads its file list
+     per lane") literally accurate for the first time.
+  4. **Do not "fix" this from the other end.** Tightening `validate-report.sh:91` to
+     reject annotated or backticked bullets would retroactively invalidate reports
+     that already passed and fight the markdown builders naturally write. The parser
+     is now the single definition of the accepted family; leave the validator
+     permissive, and say so in the script's DESCRIPTION block so a later agent does
+     not reverse this.
+  5. Frozen: everything else. The allowlist logic (`:42-58`), the harness-owned
+     plans/docs prefixes (`:43-44`), the changed-file computation (`:61-64`), the
+     exit codes, and both scripts' output vocabulary (`UNCLAIMED:`, `UNREPORTED:`,
+     `UNCHANGED:`, `OK:`, `FAIL:`) stay exactly as they are.
+- **Acceptance criteria.**
+  1. Each of these claim formats parses to the same repo-relative path and reports as
+     claimed: `- path`, ``- `path` ``, ``- `path` (new)``, ``- `path` — annotation``,
+     `- path,`, `- ./path`, `- <absolute path inside the worktree>`.
+  2. **False-positive direction still works:** a file changed in the worktree that no
+     exit report names still prints `UNCLAIMED:` and exits 1. The fix must not turn
+     the check into one that passes everything — this criterion is the one that
+     matters most, because a parser that claims too much would look identical to
+     success.
+  3. A multi-backtick bullet claims only the first token and prints the `NOTE:` line.
+  4. Harness-owned paths (plans dir, docs dir, `.gitignore`) remain allowed without
+     being claimed, and `--allow` prefixes still work.
+  5. `verify-scope.sh --report <file>` yields byte-identical results to feeding the
+     same list on stdin; without the flag its behavior is unchanged.
+  6. Re-running `verify-run-scope.sh` over THIS run's parent worktree and run dir
+     reports `OK:` with zero UNCLAIMED — the live reproduction that opened this
+     subphase is the closing evidence for it.
+  7. `bash -n` clean on both scripts; no `jq`; no new dependency.
+- **Test approach / oracle:** `new contract tests`. `tests/verify-scope-parsing.test.sh`
+  builds a throwaway git repo with a run-artifacts dir and synthetic exit reports
+  covering every format in criterion 1, plus a multi-backtick bullet, plus a changed
+  file claimed by nobody. It asserts exit codes and exact output lines in BOTH
+  directions — claimed files parse (no false UNCLAIMED) and an unclaimed file still
+  FAILs (no false OK) — and runs the same fixtures through `verify-scope.sh` via
+  `--report` and via stdin, asserting identical output. Written from this subphase's
+  format list and guard rules alone, never from the finished parser.
+- **Note for the record stage, deliberately out of this scope.** `build-dispatch.md:13`
+  would read better naming `--report` explicitly instead of "fed the report's
+  `## Files touched` list". That is a documentation nicety, not a correctness fix —
+  the additive flag keeps the current sentence true — so it belongs to the doc pass,
+  not here.
+
+## Phase 7: This repo's own branch-and-land policy (user requirement change)
+
+Single lane, single subphase, independent of every other phase — it shares no file
+with any of them, so it carries no `after:` edge and can run whenever dispatched.
+
+**7.1: source-push-sync + push-main — branch off main, merge locally, push.**
+
+- **File scope:** `.claude/rules/source-push-sync.md`,
+  `.claude/skills/push-main/SKILL.md`. Nothing else.
+- **Both files are project-scoped and synced NOWHERE.** They live only in this repo's
+  `.claude/`, which `source-push-sync.md:7` itself names as never-synced and which
+  `sync-install.sh`'s `install_path()` (`:74-83`) has no arm for. There is no
+  install-side counterpart to update and no `~/.claude` file to keep in step. A
+  consequence worth expecting rather than debugging: a commit touching only these two
+  files makes `sync-install.sh <range>` print "no universal-domain changes to sync"
+  and exit 0. That is correct, not a failed sync.
+- **The requirement, verbatim from the user:** "remove the no worktree rule for this
+  repo, but we still want to branch off main, and merge locally to main and push (not
+  make gh pr's)".
+- **Target policy.** Edits happen on a workflow branch in a worktree cut off `main`
+  via `workflow-setup.sh` — the standard scheme this repo prescribes for everyone
+  else now applies to it too, `worktree-reminder` nag included. Landing is: merge that
+  branch into `main` LOCALLY, push `main`, then sync the install exactly as before.
+  No GitHub PR is ever opened. `push-policy`'s never-force-push clause holds
+  unchanged; the "never push main" clause stays overridden for this repo only.
+- **Current wording being replaced.**
+  - `source-push-sync.md:6`, step 2, in full: "**Push up.** Land the change by
+    committing on `main` and pushing, via the `push-main` skill — this repo uses NO
+    workflow worktrees and NO PRs. This intentionally overrides the global
+    `push-policy` rule's "never push main" clause FOR THIS REPO ONLY; its other
+    clauses still hold (never force-push). The `worktree-reminder` SessionStart nag
+    does not apply here." — three claims change: no worktrees (now false), commit
+    directly on main (now: merge into main), and the worktree-reminder exemption (now
+    removed). Two survive: the never-push-main override and never-force-push.
+  - `source-push-sync.md:5` (step 1, edit here) and `:7` (step 3, mandatory sync) are
+    CORRECT and must survive verbatim — including `:7`'s "a push that lands without
+    the install sync is an incomplete change".
+  - `push-main/SKILL.md:3` (frontmatter description): "commit on main and push
+    directly to origin/main, then sync universal content to the ~/.claude install. No
+    workflow worktrees, no PRs."
+  - `push-main/SKILL.md:12`: "This repo deliberately skips the worktree/PR machinery
+    its own skills prescribe for other projects: changes are committed straight on
+    `main`…" — the premise is now half wrong: it skips the PR machinery, not the
+    worktree machinery.
+  - `push-main/SKILL.md:21`, step 1, in full: "**Verify.** You are on `main` in the
+    repo root (no worktree — if one exists for this repo, something went wrong; ask).
+    `git status` shows only the intended changes." — this actively inverts the new
+    policy: a worktree is now expected, not a symptom of something gone wrong.
+  - `push-main/SKILL.md:22`, step 2: "**Commit on main.** Stage the intended files
+    explicitly…" — becomes a merge step; the committing happens on the workflow
+    branch, upstream of this skill.
+  - `:23` (push), `:24` (sync), `:25` (report) keep their substance; `:24` in
+    particular is correct as written and must survive.
+- **Change — the new landing sequence in `push-main`.**
+  1. **Verify.** The workflow worktree is clean and everything intended is committed
+     on its `<type>/<name>` branch; the main checkout is on `main` with a clean tree.
+     Record the pre-merge remote tip, `old=$(git rev-parse origin/main)` — the sync
+     range still derives from this, exactly as today.
+  2. **Merge locally, `--no-ff`.** From the main checkout on `main`:
+     `git merge --no-ff <type>/<name>`. **`--no-ff` is the rule, and squash is
+     forbidden.** Rationale to write into the skill so it is not "simplified" later: a
+     merge commit keeps one revert point for a whole change set and keeps visible
+     which commits belonged to one run, while squashing would destroy the per-subphase
+     commit trail that builder exit reports cite as evidence. A fast-forward would be
+     harmless but leaves history indistinguishable from the old commit-straight-on-main
+     flow, which is the thing being replaced.
+  3. **Refuse on conflict.** If the merge conflicts, `git merge --abort` and stop —
+     never resolve conflicts in the terminal landing stage. A conflict means `main`
+     moved under the branch; the fix is to reconcile inside the workflow worktree and
+     re-invoke. Report the exact state, do not improvise around it.
+  4. **Push `main`.** `git push origin main`. Never `--force` in any form. A
+     permission-blocked or declined push stays a valid reported outcome, and — as
+     today — the sync is SKIPPED when the push did not land, so the install can never
+     get ahead of `origin/main`.
+  5. **Retire the branch.** Remove the worktree first (`git worktree remove <path>`,
+     then `git worktree prune`) — a branch checked out in a worktree cannot be
+     deleted — then `git branch -d <type>/<name>`. **`-d` only, never `-D`**, per the
+     safe-deletes convention this repo already enforces in `cleanup-merged/SKILL.md:41`;
+     if `-d` refuses, the merge did not fully land and that refusal is information to
+     surface, not to override.
+  6. **Sync the install**, unchanged: `sync-install.sh <old>..HEAD` from the MAIN
+     CHECKOUT. Verified precondition, not an assumption: `sync-install.sh:67-69`
+     refuses to run inside a linked worktree and requires `HEAD` to be on `main`, so
+     the sync must run after the merge from the repo root — never from the workflow
+     worktree. Worth stating explicitly in the skill, because the new flow makes
+     "finish inside the worktree" the natural habit and that is exactly where the
+     script will refuse. `git diff --name-status <old>..HEAD` compares two commits, so
+     the range works identically across a `--no-ff` merge commit.
+  7. **Report**, as today: what merged, the pushed range, the branch/worktree removed,
+     and the script's `SYNCED:`/`DELETED:` lines.
+- **Change — `source-push-sync.md` step 2.** Rewrite to: land by branching off `main`
+  with `workflow-setup.sh`, working in that worktree, then merging into `main` locally
+  and pushing, via `push-main`; **no PRs, ever** — that is the part of the exemption
+  that stays. Keep the "never push main" override and the never-force-push clause;
+  DELETE the "NO workflow worktrees" claim and the "`worktree-reminder` SessionStart
+  nag does not apply here" sentence, since the nag now applies exactly as it does
+  everywhere else. Steps 1 and 3 are untouched.
+- **Scope boundary — retroactive rebranching is OUT.** This run's commits already sit
+  directly on `main` under the old rule. Nothing in 7.1 rewrites, rebases, or
+  re-homes them; the new policy governs subsequent sessions only. An executor that
+  starts rewriting this run's history has left the subphase.
+- **Not in scope, and deliberately unchanged:** `workflow-setup.sh`,
+  `worktree-reminder.sh`, `cleanup-merged`, `push-pr`, and every universal rule. The
+  worktree machinery already works for this repo — the old policy opted out of it by
+  prose, so restoring it is a prose change, and no script needs to learn anything new.
+  Confirm this rather than assume it: if any of those scripts turns out to special-case
+  this repo, stop and report instead of widening the subphase.
+- **Acceptance criteria.**
+  1. `source-push-sync.md` step 2 describes branch → worktree → local merge → push
+     main → no PRs; the "NO workflow worktrees" claim and the worktree-reminder
+     exemption are gone; steps 1 and 3 are byte-identical to before.
+  2. `push-main` describes the six-step landing sequence above, with `--no-ff`
+     specified, squash forbidden, conflict-abort mandated, `-d`-not-`-D` for the
+     branch, and the sync running from the main checkout.
+  3. No sentence in either file says this repo skips worktrees; every sentence saying
+     it skips PRs survives.
+  4. Never-force-push and the never-push-main override are both still stated.
+  5. Neither file gains an instruction to open, request, or comment on a GitHub PR.
+  6. The frontmatter `description` at `push-main/SKILL.md:3` matches the new flow, and
+     `domain: agentic` (`:4`) is unchanged — the skill stays project-scoped.
+- **Test approach / oracle:** `equivalence check`. There is nothing executable here:
+  the deliverable is two policy documents, and the oracle is a read-through against
+  the target policy plus a dry trace of one landing — branch, work, merge, push,
+  delete, sync — confirming each step names a command that exists and a precondition
+  the real scripts actually enforce (`sync-install.sh:67-69` being the one that bites).
+  The first real landing under the new policy is the live confirmation, and it happens
+  after this run, not inside it.
+
 ## Hand-off to the record stage (not a build phase)
 
 `/docs` alignment is the run's `document-local` stage. The lines it must reconcile,
@@ -892,7 +1132,9 @@ executor; a subphase that contradicts one of these is wrong, not creative.**
 | 1.1–1.3 rules, 2.2–2.3, 3.x, 4.x, 5.1 wording | `builder` lanes → `coder` sub-agents (markdown only; no contract-tester, oracle is `equivalence check`) |
 | 2.1 `plan-lifecycle.sh` + fixture test | `builder` lane → `coder` for the script, `contract-tester` for the fixture test (oracle `new contract tests`; the tester works from the CLI + guard contract in 2.1, never from the script) |
 | 5.2, 5.3 | `builder` (integration lane, run in the parent) |
+| 6.1 scope-verification parser + test | `builder` lane → `coder` for both scripts, `contract-tester` for `tests/verify-scope-parsing.test.sh` (oracle `new contract tests`; the tester works from 6.1's accepted-format list and guard rules, never from the parser) |
 | Plan gate | `review-plan` (+ `validate-plan.sh`, and `plan-lifecycle.sh check` once 2.1 lands) |
 | Code gate | `review-code` |
 | Docs alignment (out of plan scope) | `document-local` at the record stage, against the line list above |
-| Ship | `push-main` + `sync-install.sh <range>` — orchestrator's job for this repo; no worktree, no PR, no `push-pr`, no `cleanup-merged` |
+| 7.1 branch-and-land policy | `builder` (single lane; two project-scoped markdown files, oracle `equivalence check`) |
+| Ship THIS run | `push-main` + `sync-install.sh <range>` — orchestrator's job for this repo; still no PR and no `push-pr`. This run began under the old no-worktree rule and lands that way; 7.1's branch → local-merge → push flow governs the NEXT session, not a retroactive restructuring of this one. |

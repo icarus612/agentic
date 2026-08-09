@@ -23,12 +23,20 @@
 #   removed from the install.
 #
 # MODES
+#   (no mode)     FULL reconcile — same as --full. This is the default because
+#                 the old default, 'HEAD~1..HEAD', silently synced only the last
+#                 commit: make several commits, run the sync once, and every
+#                 commit but the newest never landed. That is how 19 installed
+#                 files went stale and plan-lifecycle.sh was never installed at
+#                 all, with --check disagreeing with the sync the whole time.
+#                 A full reconcile has no range to get wrong.
 #   <git-range>   Sync only what changed in the range (e.g. 'abc123..HEAD').
-#                 Default when no mode given: 'HEAD~1..HEAD'. Deletions in the
-#                 range are propagated to the install.
-#   --full        Treat every universal source file as changed: mirror the
-#                 whole tree into the install. Does not delete unattributable
-#                 install files (see --check for spotting them).
+#                 Opt-in only — never a default. Deletions in the range are
+#                 propagated to the install; a full reconcile cannot express
+#                 deletions, so this is the mode to use when removing files.
+#   --full        Explicit form of the default: treat every universal source
+#                 file as changed and mirror the whole tree into the install.
+#                 Does not delete unattributable install files (see --check).
 #   --check       Copy nothing. Diff every universal source file against the
 #                 install and report drift (missing/stale files, plus orphaned
 #                 install files that have no source counterpart). Exit 1 on
@@ -160,13 +168,15 @@ fi
 
 # --- collect changed units --------------------------------------------------
 units=""
-if [ "$full" = 1 ]; then
+# No explicit range means a FULL reconcile. A range-based default cannot see
+# drift that predates the range, so any commit not in it stayed unsynced
+# forever and silently — the failure this default exists to make impossible.
+if [ "$full" = 1 ] || [ -z "$range" ]; then
   while IFS= read -r p; do
     rel=$(install_path "$p"); [ -n "$rel" ] || continue
     units="$units$(unit_of "$rel")\n"
   done < <(all_source_files)
 else
-  [ -n "$range" ] || range="HEAD~1..HEAD"
   git rev-parse "${range%%..*}" >/dev/null 2>&1 || err "bad git range: $range"
   while IFS=$'\t' read -r _status p _rest; do
     [ -n "${p:-}" ] || continue

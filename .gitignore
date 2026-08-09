@@ -1,3 +1,6 @@
 
 # dae-pipeline worktrees (workflow-setup.sh)
 .workflows/
+
+# dae-pipeline run dirs, inside each worktree
+.artifacts/

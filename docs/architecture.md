@@ -47,7 +47,8 @@ agentic/
 │   ├── AGENTS.md
 │   ├── skills/                #   dae (router + workflow siblings + scripts), orchestrate
 │   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
-│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
+│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
+│   │                          #   plan-lifecycle.sh, …
 │   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
 │                              #   contract-tester.md
 ├── generic/                   # the global layer                (domain: universal)
@@ -61,6 +62,7 @@ agentic/
 │       ├── AGENTS.md          #   + stubs: bash, git, go, react, python, fastapi
 │       ├── rules/
 │       └── skills/
+├── tests/                     # contract tests for the lifecycle + scope-verification scripts
 └── docs/                      # meta-docs about the repo (this tree)
 ```
 
