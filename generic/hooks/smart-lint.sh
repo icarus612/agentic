@@ -466,13 +466,23 @@ lint_javascript() {
             prettier_cmd="$repo_root/$dir/node_modules/.bin/prettier"
         elif [[ -x "$repo_root/node_modules/.bin/prettier" ]]; then
             prettier_cmd="$repo_root/node_modules/.bin/prettier"
-        elif command_exists prettier; then
-            prettier_cmd="prettier"
         else
-            # Last resort: pnpx/npx (unpinned registry version)
-            local px_cmd="pnpx"
-            [[ "$pkg_manager" == "npm" ]] && px_cmd="npx"
-            prettier_cmd="$px_cmd prettier"
+            # No project-local prettier: SKIP. Do NOT fall back to a global or
+            # pnpx-fetched binary. Two reasons, both observed in practice:
+            #
+            #   1. pnpx downloads registry-latest, which drifts from the
+            #      project's pin. Prettier does not treat formatting changes as
+            #      semver-breaking, so 3.6.2 and 3.9.6 format the same union
+            #      type differently and each rejects the other's output.
+            #   2. The --write below targets the whole DIRECTORY, not one file.
+            #      So a single disagreement rewrites every file in the tree —
+            #      a fresh worktree (deps not yet installed) silently reformats
+            #      files the edit never touched.
+            #
+            # Skipping is strictly safer: the project's own `lint` script still
+            # catches formatting, just without a wrong-version rewrite first.
+            log_info "No project-local prettier in ${dir} — skipping (refusing to format with an unpinned version)"
+            continue
         fi
 
         ran_any_js_check=true
