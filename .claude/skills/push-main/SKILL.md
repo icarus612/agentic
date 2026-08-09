@@ -1,6 +1,6 @@
 ---
 name: push-main
-description: Land changes in THIS repo (agentic) — commit on main and push directly to origin/main, then sync universal content to the ~/.claude install. No workflow worktrees, no PRs. Replaces push-pr for this repo only.
+description: Land changes in THIS repo (agentic) — merge a workflow branch into main locally (--no-ff) and push directly to origin/main, then sync universal content to the ~/.claude install. No GitHub PRs, ever. Replaces push-pr for this repo only.
 domain: agentic
 rules: [source-push-sync]
 model: sonnet
@@ -9,7 +9,7 @@ model-fallback: [gemini-pro]
 
 # push-main
 
-You land finished work in the agentic repo. This repo deliberately skips the worktree/PR machinery its own skills prescribe for other projects: changes are committed straight on `main`, pushed to `origin/main`, and the `~/.claude/` install is synced immediately after. Per the `source-push-sync` rule, this overrides the global `push-policy` "never push main" clause for this repo only.
+You land finished work in the agentic repo, after it was developed on a workflow branch in a worktree cut off `main` via `workflow-setup.sh` — same as every other project. This repo deliberately skips only the PR machinery its own skills prescribe for other projects: instead of opening a pull request, you merge that branch into `main` locally, push to `origin/main`, and sync the `~/.claude/` install immediately after. Per the `source-push-sync` rule, this overrides the global `push-policy` "never push main" clause for this repo only.
 
 ## When to use
 
@@ -18,8 +18,10 @@ You land finished work in the agentic repo. This repo deliberately skips the wor
 
 ## How it works
 
-1. **Verify.** You are on `main` in the repo root (no worktree — if one exists for this repo, something went wrong; ask). `git status` shows only the intended changes.
-2. **Commit on main.** Stage the intended files explicitly (never `git add -A` blindly; keep `.claude/settings.local.json` out) and commit with a clear message.
-3. **Push.** Note the pre-push remote tip (`old=$(git rev-parse origin/main)`), then `git push origin main`. Never `--force` in any form. A permission-blocked or declined push is a valid reported outcome — never work around it.
-4. **Sync the install.** Run `orchestrators/hooks/sync-install.sh <old>..HEAD` (the range just pushed; the script maps every changed universal-domain file to its `~/.claude/` location, copies whole skill/agent directories, propagates deletions, and `diff`-verifies). It skips `tool-based/` (tech-bound — installs into consuming projects), this repo's own `.claude/` (project-scoped, synced nowhere), and `AGENTS.md` files by construction. If the push was blocked or declined, skip this step — the install must never get ahead of `origin/main`. For a full-tree verification (or to recover a drifted install), use `sync-install.sh --check` / `--full`.
-5. **Report.** State what was committed, the pushed commit range, and the `SYNCED:`/`DELETED:` lines the script printed.
+1. **Verify.** A workflow worktree exists for this change, on its `<type>/<name>` branch, clean, with everything committed there (per `workflow-setup.sh`'s standard scheme). The main checkout, in the repo root, is on `main` with a clean tree. Note the pre-merge remote tip: `old=$(git rev-parse origin/main)`.
+2. **Merge locally, `--no-ff`.** From the main checkout: `git merge --no-ff <type>/<name>`. `--no-ff` is the rule; squash is forbidden — it keeps one revert point per run and preserves the per-subphase commit trail that builder exit reports cite as evidence, and a fast-forward merge would look indistinguishable from the old commit-straight-on-main flow this replaces.
+3. **Refuse on conflict.** If the merge conflicts, `git merge --abort` and stop — never resolve conflicts at the landing stage. Reconcile inside the workflow worktree and re-invoke `push-main`; report the exact state.
+4. **Push.** `git push origin main`. Never `--force` in any form. A permission-blocked or declined push is a valid reported outcome — never work around it.
+5. **Retire the branch.** After a successful push: remove the worktree first (`git worktree remove <path>`, then `git worktree prune` — a branch checked out in a worktree cannot be deleted), then `git branch -d <type>/<name>` (`-d` only, never `-D`, matching `cleanup-merged/SKILL.md`'s safe-delete convention). If `-d` refuses, the merge did not fully land — surface that, don't override.
+6. **Sync the install.** Run `orchestrators/hooks/sync-install.sh <old>..HEAD` (the range just pushed; the script maps every changed universal-domain file to its `~/.claude/` location, copies whole skill/agent directories, propagates deletions, and `diff`-verifies), from the main checkout — never the workflow worktree, which no longer exists at this point anyway; the script refuses inside a linked worktree and requires HEAD on main. It skips `tool-based/` (tech-bound — installs into consuming projects), this repo's own `.claude/` (project-scoped, synced nowhere), and `AGENTS.md` files by construction. If the push was blocked or declined, skip this step — the install must never get ahead of `origin/main`. For a full-tree verification (or to recover a drifted install), use `sync-install.sh --check` / `--full`.
+7. **Report.** State what was merged (the branch), the pushed commit range, that the worktree and branch were removed, and the `SYNCED:`/`DELETED:` lines the script printed.
