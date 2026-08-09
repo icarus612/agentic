@@ -50,8 +50,17 @@ push_msg='Before running git push or opening/commenting on/reviewing a pull requ
 
 context=$(printf '%s\n\n%s' "$worktree_msg" "$push_msg")
 
+# Pure parameter expansion, no sed. The previous form used GNU sed's label
+# syntax (:a;N;$!ba) to fold newlines; BSD sed (macOS) rejects it as an unused
+# label, so the hook emitted invalid JSON and its additionalContext was silently
+# dropped on every macOS session. Do not reintroduce sed here — this runs
+# identically on bash 3.2 (macOS system bash) and 5.x.
 json_escape() {
-  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
+  local s="$1"
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  printf '%s' "$s"
 }
 
 escaped=$(json_escape "$context")
