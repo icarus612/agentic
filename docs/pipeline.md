@@ -75,10 +75,13 @@ parent, which `push-pr` publishes.
 ## Gates
 
 All judgment gates are capped (3 loops, then escalate to the human), write
-their verdict rounds to committed report files beside the plan (per the
-`run-artifacts` rule — the verdict vocabulary `ready | tentative | rejected`
-is enforced by `report-verdict.sh`/`validate-report.sh`, and the loop history
-is readable from the file), and return envelope verdicts. The code and PR
+their verdict rounds to committed report files in the plan's own dir —
+`<plans-dir>/<slug>-MM-DD-YY/<kind>.md`; a pre-approval plan-review round
+goes to `proposals/<slug>-MM-DD-YY.plan-review.md` beside the proposal and
+moves in at promotion (per the `run-artifacts` rule — the verdict vocabulary
+`ready | tentative | rejected` is enforced by
+`report-verdict.sh`/`validate-report.sh`, and the loop history is readable
+from the file), and return envelope verdicts. The code and PR
 gates' `next` carries a kickback reason code: `impl-wrong` → redispatch the
 lane; `plan-wrong` → message the warm planner; `map-wrong` → re-run `explore`,
 then the planner — the redispatched worker gets the report PATH, never a
@@ -95,7 +98,8 @@ dispatches on its shape: a filesystem path (default `/docs`) →
 **`document-local`** (mirror/symlink rules per `doc-format`); a Confluence
 location → **`document-confluence`** (`domain: confluence` — Confluence is the
 docs source of truth; requirements were captured up front per
-`confluence-mode.md` and persisted as a `.story.md` beside the plan; large
+`confluence-mode.md` and persisted as `proposals/<slug>-MM-DD-YY.story.md`,
+the plan dir's `story.md` after promotion; large
 artifacts go to Google Drive per `external-storage-cap`). Extensible: another
 `<target>:` scheme maps to `document-<target>`.
 
@@ -107,6 +111,9 @@ Bash, applying to a **consuming** project, not to `agentic` (except
 - Helpers (invoked, never wired): `workflow-setup.sh` (worktrees; types
   `feature|bug|hotfix|docs|sync`; `--parent` children; `--reuse` resume),
   `resolve-config.sh` (CLAUDE_* chain), `mark-syllabus.sh`, `verify-scope.sh`,
+  `plan-lifecycle.sh` (every plan move:
+  `promote | archive | supersede | reopen | locate | check`; `archive` refuses
+  a plan that didn't ship),
   `sync-install.sh` (this repo → `~/.claude`, deletions included).
 - Wired: `workflow-diff-check.sh` (`Stop` on `dae`), `scope-writes.sh`
   (`PreToolUse`; orchestrator write-scope config).

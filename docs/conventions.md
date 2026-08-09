@@ -122,14 +122,18 @@ report shape instead of this envelope is a convention violation.
 
 ## Run artifacts & verdict reports
 
-Defined by the `run-artifacts` rule. Two homes: **committed review records**
-beside the plan (`<slug>-MM-DD-YY.{story,diagnosis,sync-report,plan-review,code-review,pr-review}.md`),
-and the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
+Defined by the `run-artifacts` rule. Two homes: **committed plan records**
+inside the plan's own dir (`<plans-dir>/<slug>-MM-DD-YY/` — the spec of record
+`plan.md` plus records named for their kind alone: `story.md`,
+`plan-review.md`, `code-review.md`, `pr-review.md`, `sync-report.md`; there is
+no `diagnosis` kind — a diagnose run's ranked report IS its `plan.md`), and
+the **gitignored run dir** `<workflows-dir>/<name>-artifacts/` holding
 `progress-log.md` (the orchestrator's live run state, rewritten in place,
-never committed), `contracts/<lane-id>.md`, and `reports/<lane-id>-exit.md`
+never committed), `contracts/<lane-id>.md`, `reports/<lane-id>-exit.md`
 (lane ids are always `l1`, `l2`, … — the plan's numbered lanes — naming each
 builder's branch `<type>/<name>-l<n>`, worktree, contract, and exit report;
-the parent branch is plain `<type>/<name>`).
+the parent branch is plain `<type>/<name>`), and the `explore` fork's map
+(`explore-map-<scope-slug>-<MM-DD-YY>.md` — never the plans dir).
 
 Review reports append one `## Round <n>` section per gate iteration. The
 verdict vocabulary is enforced by scripts, not prose: `report-verdict.sh` is
@@ -160,7 +164,7 @@ phase behaves in any project that adopts this library:
 | Artifact | Default | Config var |
 |---|---|---|
 | Docs | root `/docs` | `CLAUDE_DOCS_DIR` — a path keeps docs local (`document-local`); an Atlassian wiki URL or `confluence:SPACE[/Parent]` makes Confluence the docs source of truth (`document-confluence`) |
-| Implementation plans | root `/project-plans/` | `CLAUDE_PROJECT_PLANS_DIR` |
+| Implementation plans + their committed records | root `/project-plans/` — `proposals/` → `<slug>-MM-DD-YY/` → `completed/`, per `plan-format` | `CLAUDE_PROJECT_PLANS_DIR` |
 | Workflow worktrees | root `.workflows/` (gitignored, branch `<type>/<name>`) | `CLAUDE_WORKFLOWS_DIR` |
 
 Config vars are set in a project's own `.claude/settings.json` `env` block. This
@@ -168,18 +172,32 @@ repo has none, so this `/docs` tree uses the plain defaults.
 
 ## Plan format
 
-Filename `<feature-slug>-MM-DD-YY.md`; phase syllabus first — title-only, one
-nested checkbox per subphase under its phase header (every phase decomposes
-into `<phase>.<subphase>` entries), with optional `(after: <ids>)` dependency
+A plan is identified by `<feature-slug>-MM-DD-YY` and moves through a
+lifecycle: an unapproved proposal is `proposals/<slug>-MM-DD-YY.md`, its
+pre-approval records (`<slug>-MM-DD-YY.plan-review.md`, a Confluence-mode
+`<slug>-MM-DD-YY.story.md`) sitting beside it as dotted siblings; at approval
+it is promoted to its own dir `<slug>-MM-DD-YY/` as **`plan.md`**, the
+siblings moving in under bare kind names; at post-merge closeout ONLY
+`plan.md` archives to `completed/<slug>-MM-DD-YY.md` — the rest of the dir is
+removed, git history keeps the records. A superseded or abandoned plan never
+enters `completed/`: it is deleted, and the successor plan's Goal & scope
+names what it supersedes and why. Every move goes through `plan-lifecycle.sh`
+(`promote | archive | supersede | reopen | locate | check`), never by hand —
+`archive` refuses a plan whose syllabus says it didn't ship.
+
+Structure: phase syllabus first — title-only, one nested checkbox per
+subphase under its phase header (every phase decomposes into
+`<phase>.<subphase>` entries), with optional `(after: <ids>)` dependency
 and numbered `(lane <n>)` annotations that let the `dae` orchestrator dispatch parallel
 builders; required sections — goal & scope, stack & MAJOR versions (with the
 manifest each was verified from), conventions to enforce, subphase detail
 blocks (each naming its file scope; independent lanes' scopes must be
 disjoint), risks/open questions/decision points, skill mapping; a living
-document (syllabus checked off per subphase); **never** time estimates.
-In Confluence mode the `dae` orchestrator also writes a sibling story file
-(`<feature-slug>-MM-DD-YY.story.md`) with the verbatim ask, narrative,
-acceptance criteria, and Jira keys.
+document (syllabus checked off per subphase — `archive` reads those ticks);
+**never** time estimates. In Confluence mode the `dae` orchestrator also
+captures the story as `proposals/<slug>-MM-DD-YY.story.md` (verbatim ask,
+narrative, acceptance criteria, Jira keys), which becomes the plan dir's
+`story.md` at promotion.
 
 ## Contribution convention
 
