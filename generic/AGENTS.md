@@ -51,6 +51,16 @@ context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
 | `push-pr` | Terminal ship stage: commit stragglers, push the workflow branch, open a PR (draft on the gate's publish-anyway path). Leaves the worktree standing — teardown is `cleanup-merged`'s, post-merge. Always asks first. |
 | `cleanup-merged` | Post-merge closeout: verified-merged branch deleted local+remote, worktrees pruned, run dir removed, only `plan.md` archived to `completed/` (its records removed with the rest of the dir), optional Jira transition. Safe deletes only. |
 
+## `settings/` — the user-level Claude Code settings
+
+`settings.json` is the versioned source of `~/.claude/settings.json`:
+permission allow/ask/deny lists, hook wiring, model choice, and UI flags —
+never secrets (API keys and tokens do not belong here). `sync-install.sh`
+installs it like any other universal unit. It is the one unit whose INSTALL
+side also mutates legitimately (Claude Code appends "always allow" grants to
+the live file); `sync-install.sh --check` flags that drift so accepted grants
+get folded back into this copy before the next push.
+
 ## `hooks/` — global quality enforcement
 
 Wired via `settings.json`, not skill frontmatter, so they apply to every

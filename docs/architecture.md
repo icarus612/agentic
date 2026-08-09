@@ -55,7 +55,8 @@ agentic/
 │   ├── AGENTS.md
 │   ├── rules/                 #   the always-on set (8)
 │   ├── skills/                #   the 7 tech-agnostic forks/gates
-│   └── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired)
+│   ├── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired)
+│   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # the tech layers                 (domain: <tech>)
 │   ├── AGENTS.md
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence
