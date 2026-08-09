@@ -24,7 +24,7 @@ You are NOT a mandatory pre-plan phase: the planner explores for itself and call
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), and optionally the output path for the map file. If no output path is given, write the map to the resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain per `artifact-locations`, default `.workflows/` — gitignored) as `explore-map-<scope-slug>-<MM-DD-YY>.md`.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), and optionally the output path for the map file. If no output path is given, write the map to the resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain per `artifact-locations`, default `.workflows/` — gitignored) as `explore-map-<scope-slug>-<MM-DD-YY>.md`. The map never goes in the plans dir — it is ephemeral like everything else on the workflows side of the split, and a map is not a plan record.
 
 ## Modes
 

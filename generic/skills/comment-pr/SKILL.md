@@ -20,7 +20,7 @@ You publish a verdict that already exists. The `review-pr` skill wrote a report 
 
 ## Inputs
 
-You run as an isolated fork — everything arrives via invocation args. Expect: the report path (`<slug>-MM-DD-YY.pr-review.md`), the PR URL/number (and repo if not the current one), and confirmation from the caller that posting was explicitly approved by the user.
+You run as an isolated fork — everything arrives via invocation args. Expect: the report path (`<plan-dir>/pr-review.md`), the PR URL/number (and repo if not the current one), and confirmation from the caller that posting was explicitly approved by the user.
 
 ## How it works
 
