@@ -15,12 +15,12 @@ the convention's consumers are ~20 markdown surfaces plus one new script).
   - [x] 2.2: review-plan — run `check` at the gate, hand off promotion          (lane 2, after: 2.1)
   - [x] 2.3: cleanup-merged — archive through the script, never archive superseded  (lane 2, after: 2.1)
 - [ ] Phase 3: Orchestrator-side wording
-  - [ ] 3.1: planner, builder, and the plan-* modules                     (lane 3)
-  - [ ] 3.2: dae SKILL.md and its workflow siblings                       (lane 3)
+  - [x] 3.1: planner, builder, and the plan-* modules                     (lane 3)
+  - [x] 3.2: dae SKILL.md and its workflow siblings                       (lane 3)
 - [ ] Phase 4: Skill wording
-  - [ ] 4.1: review-code, review-pr, comment-pr                           (lane 4)
-  - [ ] 4.2: document-local, push-pr, explore                             (lane 4)
-  - [ ] 4.3: document-confluence (tool-based domain)                      (lane 4)
+  - [x] 4.1: review-code, review-pr, comment-pr                           (lane 4)
+  - [x] 4.2: document-local, push-pr, explore                             (lane 4)
+  - [x] 4.3: document-confluence (tool-based domain)                      (lane 4)
 - [ ] Phase 5: Integration
   - [ ] 5.1: Index tables and repo tree listings   (after: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3)
   - [ ] 5.2: This repo's own plans dir scaffolding (after: 1.1, 2.1)
