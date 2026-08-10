@@ -97,9 +97,14 @@ CWD_BASENAME=$(basename "$CWD")
 
 # Function to clean terminal title
 clean_terminal_title() {
-    local title="$1"
-    # Remove Claude icons and control characters
-    echo "$title" | sed -E 's/[✅🤖⚡✨🔮💫☁️🌟🚀🎯🔍🛡️📝🧠🖨️🔐📤⏳❌⚠️]//g' | sed 's/[[:cntrl:]]//g' | xargs
+    local title="$1" icon
+    # Remove Claude icons and control characters. Pure parameter expansion plus
+    # tr, no sed: BSD sed (macOS) handles multibyte emoji in bracket
+    # expressions unreliably and can mangle the title bytes.
+    for icon in ✅ 🤖 ⚡ ✨ 🔮 💫 ☁️ 🌟 🚀 🎯 🔍 🛡️ 📝 🧠 🖨️ 🔐 📤 ⏳ ❌ ⚠️; do
+        title=${title//"$icon"/}
+    done
+    echo "$title" | tr -d '[:cntrl:]' | xargs
 }
 
 # Get terminal title with improved detection

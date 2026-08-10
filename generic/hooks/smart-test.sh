@@ -526,7 +526,15 @@ run_python_tests() {
 run_javascript_tests() {
     local file="$1"
     local dir=$(dirname "$file")
-    local base=$(basename "$file" | sed 's/\.[tj]sx\?$//' | sed 's/\.(test|spec)$//')
+    # Pure parameter expansion, no sed: the old GNU-BRE \? is a literal '?' to
+    # BSD sed (extension never stripped on macOS), and the unescaped (test|spec)
+    # group never matched under any sed flavor.
+    local base=$(basename "$file")
+    case "$base" in
+        *.ts|*.tsx|*.js|*.jsx) base=${base%.*} ;;
+    esac
+    base=${base%.test}
+    base=${base%.spec}
 
     # Detect package manager (prefer pnpm)
     local pkg_manager="pnpm"

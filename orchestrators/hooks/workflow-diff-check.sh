@@ -48,7 +48,9 @@ base=""
 if git rev-parse --verify -q origin/main >/dev/null; then base="origin/main"
 elif git rev-parse --verify -q main >/dev/null; then base="main"; fi
 
-mapfile -t changed < <(
+# while-read instead of mapfile: macOS system bash is 3.2, which lacks mapfile.
+changed=()
+while IFS= read -r line; do changed+=("$line"); done < <(
   {
     if [ -n "$base" ]; then
       mb=$(git merge-base "$base" HEAD 2>/dev/null) && git diff --name-only "$mb" 2>/dev/null
@@ -84,7 +86,9 @@ fi
 
 # ---- Go: go test on the packages of changed files -------------------------
 if [ ${#go[@]} -gt 0 ] && command -v go >/dev/null 2>&1; then
-  mapfile -t pkgs < <(printf '%s\n' "${go[@]}" | xargs -n1 dirname | sort -u | sed 's|^|./|')
+  pkgs=()
+  while IFS= read -r line; do pkgs+=("$line"); done \
+    < <(printf '%s\n' "${go[@]}" | xargs -n1 dirname | sort -u | sed 's|^|./|')
   out=$(go test "${pkgs[@]}" 2>&1) \
     || add_fail "go test ($root)" "$(printf '%s\n' "$out" | tail -30)"
 fi
@@ -100,7 +104,10 @@ if [ ${#py[@]} -gt 0 ]; then
       b=$(basename "$f")
       case "$b" in test_*.py|*_test.py) targets+=("$f") ;; *) targets+=("$(dirname "$f")") ;; esac
     done
-    mapfile -t targets < <(printf '%s\n' "${targets[@]}" | sort -u)
+    uniq_targets=()
+    while IFS= read -r line; do uniq_targets+=("$line"); done \
+      < <(printf '%s\n' "${targets[@]}" | sort -u)
+    targets=("${uniq_targets[@]}")
     out=$($pyrun -q "${targets[@]}" 2>&1) \
       || add_fail "pytest ($root)" "$(printf '%s\n' "$out" | tail -30)"
   fi
