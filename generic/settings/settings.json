@@ -39,12 +39,12 @@
       "Glob",
       "Grep",
       "Skill",
-      "Read(//home/icarus64/.claude/skills/**)",
-      "Read(//home/icarus64/.claude/rules/**)",
-      "Read(//home/icarus64/.claude/hooks/**)",
-      "Read(//home/icarus64/.claude/agents/**)",
-      "Read(//home/icarus64/repos/**)",
-      "Edit(//home/icarus64/repos/**/.workflows/**)",
+      "Read(~/.claude/skills/**)",
+      "Read(~/.claude/rules/**)",
+      "Read(~/.claude/hooks/**)",
+      "Read(~/.claude/agents/**)",
+      "Read(~/repos/**)",
+      "Edit(~/repos/**/.workflows/**)",
       "Bash(cd:*)",
       "Bash(pushd:*)",
       "Bash(popd:*)",
@@ -97,10 +97,10 @@
       "Bash(git worktree remove:*)"
     ],
     "additionalDirectories": [
-      "/home/icarus64/.claude/skills",
-      "/home/icarus64/.claude/rules",
-      "/home/icarus64/.claude/hooks",
-      "/home/icarus64/.claude/agents"
+      "~/.claude/skills",
+      "~/.claude/rules",
+      "~/.claude/hooks",
+      "~/.claude/agents"
     ]
   },
   "model": "fable",
