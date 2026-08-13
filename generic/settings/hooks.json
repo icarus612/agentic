@@ -1,0 +1,77 @@
+{
+  "claude-compatibility-shim": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "echo '{\"injectSteps\":[{\"ephemeralMessage\":\"<system_instructions>Agent tool maps to define_subagent/invoke_subagent. Bash maps to run_command.</system_instructions>\"}]}'"
+      }
+    ]
+  },
+  "permissions": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content|multi_replace_file_content|invoke_subagent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-permissions.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "allow-workflow-cleanup": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/allow-workflow-cleanup.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "post-tool-checks": {
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/smart-lint.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/smart-test.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/claude-install-drift.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "session-start": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/worktree-reminder.sh"
+      },
+      {
+        "type": "command",
+        "command": "~/.gemini/config/hooks/agy-hook-adapter.sh 'cd ~/repos/agentic 2>/dev/null && ~/.gemini/config/hooks/sync-install.sh --check >&2 || true'"
+      }
+    ]
+  },
+  "stop-notifier": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/ntfy-notifier.sh notification"
+      }
+    ]
+  }
+}

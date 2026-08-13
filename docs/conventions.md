@@ -156,7 +156,11 @@ Every skill declares `model:` plus an ordered `model-fallback:` ending in
 - **Everything else** → `sonnet → gemini-pro`.
 
 Declarative intent — each tool honors what it can. Claude Code reads only the
-single `model:` value and ignores `model-fallback:`.
+single `model:` value and ignores `model-fallback:`. When executing on Antigravity, the cross-platform model mapping is:
+
+- `opus` → `pro`
+- `sonnet` → `inherit`
+- `haiku` → `flash_lite`
 
 ## Artifact locations (for consuming projects)
 
@@ -200,6 +204,10 @@ document (syllabus checked off per subphase — `archive` reads those ticks);
 captures the story as `proposals/<slug>-MM-DD-YY.story.md` (verbatim ask,
 narrative, acceptance criteria, Jira keys), which becomes the plan dir's
 `story.md` at promotion.
+
+## Antigravity Adoption
+
+Consuming projects adopting Antigravity should create an `.agents/GEMINI.md` file that references their existing `.claude/` tech layers. Do not attempt to sync or duplicate files between `.claude/` and `.agents/`; instead, reference the existing source of truth.
 
 ## Contribution convention
 
