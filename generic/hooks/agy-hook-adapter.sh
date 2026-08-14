@@ -77,10 +77,15 @@ if [ -n "$context" ]; then
     exit 0
 fi
 
-# Translate the exit code back to AGY's decision contract
+# Translate the exit code (and optionally stdout) back to AGY's decision contract.
+# Claude's contract: 0 = allow, 2 = BLOCK, any other non-zero = non-blocking
+# error. Mapping 2 to anything softer than "deny" would silently downgrade every
+# blocking hook to a prompt under AGY — branch-squash-guard denies with exit 2
+# (see its EXIT CODES header), so under the old 1=deny mapping none of its
+# denials actually blocked anything in Antigravity.
 if [ $exit_code -eq 0 ]; then
     echo '{"decision": "allow"}'
-elif [ $exit_code -eq 1 ]; then
+elif [ $exit_code -eq 2 ]; then
     echo '{"decision": "deny"}'
 else
     echo '{"decision": "ask"}'

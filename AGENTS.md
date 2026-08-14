@@ -31,8 +31,8 @@ thing is bound to:
 
 | `domain:` | Bound to | Lives in | Installs to |
 |---|---|---|---|
-| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.claude/` (or `.agent/`) |
-| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.claude/` / `.agent/` |
+| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.claude/` / `.agents/` |
 | `<project-name>` (`mythic-made`, …) | one project — its brand tokens, its layout | **that project only** | it's already there |
 
 Everything in `orchestrators/` and `generic/` is `domain: universal` — it goes
@@ -79,7 +79,7 @@ to bindings by `domain:`.
   only while that skill is active (`workflow-diff-check.sh`); global quality
   hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
   scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
-  the `~/.claude/hooks/` install path but are invoked explicitly, never wired.
+  the `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) install path but are invoked explicitly, never wired.
 
 Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
 every time, mechanically"* → hook.

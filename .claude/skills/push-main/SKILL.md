@@ -1,6 +1,6 @@
 ---
 name: push-main
-description: Land changes in THIS repo (agentic) — merge a workflow branch into main locally (--no-ff) and push directly to origin/main, then sync universal content to the ~/.claude install. No GitHub PRs, ever. Replaces push-pr for this repo only.
+description: Land changes in THIS repo (agentic) — squash-merge a workflow branch into main locally and push directly to origin/main, then sync universal content to the ~/.claude install. No GitHub PRs, ever. Replaces push-pr for this repo only.
 domain: agentic
 rules: [source-push-sync]
 model: sonnet
@@ -19,7 +19,7 @@ You land finished work in the agentic repo, after it was developed on a workflow
 ## How it works
 
 1. **Verify.** A workflow worktree exists for this change, on its `<type>/<name>` branch, clean, with everything committed there (per `workflow-setup.sh`'s standard scheme). The main checkout, in the repo root, is on `main` with a clean tree. Note the pre-merge remote tip: `old=$(git rev-parse origin/main)`.
-2. **Merge locally, `--no-ff`.** From the main checkout: `git merge --no-ff <type>/<name>`. `--no-ff` is the rule; squash is forbidden — it keeps one revert point per run and preserves the per-subphase commit trail that builder exit reports cite as evidence, and a fast-forward merge would look indistinguishable from the old commit-straight-on-main flow this replaces.
+2. **Squash-merge locally.** From the main checkout: `git merge --squash <type>/<name>` followed by `git commit`. Squash is the rule, universally, per `push-policy` — one commit per run on `main`, one revert point, and the per-subphase trail stays readable in the run's exit reports and in the branch itself until it is retired. `--no-ff` was this repo's former exception and is no longer permitted; `branch-squash-guard.sh` denies any non-squash merge into the base branch at the tool-call level.
 3. **Refuse on conflict.** If the merge conflicts, `git merge --abort` and stop — never resolve conflicts at the landing stage. Reconcile inside the workflow worktree and re-invoke `push-main`; report the exact state.
 4. **Push.** `git push origin main`. Never `--force` in any form. A permission-blocked or declined push is a valid reported outcome — never work around it.
 5. **Retire the branch.** After a successful push: remove the worktree first (`git worktree remove <path>`, then `git worktree prune` — a branch checked out in a worktree cannot be deleted), then `git branch -d <type>/<name>` (`-d` only, never `-D`, matching `cleanup-merged/SKILL.md`'s safe-delete convention). If `-d` refuses, the merge did not fully land — surface that, don't override.

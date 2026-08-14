@@ -1,7 +1,7 @@
 # agentic
 
 A **library** of AI-agent skills, rules, and hooks — a single source of truth
-you install into Claude Code. It is **not** a project you run. Nothing here
+you install into Claude Code or Google Antigravity. It is **not** a project you run. Nothing here
 executes; you copy pieces of it to where the tool expects them.
 
 ## The one question
@@ -11,8 +11,8 @@ decides where it installs:
 
 | `domain:` | Bound to | Installs to |
 |---|---|---|
-| `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (or `.agent/`) |
-| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | **project level**: that project's `.claude/` / `.agent/` |
+| `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | **project level**: that project's `.claude/` / `.agents/` |
 | `<project-name>` (`mythic-made`, …) | one project — brand tokens, its own layout | lives only in that project; **never in this repo** |
 
 `domain:` is the only classifier, and it's the only one that survives: the
@@ -80,15 +80,15 @@ every time, mechanically"* → hook.
 ## Install
 
 1. Copy `orchestrators/skills/*` and `generic/skills/*` (whole directories —
-   several carry sibling files and `scripts/`) into `~/.claude/skills/`,
-   `orchestrators/agents/*` into `~/.claude/agents/`, and `generic/rules/*`
-   into your `CLAUDE.md` context.
+   several carry sibling files and `scripts/`) into `~/.claude/skills/` (or `~/.gemini/config/skills/`),
+   `orchestrators/agents/*` into `~/.claude/agents/` (or `~/.gemini/config/agents/`), and `generic/rules/*`
+   into your `CLAUDE.md` context (or `~/.gemini/config/rules/`).
 2. Copy each `tool-based/<tech>/` layer your project uses into that **project's**
-   `.claude/` (or `.agent/`).
-3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` —
+   `.claude/` (or `.agents/`).
+3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) —
    automated by Nix home-manager in this setup; copy them manually otherwise.
 4. Grant the install standing permission in **`~/.claude/settings.json`** (global,
-   not a project file). Copying the payload in is not enough: every `Skill`
+   not a project file) for Claude Code, or wire up `generic/settings/hooks.json` for Antigravity. Copying the payload in is not enough: every `Skill`
    invocation and every read of a skill's sibling modules is permission-checked,
    and the interactive "always allow" button does not persist a `Skill` rule —
    it only fills a session-scoped skill allowlist that dies with the session.
@@ -145,8 +145,8 @@ every time, mechanically"* → hook.
 Distribution is deliberately copy-paste, not symlinks or a setup script, so it
 behaves identically across platforms with zero tooling.
 `orchestrators/hooks/sync-install.sh` automates the universal-domain copy for
-THIS repo's own working copy (it is what the repo-local `push-main` skill runs
-after every landing, deletions included).
+THIS repo's own working copy to both Claude and Antigravity (accepts `--claude` and `--agy` flags). It is what the repo-local `push-main` skill runs
+after every landing, deletions included.
 
 ## Contributing
 
