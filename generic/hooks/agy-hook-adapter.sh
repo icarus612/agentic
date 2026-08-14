@@ -2,7 +2,7 @@
 
 # Fallback if jq is not installed
 if ! command -v jq >/dev/null 2>&1; then
-    echo '{"directive": "allow", "error": "jq not installed, gracefully degrading"}'
+    echo '{"decision": "allow", "error": "jq not installed, gracefully degrading"}'
     exit 0
 fi
 
@@ -10,7 +10,7 @@ input=$(cat)
 claude_hook=$1
 
 if [ -z "$claude_hook" ] || [ ! -x "$claude_hook" ]; then
-    echo '{"directive": "allow"}'
+    echo '{"decision": "allow"}'
     exit 0
 fi
 
@@ -26,9 +26,9 @@ exit_code=$?
 
 # Translate the exit codes (and optionally stdout) back to AGY JSON
 if [ $exit_code -eq 0 ]; then
-    echo '{"directive": "allow"}'
+    echo '{"decision": "allow"}'
 elif [ $exit_code -eq 1 ]; then
-    echo '{"directive": "deny"}'
+    echo '{"decision": "deny"}'
 else
-    echo '{"directive": "ask"}'
+    echo '{"decision": "ask"}'
 fi

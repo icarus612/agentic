@@ -2,7 +2,7 @@
 
 if ! command -v jq >/dev/null 2>&1; then
     # Graceful degradation
-    echo '{"directive": "ask"}'
+    echo '{"decision": "ask"}'
     exit 0
 fi
 
@@ -11,9 +11,9 @@ input=$(cat)
 tool=$(echo "$input" | jq -r '.toolCall.name // empty')
 cmd=$(echo "$input" | jq -r '.toolCall.arguments.CommandLine // empty')
 
-if [ "$tool" != "run_command" ]; then
+if [ "$tool" != "default_api:run_command" ]; then
     # Allowlist all other tools since they aren't raw bash execution
-    echo '{"directive": "allow"}'
+    echo '{"decision": "allow"}'
     exit 0
 fi
 
@@ -38,7 +38,7 @@ if [[ "$cmd" == "git clean -f"* ]] || \
    [[ "$cmd" == "git submodule deinit"* ]] || \
    [[ "$cmd" == "git rm --cached"* ]] || \
    [[ "$cmd" == "git update-ref -d"* ]]; then
-    echo '{"directive": "deny"}'
+    echo '{"decision": "deny"}'
     exit 0
 fi
 
@@ -49,7 +49,7 @@ if [[ "$cmd" == "git push"* ]] || \
    [[ "$cmd" == "awk -i"* ]] || \
    [[ "$cmd" == "awk --in-place"* ]] || \
    [[ "$cmd" == "git worktree remove"* ]]; then
-    echo '{"directive": "ask"}'
+    echo '{"decision": "ask"}'
     exit 0
 fi
 
@@ -58,6 +58,7 @@ if [[ "$cmd" == "pnpm "* ]] || [[ "$cmd" == "pnpm" ]] || \
    [[ "$cmd" == "grep "* ]] || [[ "$cmd" == "grep" ]] || \
    [[ "$cmd" == "git "* ]] || [[ "$cmd" == "git" ]] || \
    [[ "$cmd" == "ls "* ]] || [[ "$cmd" == "ls" ]] || \
+   [[ "$cmd" == "cp "* ]] || [[ "$cmd" == "cp" ]] || \
    [[ "$cmd" == "cat "* ]] || [[ "$cmd" == "cat" ]] || \
    [[ "$cmd" == "find "* ]] || [[ "$cmd" == "find" ]] || \
    [[ "$cmd" == "echo "* ]] || [[ "$cmd" == "echo" ]] || \
@@ -104,9 +105,9 @@ if [[ "$cmd" == "pnpm "* ]] || [[ "$cmd" == "pnpm" ]] || \
    [[ "$cmd" == "gh repo view"* ]] || \
    [[ "$cmd" == "gh search"* ]] || \
    [[ "$cmd" == "gh auth status"* ]]; then
-    echo '{"directive": "allow"}'
+    echo '{"decision": "allow"}'
     exit 0
 fi
 
 # Fallback for unrecognized bash commands
-echo '{"directive": "ask"}'
+echo '{"decision": "ask"}'
