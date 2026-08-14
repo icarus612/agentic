@@ -3,19 +3,19 @@
 ## Phase syllabus
 
 - Phase 1: Skills, Rules, and Sync
-  - [ ] 1.1 Update `sync-install.sh` to support explicit `--claude` and `--agy` install flags (lane 1)
-  - [ ] 1.2 Verify all 11 skill dirs copy cleanly to `~/.gemini/config/skills/` (lane 1, after: 1.1)
-  - [ ] 1.3 Verify all 10 rule files copy cleanly to `~/.gemini/config/rules/` (lane 1, after: 1.1)
-  - [ ] 1.4 Document project-level `.agents/` strategy in `docs/conventions.md` (lane 1)
+  - [x] 1.1 Update `sync-install.sh` to support explicit `--claude` and `--agy` install flags (lane 1)
+  - [x] 1.2 Verify all 11 skill dirs copy cleanly to `~/.gemini/config/skills/` (lane 1, after: 1.1)
+  - [x] 1.3 Verify all 10 rule files copy cleanly to `~/.gemini/config/rules/` (lane 1, after: 1.1)
+  - [x] 1.4 Document project-level `.agents/` strategy in `docs/conventions.md` (lane 1)
 - Phase 2: Agent Compatibility
-  - [ ] 2.1 Update `generic/settings/hooks.json` to inject an inline `PreInvocation` compatibility shim (lane 1)
-  - [ ] 2.2 Document cross-platform model mapping (`opus`→`pro`, `sonnet`→`inherit`) in `docs/conventions.md` (lane 1)
+  - [x] 2.1 Update `generic/settings/hooks.json` to inject an inline `PreInvocation` compatibility shim (lane 1)
+  - [x] 2.2 Document cross-platform model mapping (`opus`→`pro`, `sonnet`→`inherit`) in `docs/conventions.md` (lane 1)
 - Phase 3: Hooks & Permissions
-  - [ ] 3.1 Write `generic/hooks/agy-hook-adapter.sh` polyfill with `jq` JSON translation and `invocationNum` synthesis (lane 1)
-  - [ ] 3.2 Write `generic/hooks/agy-permissions.sh` to replicate `settings.json` allowlist for silent UX (lane 1)
-  - [ ] 3.3 Finalize `generic/settings/hooks.json` wiring all hooks through the adapter (lane 1, after: 3.1, 3.2, 2.1)
-  - [ ] 3.4 Add `hooks.json` copy logic to `sync-install.sh` Antigravity target (lane 1, after: 3.3, 1.1)
-  - [ ] 3.5 Test each hook through the adapter end-to-end (lane 1, after: 3.4)
+  - [x] 3.1 Write `generic/hooks/agy-hook-adapter.sh` polyfill with `jq` JSON translation and `invocationNum` synthesis (lane 1)
+  - [x] 3.2 Write `generic/hooks/agy-permissions.sh` to replicate `settings.json` allowlist for silent UX (lane 1)
+  - [x] 3.3 Finalize `generic/settings/hooks.json` wiring all hooks through the adapter (lane 1, after: 3.1, 3.2, 2.1)
+  - [x] 3.4 Add `hooks.json` copy logic to `sync-install.sh` Antigravity target (lane 1, after: 3.3, 1.1)
+  - [x] 3.5 Test each hook through the adapter end-to-end (lane 1, after: 3.4)
 
 ## Goal & scope
 
