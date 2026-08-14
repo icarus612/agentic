@@ -20,7 +20,7 @@ a rule.
 | `verify-dont-assume` | Read the real code/config/docs before asserting. Confidently wrong is the failure mode. |
 | `respect-versions-and-conventions` | Use idioms correct for the installed MAJOR version; project conventions are hard constraints. |
 | `tech-agnostic` | Never assume or hard-code a stack; discover it, then load the skills whose `domain:` names it. |
-| `push-policy` | Ask before every push; never force-push; never push main. |
+| `push-policy` | Two modes by whether the repo has `dev`: WITH dev, dev is the integration branch (remote squash-merged PRs) and main is off-limits except an authorized hotfix; WITHOUT dev, main is the integration branch, squash-merged locally and pushed. Always: squash, ask before every push, never force-push, never commit on the integration branch. |
 | `model-policy` | Each skill declares `model:` plus an ordered `model-fallback:`. |
 | `artifact-locations` | Where docs, plans and their records, worktrees, and the base branch resolve from (config-resolved) — and how the docs target selects the documentation skill. |
 | `doc-format` | How docs are structured and placed. |

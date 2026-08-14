@@ -33,6 +33,19 @@
       }
     ]
   },
+  "branch-squash-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/branch-squash-guard.sh"
+          }
+        ]
+      }
+    ]
+  },
   "post-tool-checks": {
     "PostToolUse": [
       {

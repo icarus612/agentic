@@ -133,6 +133,19 @@
             "type": "command",
             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
             "if": "Bash(git worktree remove:*)"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/branch-squash-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/branch-squash-guard.sh"
           }
         ]
       }
