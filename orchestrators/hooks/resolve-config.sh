@@ -16,20 +16,7 @@
 #     1. <root>/.claude/settings.local.json   env.<VAR_NAME>
 #     2. <root>/.claude/settings.json         env.<VAR_NAME>
 #     3. ~/.claude/settings.json              env.<VAR_NAME>
-#     4. --default <value>, or (--base-branch-default) a git heuristic:
-#        'dev' if it exists (local branch OR origin/dev — a fresh worktree
-#        may not have checked out a local 'dev' yet), else 'main' if it
-#        exists, else the short name of origin/HEAD.
-#
-#   The 'dev' precedence encodes this user's two-mode branch policy (see the
-#   push-policy rule): a repo WITH a dev branch treats dev as the
-#   integration branch and main as off-limits (branch/merge/commit/push,
-#   except an explicitly authorized hotfix); a repo with no dev branch
-#   treats main as the integration branch, unchanged from before. Every
-#   consumer of --base-branch-default (workflow-setup.sh, the dae skills,
-#   branch-squash-guard.sh) inherits this automatically rather than each
-#   re-implementing the check — see branch-squash-guard.sh for where mode
-#   detection and the hotfix escape actually get enforced.
+#     4. --default <value>, or (--base-branch-default) 'dev' globally.
 #
 #   No jq dependency, matching this repo's other hooks (record-changed.sh,
 #   test-changed.sh, workflow-diff-check.sh) — the `env` block is Claude
@@ -76,15 +63,8 @@ done
 
 if [ -z "$resolved" ]; then
   if [ "$base_branch_mode" = 1 ]; then
-    if git -C "$root" rev-parse --verify -q refs/heads/dev >/dev/null 2>&1 \
-      || git -C "$root" rev-parse --verify -q refs/remotes/origin/dev >/dev/null 2>&1; then
-      resolved="dev"
-    elif git -C "$root" rev-parse --verify -q main >/dev/null 2>&1; then
-      resolved="main"
-    else
-      resolved=$(git -C "$root" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
-    fi
-    source="git heuristic (dev if present, else main, else origin/HEAD)"
+    resolved="dev"
+    source="global default (dev)"
   elif [ "$have_default" = 1 ]; then
     resolved="$default"
     source="supplied default"
