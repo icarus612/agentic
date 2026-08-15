@@ -85,7 +85,7 @@ find_pruned() {
     local depth="$1"
     shift
 
-    local names=(node_modules .git vendor target .godot .venv venv env __pycache__ dist build out result .next .turbo)
+    local names=(node_modules .git vendor target .godot .venv venv env __pycache__ dist build out result .next .turbo .workflows)
     # shellcheck disable=SC2206 # intentional word-splitting
     [[ -n "${CLAUDE_HOOKS_PRUNE_EXTRA:-}" ]] && names+=(${CLAUDE_HOOKS_PRUNE_EXTRA})
 
@@ -187,6 +187,78 @@ should_skip_file() {
         return 0
     fi
     
+    return 1
+}
+
+# ============================================================================
+# HOOK-MODE SCOPING (TARGET_FILE)
+# ============================================================================
+#
+# Everything below exists to answer one question — given the single file that
+# triggered this run, should it be linted at all, and if so by which one
+# linter? Hook mode never runs detect_project_type(); these helpers replace
+# it with a direct, per-file dispatch.
+
+# target_lintable_ext <file> — true if the extension is one this hook knows
+# how to lint. Anything else (markdown, JSON, a lockfile, ...) exits clean
+# before any linter runs.
+target_lintable_ext() {
+    case "${1##*.}" in
+        py|go|js|jsx|ts|tsx|rs|nix) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# find_nearest_manifest <file> <manifest-name> — walk up from the file's
+# directory looking for <manifest-name> (go.mod, Cargo.toml, ...), printing
+# the first directory that has one. Empty output + non-zero exit means none
+# was found above the file. Shared by the Go and Rust scoped linters so a
+# hook-mode run touches only the module/crate that owns the file, never
+# every module/crate in the repo.
+find_nearest_manifest() {
+    local start_dir manifest_name dir
+    start_dir=$(dirname "$1")
+    manifest_name="$2"
+    dir=$(cd "$start_dir" 2>/dev/null && pwd) || return 1
+    while [[ "$dir" != "/" ]]; do
+        [[ -f "$dir/$manifest_name" ]] && { echo "$dir"; return 0; }
+        dir=$(dirname "$dir")
+    done
+    return 1
+}
+
+# should_skip_target <file> <repo-root> — the hook-mode early clean-exit
+# gate. True (skip) when the file is gone, lives outside this repo, is
+# ignored, or has no lintable extension. This is the fix for the single
+# largest source of this script's old cost: a write to a markdown file, a
+# progress log, or a path outside the repo used to trigger a full repo-wide
+# sweep; now it prints one line and the caller exits 0 immediately.
+should_skip_target() {
+    local file="$1"
+    local repo_root="$2"
+
+    if [[ ! -e "$file" ]]; then
+        log_info "Skip (does not exist): $file"
+        return 0
+    fi
+
+    local abs_file
+    abs_file=$(cd "$(dirname "$file")" 2>/dev/null && printf '%s/%s' "$PWD" "$(basename "$file")") || abs_file=""
+    if [[ -z "$abs_file" || "$abs_file" != "$repo_root"/* ]]; then
+        log_info "Skip (outside repo): $file"
+        return 0
+    fi
+
+    if should_skip_file "$file"; then
+        log_info "Skip (ignored): $file"
+        return 0
+    fi
+
+    if ! target_lintable_ext "$file"; then
+        log_info "Skip (no lintable extension): $file"
+        return 0
+    fi
+
     return 1
 }
 
@@ -342,6 +414,52 @@ lint_go_modules() {
     done <<< "$gomods"
 }
 
+# Hook-mode Go: format just the triggering file, vet just the module that
+# owns it. Never touches a module the edit didn't happen in.
+lint_go_scoped() {
+    local file="$1"
+
+    if [[ "${CLAUDE_HOOKS_GO_ENABLED:-true}" != "true" ]]; then
+        log_debug "Go linting disabled"
+        return 0
+    fi
+
+    log_info "Running Go formatting and linting (scoped to $file)..."
+
+    local unformatted
+    unformatted=$(gofmt -l "$file" 2>/dev/null || true)
+    if [[ -n "$unformatted" ]]; then
+        local fmt_output
+        if ! fmt_output=$(gofmt -w "$file" 2>&1); then
+            add_error "Go formatting failed ($file)"
+            echo "$fmt_output" >&2
+        fi
+    fi
+
+    local mod_dir
+    mod_dir=$(find_nearest_manifest "$file" "go.mod") || {
+        log_info "No go.mod found above $file — skipping go vet"
+        return 0
+    }
+
+    log_info "Go module: $mod_dir"
+    if command_exists golangci-lint; then
+        local lint_output
+        if ! lint_output=$(cd "$mod_dir" && golangci-lint run --timeout=2m 2>&1); then
+            add_error "golangci-lint found issues ($mod_dir)"
+            echo "$lint_output" >&2
+        fi
+    elif command_exists go; then
+        local vet_output
+        if ! vet_output=$(cd "$mod_dir" && go vet ./... 2>&1); then
+            add_error "go vet found issues ($mod_dir)"
+            echo "$vet_output" >&2
+        fi
+    else
+        log_error "No Go linting tools available - install golangci-lint or go"
+    fi
+}
+
 # ============================================================================
 # OTHER LANGUAGE LINTERS
 # ============================================================================
@@ -355,7 +473,7 @@ lint_python() {
     log_info "Running Python linters..."
 
     # Common exclusions for Python linting
-    local exclude_dirs=".venv,venv,.env,env,node_modules,.git,__pycache__,build,dist,.eggs,*.egg-info"
+    local exclude_dirs=".venv,venv,.env,env,node_modules,.git,__pycache__,build,dist,.eggs,*.egg-info,.workflows"
 
     # Black formatting
     if command_exists black; then
@@ -384,6 +502,49 @@ lint_python() {
         local flake8_output
         if ! flake8_output=$(flake8 . --exclude="$exclude_dirs" "${flake8_args[@]}" 2>&1); then
             add_error "Flake8 found issues"
+            echo "$flake8_output" >&2
+        fi
+    fi
+
+    return 0
+}
+
+# Hook-mode Python: black + flake8 on the single triggering file only. No
+# ruff step — the installed base this was upstreamed from does not run ruff
+# in its PostToolUse path (only black + flake8), so there is nothing to
+# scope here; ruff stays a separate, unpinned gate elsewhere (see plan R7).
+lint_python_scoped() {
+    local file="$1"
+
+    if [[ "${CLAUDE_HOOKS_PYTHON_ENABLED:-true}" != "true" ]]; then
+        log_debug "Python linting disabled"
+        return 0
+    fi
+
+    log_info "Running Python linters (scoped to $file)..."
+
+    if command_exists black; then
+        local black_output
+        if ! black_output=$(black --check "$file" 2>&1); then
+            local format_output
+            if ! format_output=$(black "$file" 2>&1); then
+                add_error "Python formatting failed ($file)"
+                echo "$format_output" >&2
+            fi
+        fi
+    fi
+
+    if command_exists flake8; then
+        # Same black-compatible defaults the repo-wide path computes, only
+        # applied when the repo has no flake8 config of its own.
+        local flake8_args=()
+        if [[ ! -f ".flake8" ]] && ! grep -qs '^\[flake8\]' setup.cfg tox.ini; then
+            flake8_args+=(--max-line-length=88 --extend-ignore=E203)
+        fi
+
+        local flake8_output
+        if ! flake8_output=$(flake8 "$file" "${flake8_args[@]}" 2>&1); then
+            add_error "Flake8 found issues ($file)"
             echo "$flake8_output" >&2
         fi
     fi
@@ -591,6 +752,48 @@ lint_rust() {
     return 0
 }
 
+# Hook-mode Rust: fmt/clippy scoped to the crate containing the file. Cargo
+# has no single-file fmt/clippy mode, so the crate is the finest scope
+# available — never every crate in the repo.
+lint_rust_scoped() {
+    local file="$1"
+
+    if [[ "${CLAUDE_HOOKS_RUST_ENABLED:-true}" != "true" ]]; then
+        log_debug "Rust linting disabled"
+        return 0
+    fi
+
+    if ! command_exists cargo; then
+        log_info "Cargo not found, skipping Rust checks"
+        return 0
+    fi
+
+    local crate_dir
+    crate_dir=$(find_nearest_manifest "$file" "Cargo.toml") || {
+        log_info "No Cargo.toml found above $file — skipping Rust checks"
+        return 0
+    }
+
+    log_info "Rust crate: $crate_dir (scoped to $file)"
+
+    local fmt_output
+    if ! fmt_output=$(cd "$crate_dir" && cargo fmt -- --check 2>&1); then
+        local format_output
+        if ! format_output=$(cd "$crate_dir" && cargo fmt 2>&1); then
+            add_error "Rust formatting failed ($crate_dir)"
+            echo "$format_output" >&2
+        fi
+    fi
+
+    local clippy_output
+    if ! clippy_output=$(cd "$crate_dir" && cargo clippy --quiet -- -D warnings 2>&1); then
+        add_error "Clippy found issues ($crate_dir)"
+        echo "$clippy_output" >&2
+    fi
+
+    return 0
+}
+
 lint_nix() {
     if [[ "${CLAUDE_HOOKS_NIX_ENABLED:-true}" != "true" ]]; then
         log_debug "Nix linting disabled"
@@ -642,6 +845,42 @@ lint_nix() {
     return 0
 }
 
+# Hook-mode Nix: format-check just the triggering file. statix is a
+# whole-project static analyzer with no per-file scope, so it is skipped in
+# hook mode rather than run repo-wide for a single-file edit.
+lint_nix_scoped() {
+    local file="$1"
+
+    if [[ "${CLAUDE_HOOKS_NIX_ENABLED:-true}" != "true" ]]; then
+        log_debug "Nix linting disabled"
+        return 0
+    fi
+
+    log_info "Running Nix formatting (scoped to $file)..."
+
+    if command_exists nixpkgs-fmt; then
+        local fmt_output
+        if ! fmt_output=$(nixpkgs-fmt --check "$file" 2>&1); then
+            local format_output
+            if ! format_output=$(nixpkgs-fmt "$file" 2>&1); then
+                add_error "Nix formatting failed ($file)"
+                echo "$format_output" >&2
+            fi
+        fi
+    elif command_exists alejandra; then
+        local fmt_output
+        if ! fmt_output=$(alejandra --check "$file" 2>&1); then
+            local format_output
+            if ! format_output=$(alejandra "$file" 2>&1); then
+                add_error "Nix formatting failed ($file)"
+                echo "$format_output" >&2
+            fi
+        fi
+    fi
+
+    return 0
+}
+
 # ============================================================================
 # MAIN EXECUTION
 # ============================================================================
@@ -685,6 +924,19 @@ if [[ -z "${TARGET_FILE:-}" ]] && [[ ! -t 0 ]]; then
 fi
 export TARGET_FILE="${TARGET_FILE:-}"
 
+# Hook mode: bail out immediately — before the header, before config
+# loading, before any project detection, before touching a single linter —
+# when the triggering file cannot need linting at all (gone, outside this
+# repo, ignored, or an extension no linter here understands). This is the
+# fix for the cost this script used to impose on every edit, including
+# non-code writes and writes to paths outside the repo entirely.
+if [[ -n "$TARGET_FILE" ]]; then
+    REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+    if should_skip_target "$TARGET_FILE" "$REPO_ROOT"; then
+        exit 0
+    fi
+fi
+
 # Print header
 echo "" >&2
 echo "🔍 Style Check - Validating code formatting..." >&2
@@ -696,45 +948,58 @@ load_config
 # Start timing
 START_TIME=$(time_start)
 
-# Detect project type
-PROJECT_TYPE=$(detect_project_type)
-log_info "Project type: $PROJECT_TYPE"
-
 # Main execution
 main() {
-    # Handle mixed project types
-    if [[ "$PROJECT_TYPE" == mixed:* ]]; then
-        local types="${PROJECT_TYPE#mixed:}"
-        IFS=',' read -ra TYPE_ARRAY <<< "$types"
-        
-        for type in "${TYPE_ARRAY[@]}"; do
-            case "$type" in
+    if [[ -n "$TARGET_FILE" ]]; then
+        # Hook mode: lint only the file/module/crate the edit touched. No
+        # detect_project_type() sweep at all — the extension alone decides
+        # which single linter runs.
+        case "${TARGET_FILE##*.}" in
+            py)            lint_python_scoped "$TARGET_FILE" ;;
+            go)             lint_go_scoped "$TARGET_FILE" ;;
+            js|jsx|ts|tsx)  lint_javascript ;;
+            rs)             lint_rust_scoped "$TARGET_FILE" ;;
+            nix)            lint_nix_scoped "$TARGET_FILE" ;;
+        esac
+    else
+        # CLI mode: unchanged repo-wide sweep.
+        PROJECT_TYPE=$(detect_project_type)
+        log_info "Project type: $PROJECT_TYPE"
+
+        # Handle mixed project types
+        if [[ "$PROJECT_TYPE" == mixed:* ]]; then
+            local types="${PROJECT_TYPE#mixed:}"
+            IFS=',' read -ra TYPE_ARRAY <<< "$types"
+
+            for type in "${TYPE_ARRAY[@]}"; do
+                case "$type" in
+                    "go") lint_go ;;
+                    "python") lint_python ;;
+                    "javascript") lint_javascript ;;
+                    "rust") lint_rust ;;
+                    "nix") lint_nix ;;
+                esac
+
+                # Fail fast if configured
+                if [[ "$CLAUDE_HOOKS_FAIL_FAST" == "true" && $CLAUDE_HOOKS_ERROR_COUNT -gt 0 ]]; then
+                    break
+                fi
+            done
+        else
+            # Single project type
+            case "$PROJECT_TYPE" in
                 "go") lint_go ;;
                 "python") lint_python ;;
                 "javascript") lint_javascript ;;
                 "rust") lint_rust ;;
                 "nix") lint_nix ;;
+                "unknown")
+                    log_info "No recognized project type, skipping checks"
+                    ;;
             esac
-            
-            # Fail fast if configured
-            if [[ "$CLAUDE_HOOKS_FAIL_FAST" == "true" && $CLAUDE_HOOKS_ERROR_COUNT -gt 0 ]]; then
-                break
-            fi
-        done
-    else
-        # Single project type
-        case "$PROJECT_TYPE" in
-            "go") lint_go ;;
-            "python") lint_python ;;
-            "javascript") lint_javascript ;;
-            "rust") lint_rust ;;
-            "nix") lint_nix ;;
-            "unknown") 
-                log_info "No recognized project type, skipping checks"
-                ;;
-        esac
+        fi
     fi
-    
+
     # Show timing if enabled
     time_end "$START_TIME"
     

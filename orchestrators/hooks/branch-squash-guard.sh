@@ -204,12 +204,30 @@ esac
 
 cwd=$(field cwd)
 [ -n "$cwd" ] || cwd=$(pwd)
-ctx=$(resolve_ctx "$cwd") || exit 0
-{ read -r branch; read -r base; read -r mode_a; read -r hotfix; } <<<"$ctx"
-on_base=0
-[ "$branch" = "$base" ] && on_base=1
-on_main_modeA=0
-[ "$mode_a" = 1 ] && [ "$branch" = "main" ] && on_main_modeA=1
+
+# set_ctx <dir> — resolve the git context for <dir> into the globals the
+# segment loop reads. Returns non-zero when <dir> is not a git repo.
+#
+# RECURRING BUG CLASS — resolve git state from the directory the command
+# ACTUALLY runs in, never from the payload's cwd alone. This has now bitten
+# three times: the write-tool check (cwd vs the target file's own path),
+# `git rev-parse --git-path` (resolved against the hook's process cwd), and
+# `cd <dir> && git ...` (the leading cd changes the repo for everything
+# after it). Any new resolution added here must answer "which directory does
+# this specific thing run in?" before reading git state.
+set_ctx() {
+  local d="$1" c
+  c=$(resolve_ctx "$d") || return 1
+  { read -r branch; read -r base; read -r mode_a; read -r hotfix; } <<<"$c"
+  on_base=0
+  [ "$branch" = "$base" ] && on_base=1
+  on_main_modeA=0
+  [ "$mode_a" = 1 ] && [ "$branch" = "main" ] && on_main_modeA=1
+  return 0
+}
+
+set_ctx "$cwd" || exit 0
+cur_dir="$cwd"
 
 cmd=$(field command)
 [ -n "$cmd" ] || exit 0
@@ -281,6 +299,31 @@ for raw in "${segments[@]}"; do
   # shellcheck disable=SC2206
   toks=($raw)
   [ "${#toks[@]}" -ge 1 ] || continue
+
+  # `cd <dir> && git ...` — every segment after the cd runs in a DIFFERENT
+  # repo/branch than the payload's cwd. Re-resolve so the checks below judge
+  # the right repository. When the target can't be resolved confidently
+  # (variables, missing dir, non-repo), allow rather than guess: a missed
+  # block is far cheaper than blocking legal work.
+  case "${toks[0]}" in
+    cd|pushd)
+      nd="${toks[1]:-}"
+      [ -n "$nd" ] || continue
+      case "$nd" in
+        -*) continue ;;
+        *'$'*) exit 0 ;;
+      esac
+      nd=${nd%\"}; nd=${nd#\"}; nd=${nd%\'}; nd=${nd#\'}
+      case "$nd" in
+        /*) : ;;
+        '~'|'~/'*) nd="$HOME${nd#\~}" ;;
+        *) nd="$cur_dir/$nd" ;;
+      esac
+      [ -d "$nd" ] || exit 0
+      cur_dir="$nd"
+      set_ctx "$cur_dir" || exit 0
+      continue ;;
+  esac
 
   # force-push, any form — denied regardless of branch/mode/hotfix (defense
   # in depth; settings.json already denies this for Claude, but Antigravity
