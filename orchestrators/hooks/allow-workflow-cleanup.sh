@@ -59,6 +59,7 @@ case "$cmd" in
 esac
 
 cwd=$(field cwd)
+[ -n "$cwd" ] || cwd=$(field Cwd)
 [ -n "$cwd" ] || cwd=$(pwd)
 
 # resolve the MAIN repo root and the workflows dir (shared by both cases)
