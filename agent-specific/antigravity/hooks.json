@@ -79,6 +79,27 @@
       }
     ]
   },
+  "scope-writes": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/scope-writes.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "workflow-diff-check": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "~/.gemini/config/hooks/agy-hook-adapter.sh ~/.gemini/config/hooks/workflow-diff-check.sh"
+      }
+    ]
+  },
   "stop-notifier": {
     "Stop": [
       {
