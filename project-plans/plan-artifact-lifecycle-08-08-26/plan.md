@@ -46,19 +46,19 @@ are enforced by scripts rather than by prose, and an enforcement script that rep
 every file as unclaimed enforces nothing. Phase 6 fixes it and nothing else.
 
 **In scope**
-- The three normative rules: `generic/rules/plan-format.md`, `artifact-locations.md`,
+- The three normative rules: `agent-agnostic/rules/plan-format.md`, `artifact-locations.md`,
   `run-artifacts.md`.
 - One new script, `orchestrators/hooks/plan-lifecycle.sh`, plus its fixture test.
 - Every skill / agent / workflow file whose wording names a plan path, a record
   filename, or an archive move (enumerated per subphase below, each with the exact
-  current line it replaces) — in `generic/`, `orchestrators/`, **and `tool-based/`**.
+  current line it replaces) — in `agent-agnostic/`, `orchestrators/`, **and `tool-based/`**.
   The `tool-based/` reach matters: that content is tech-bound and installs into the
-  projects that use it rather than into `~/.claude` (`.claude/rules/source-push-sync.md:3`),
+  projects that use it rather than into `~/.claude` (`.agent-specific/claude/rules/source-push-sync.md:3`),
   so it is never caught by an install-side sweep and must be enumerated here.
 - This repo's own `project-plans/` scaffolding.
 
 **Explicitly out of scope**
-- `~/.claude/**`. The install is produced by `sync-install.sh` at ship; no subphase
+- `~/.agent-specific/claude/**`. The install is produced by `sync-install.sh` at ship; no subphase
   writes there. (`sync-install.sh` needs no change: `install_path()` at
   `orchestrators/hooks/sync-install.sh:74-83` already maps any new file under
   `orchestrators/hooks/` to `hooks/<file>`, and a repo-root `tests/` dir is
@@ -81,24 +81,24 @@ every file as unclaimed enforces nothing. Phase 6 fixes it and nothing else.
 ## Stack & MAJOR versions
 
 Verified from the repo itself — there is no package manifest or lockfile of any
-kind (`ls -a` at the repo root shows only `AGENTS.md`, `README.md`, `.claude/`,
-`.gitignore`, `docs/`, `generic/`, `orchestrators/`, `project-plans/`,
+kind (`ls -a` at the repo root shows only `AGENTS.md`, `README.md`, `.agent-specific/claude/`,
+`.gitignore`, `docs/`, `agent-agnostic/`, `orchestrators/`, `project-plans/`,
 `tool-based/`, `.workflows/`).
 
 | Component | Version / form | Verified from |
 |---|---|---|
-| Content | Markdown skill/rule/agent definitions with YAML frontmatter | `generic/rules/plan-format.md:1-5` (frontmatter `name`/`description`/`domain`) |
+| Content | Markdown skill/rule/agent definitions with YAML frontmatter | `agent-agnostic/rules/plan-format.md:1-5` (frontmatter `name`/`description`/`domain`) |
 | Executables | POSIX-ish Bash, `#!/usr/bin/env bash`, `set -uo pipefail`, no `jq` | `orchestrators/hooks/resolve-config.sh:1,30` and its comment at `:22` ("No jq dependency, matching this repo's other hooks") |
 | Config resolution | `resolve-config.sh <VAR> [--default v] [--root p]` | `orchestrators/hooks/resolve-config.sh:5` |
-| Test framework | **none exists in this repo** | `find . -name '*test*'` returns six hits — `generic/hooks/smart-test.sh`, `generic/hooks/test-changed.sh`, `orchestrators/agents/contract-tester.md`, `tool-based/godot/skills/run-godot-test`, `tool-based/svelte/rules/component-testing.md`, `tool-based/svelte/skills/write-component-test` — none of which is a test framework or a test suite |
+| Test framework | **none exists in this repo** | `find . -name '*test*'` returns six hits — `agent-agnostic/hooks/smart-test.sh`, `agent-agnostic/hooks/test-changed.sh`, `orchestrators/agents/contract-tester.md`, `tool-based/godot/skills/run-godot-test`, `tool-based/svelte/rules/component-testing.md`, `tool-based/svelte/skills/write-component-test` — none of which is a test framework or a test suite |
 
 ## Conventions to enforce
 
 Hard constraints, not suggestions:
 
-1. **Source-only edits.** All changes land in `generic/`, `orchestrators/`,
+1. **Source-only edits.** All changes land in `agent-agnostic/`, `orchestrators/`,
    `project-plans/`, and a repo-root `tests/` (D4 settled: 2.1's test IS committed).
-   Never `~/.claude/**` — `.claude/rules/source-push-sync.md:1-3`.
+   Never `~/.agent-specific/claude/**` — `.agent-specific/claude/rules/source-push-sync.md:1-3`.
 2. **No jq, no non-Bash dependency** in any script — `resolve-config.sh:22`.
 3. **Scripts mutate, callers commit.** `mark-syllabus.sh` mutates the plan file and
    never commits (`orchestrators/hooks/mark-syllabus.sh:43-47`); `plan-lifecycle.sh`
@@ -156,13 +156,13 @@ plan's supersession note are the record (D1, settled at the gate).
 
 ## Phase 1: Normative scheme (the three rules)
 
-Lane 1 owns `generic/rules/` exclusively. 1.2 and 1.3 come after 1.1 because both
+Lane 1 owns `agent-agnostic/rules/` exclusively. 1.2 and 1.3 come after 1.1 because both
 cite the layout 1.1 defines; all three are one file each, so they serialize inside
 the lane at no cost.
 
 **1.1: plan-format — plan dir lifecycle, naming, standing dirs.**
 
-- **File scope:** `generic/rules/plan-format.md` (only).
+- **File scope:** `agent-agnostic/rules/plan-format.md` (only).
 - **Current wording being replaced.** Line 8: "Implementation plans are
   self-contained markdown files in the plans dir (see `artifact-locations`)." Line
   10: "**Naming.** `<feature-slug>-MM-DD-YY.md` — slug first, then date (e.g.
@@ -213,8 +213,8 @@ the lane at no cost.
   >     exists to remove.
   >   - The two standing dirs are never deleted, even when empty.
   >   - **The moves are performed by `plan-lifecycle.sh`** (`promote | archive |
-  >     supersede | reopen | locate | check`; install `~/.claude/hooks/`, or the
-  >     project's `.claude/hooks/` copy), never by hand. `archive` refuses a plan
+  >     supersede | reopen | locate | check`; install `~/.agent-specific/claude/hooks/`, or the
+  >     project's `.agent-specific/claude/hooks/` copy), never by hand. `archive` refuses a plan
   >     that did not ship — that refusal, not anyone's good intentions, is what keeps
   >     an abandoned plan out of `completed/`. `supersede` is the route that refusal
   >     names, and it refuses in turn unless a named successor actually exists and
@@ -238,7 +238,7 @@ the lane at no cost.
 
 **1.2: artifact-locations — plans dir entry + committed/ephemeral split.**
 
-- **File scope:** `generic/rules/artifact-locations.md` (only).
+- **File scope:** `agent-agnostic/rules/artifact-locations.md` (only).
 - **Current wording being replaced.** Line 14 in full: "- **Implementation plans** —
   `CLAUDE_PROJECT_PLANS_DIR`, local default root `/project-plans/`. Structure per
   `plan-format`." That single sentence is the entire statement of where plans live —
@@ -272,7 +272,7 @@ the lane at no cost.
 
 **1.3: run-artifacts — record kinds, negative statements, explore map.**
 
-- **File scope:** `generic/rules/run-artifacts.md` (only).
+- **File scope:** `agent-agnostic/rules/run-artifacts.md` (only).
 - **Current wording being replaced.**
   - `:9` "Every dae run produces files in exactly two places. Nothing a worker, gate,
     or orchestrator needs to hand to another agent may live only in conversation
@@ -306,7 +306,7 @@ the lane at no cost.
      progress log, contract, or exit report under the plans dir."
   4. Add a fourth bullet to the run-dir section (after `:21`; that section's existing
      bullets are `:19-21`), because the current
-     "exactly two places" claim is already false — `generic/skills/explore/SKILL.md:27`
+     "exactly two places" claim is already false — `agent-agnostic/skills/explore/SKILL.md:27`
      writes a map to the workflows dir:
      > - **`explore-map-<scope-slug>-<MM-DD-YY>.md`** — the `explore` fork's
      >   structured map, written to the resolved workflows dir (its default when the
@@ -321,7 +321,7 @@ the lane at no cost.
   4. The explore map is accounted for, so "two homes" is no longer contradicted.
   5. The script-enforcement half of `:13` survives unchanged.
 - **Test approach / oracle:** `equivalence check` — as 1.2, read against 1.1/1.2 for
-  single-source-of-truth; plus `grep -n 'diagnosis' generic/rules/run-artifacts.md`
+  single-source-of-truth; plus `grep -n 'diagnosis' agent-agnostic/rules/run-artifacts.md`
   returning only the "no diagnosis record kind" sentence.
 
 ## Phase 2: Lifecycle tooling and its direct callers
@@ -436,7 +436,7 @@ Lane 2. 2.2 and 2.3 quote the script's exact CLI, so both come after 2.1.
 
 **2.2: review-plan — run `check` at the gate, hand off promotion.**
 
-- **File scope:** `generic/skills/review-plan/SKILL.md` (only —
+- **File scope:** `agent-agnostic/skills/review-plan/SKILL.md` (only —
   `scripts/validate-plan.sh` is deliberately untouched; the layout check lives in
   `plan-lifecycle.sh` because only that script sits beside `resolve-config.sh` and
   can resolve the plans dir).
@@ -478,7 +478,7 @@ Lane 2. 2.2 and 2.3 quote the script's exact CLI, so both come after 2.1.
 
 **2.3: cleanup-merged — archive through the script, never archive superseded.**
 
-- **File scope:** `generic/skills/cleanup-merged/SKILL.md` (only).
+- **File scope:** `agent-agnostic/skills/cleanup-merged/SKILL.md` (only).
 - **Current wording being replaced.** `:31` step 5 in full: "**Archive the plan.**
   Move the plan and its committed review records
   (`.story`/`.diagnosis`/`.sync-report`/`.plan-review`/`.code-review`/`.pr-review`
@@ -634,14 +634,14 @@ no file is shared with another lane.
 
 ## Phase 4: Skill wording
 
-Lane 4 owns the remaining `generic/skills/` consumers (review-plan and
+Lane 4 owns the remaining `agent-agnostic/skills/` consumers (review-plan and
 cleanup-merged belong to lane 2 and are excluded here) plus the one `tool-based/`
 consumer in 4.3.
 
 **4.1: review-code, review-pr, comment-pr.**
 
-- **File scope:** `generic/skills/review-code/SKILL.md`,
-  `generic/skills/review-pr/SKILL.md`, `generic/skills/comment-pr/SKILL.md`.
+- **File scope:** `agent-agnostic/skills/review-code/SKILL.md`,
+  `agent-agnostic/skills/review-pr/SKILL.md`, `agent-agnostic/skills/comment-pr/SKILL.md`.
 - **Current wording being replaced.**
   - `review-code/SKILL.md:23` "You receive via invocation args the plan path
     (`/project-plans/`, or `CLAUDE_PROJECT_PLANS_DIR` if set)…" and `:27` step 1
@@ -669,8 +669,8 @@ consumer in 4.3.
 
 **4.2: document-local, push-pr, explore.**
 
-- **File scope:** `generic/skills/document-local/SKILL.md`,
-  `generic/skills/push-pr/SKILL.md`, `generic/skills/explore/SKILL.md`.
+- **File scope:** `agent-agnostic/skills/document-local/SKILL.md`,
+  `agent-agnostic/skills/push-pr/SKILL.md`, `agent-agnostic/skills/explore/SKILL.md`.
 - **Current wording being replaced.**
   - `document-local/SKILL.md:29` "the plan path in `/project-plans/`", `:31` "the
     plan path in `/project-plans/`, and the path to the **reconciliation report**
@@ -736,11 +736,11 @@ dangling-reference check.
 
 **5.1: Index tables and repo tree listings.**
 
-- **File scope:** `generic/AGENTS.md`, `orchestrators/AGENTS.md`, and the repo-root
+- **File scope:** `agent-agnostic/AGENTS.md`, `orchestrators/AGENTS.md`, and the repo-root
   `README.md` and `AGENTS.md` tree listings (`README.md:31`, `AGENTS.md:13` show the
   tree; D4 is settled, so the new `tests/` dir belongs in it — unconditionally).
 - **Current wording being replaced.**
-  - `generic/AGENTS.md:25` "| `artifact-locations` | Where docs, plans, and worktrees
+  - `agent-agnostic/AGENTS.md:25` "| `artifact-locations` | Where docs, plans, and worktrees
     live (config-resolved)…"; `:27` "| `plan-format` | How plans are named, phased,
     and kept current. |"; `:28` "| `run-artifacts` | Where run files live: committed
     review records beside the plan; the gitignored run dir…"; `:46`/`:47`/`:48` (the
@@ -778,7 +778,7 @@ dangling-reference check.
 
 - **File scope:** no file is edited by default; any residue this sweep finds is
   fixed in place in the file that carries it.
-- **The sweep.** From the repo root, over `generic/ orchestrators/ tool-based/` plus
+- **The sweep.** From the repo root, over `agent-agnostic/ orchestrators/ tool-based/` plus
   root `README.md`/`AGENTS.md` — i.e. every source dir, since `tool-based/` consumers
   are invisible to any install-side check — each pattern must return either zero hits
   or only hits that the new scheme sanctions:
@@ -913,10 +913,10 @@ with any of them, so it carries no `after:` edge and can run whenever dispatched
 
 **7.1: source-push-sync + push-main — branch off main, merge locally, push.**
 
-- **File scope:** `.claude/rules/source-push-sync.md`,
-  `.claude/skills/push-main/SKILL.md`. Nothing else.
+- **File scope:** `.agent-specific/claude/rules/source-push-sync.md`,
+  `.agent-specific/claude/skills/push-main/SKILL.md`. Nothing else.
 - **Both files are project-scoped and synced NOWHERE.** They live only in this repo's
-  `.claude/`, which `source-push-sync.md:7` itself names as never-synced and which
+  `.agent-specific/claude/`, which `source-push-sync.md:7` itself names as never-synced and which
   `sync-install.sh`'s `install_path()` (`:74-83`) has no arm for. There is no
   install-side counterpart to update and no `~/.claude` file to keep in step. A
   consequence worth expecting rather than debugging: a commit touching only these two

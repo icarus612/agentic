@@ -137,37 +137,41 @@ else
     # Read JSON input from stdin
     INPUT=$(cat)
     
-    # Check if input is valid JSON
-    if echo "$INPUT" | jq . >/dev/null 2>&1; then
-        # Extract relevant fields
-        TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
-        TOOL_INPUT=$(echo "$INPUT" | jq -r '.tool_input // empty')
-        
-        # Only process edit-related tools
-        if [[ ! "$TOOL_NAME" =~ ^(Edit|Write|MultiEdit)$ ]]; then
+    # Extract relevant fields using flat regex to avoid jq dependency and handle AGY format
+    _extract_field() {
+        printf '%s' "$INPUT" | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"" \
+          | head -1 | sed -E "s/^\"$1\"[[:space:]]*:[[:space:]]*\"//; s/\"$//" \
+          | sed -E 's/\\(["\\/])/\1/g' || true
+    }
+    
+    TOOL_NAME=$(_extract_field tool_name)
+    [ -n "$TOOL_NAME" ] || TOOL_NAME=$(_extract_field name)
+    
+    # Only process edit-related tools
+    case "$TOOL_NAME" in
+        Edit | Write | MultiEdit | write_to_file | *:write_to_file | replace_file_content | *:replace_file_content | multi_replace_file_content | *:multi_replace_file_content)
+            ;;
+        *)
             exit 0
-        fi
-        
-        # Extract file path(s)
-        if [[ "$TOOL_NAME" == "MultiEdit" ]]; then
-            # MultiEdit has a different structure
-            FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty')
-        else
-            FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty')
-        fi
-        
-        # Skip if no file path
-        [[ -z "$FILE_PATH" ]] && exit 0
-        
-        # Skip tests for hook files themselves
-        if [[ "$FILE_PATH" =~ /.claude/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /claude-code/hooks/.*\.sh$ ]]; then
-            echo -e "${BLUE}[INFO]${NC} Skipping tests for hook file: $FILE_PATH" >&2
-            exit 0
-        fi
-    else
-        # Not valid JSON - treat as CLI mode
-        FILE_PATH="./..."
+            ;;
+    esac
+    
+    # Extract file path
+    FILE_PATH=$(_extract_field file_path)
+    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field TargetFile)
+    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field target_file)
+    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field notebook_path)
+    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field path)
+    
+    # Skip if no file path
+    [[ -z "$FILE_PATH" ]] && exit 0
+    
+    # Skip tests for hook files themselves
+    if [[ "$FILE_PATH" =~ /.agent-specific/claude/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /claude-code/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /.gemini/config/hooks/.*\.sh$ ]]; then
+        echo -e "${BLUE}[INFO]${NC} Skipping tests for hook file: $FILE_PATH" >&2
+        exit 0
     fi
+
 fi
 
 # Load configuration

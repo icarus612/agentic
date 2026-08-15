@@ -918,8 +918,22 @@ done
 # with no path (CLI mode), which is what `--fast` and ad-hoc runs expect.
 if [[ -z "${TARGET_FILE:-}" ]] && [[ ! -t 0 ]]; then
     _hook_input=$(cat 2>/dev/null || true)
-    if [[ -n "$_hook_input" ]] && command_exists jq && echo "$_hook_input" | jq . >/dev/null 2>&1; then
-        TARGET_FILE=$(echo "$_hook_input" | jq -r '.tool_input.file_path // empty')
+    if [[ -n "$_hook_input" ]]; then
+        _extract_field() {
+            printf '%s' "$_hook_input" | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"" \
+              | head -1 | sed -E "s/^\"$1\"[[:space:]]*:[[:space:]]*\"//; s/\"$//" \
+              | sed -E 's/\\(["\\/])/\1/g' || true
+        }
+        TARGET_FILE=$(_extract_field file_path)
+        [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field TargetFile)
+        [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field target_file)
+        [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field notebook_path)
+        [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field path)
+        
+        if [[ -z "$TARGET_FILE" ]]; then
+            log_info "Hook mode invoked but no target file found in payload (fail-open) — exiting 0"
+            exit 0
+        fi
     fi
 fi
 export TARGET_FILE="${TARGET_FILE:-}"

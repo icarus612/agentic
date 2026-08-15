@@ -17,7 +17,7 @@
 #      THAT text is the payload that matters, not the exit code — translate
 #      it to Antigravity's context-injection form
 #      {"injectSteps":[{"ephemeralMessage":"<text>"}]}, matching the
-#      claude-compatibility-shim entry in generic/settings/hooks.json.
+#      claude-compatibility-shim entry in agent-agnostic/settings/hooks.json.
 #      Before this fix, the wrapped hook's stdout was captured into `out`
 #      and never used, so every Claude hook that communicates via stdout
 #      JSON (not just exit code) was silently a no-op under Antigravity —

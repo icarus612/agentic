@@ -32,7 +32,7 @@ bfield() { # flat "name":true|false -> the bool token
 sid=$(sfield session_id)
 [ -n "$sid" ] || exit 0
 
-dir="$HOME/.claude/state/test-changed"
+dir="$HOME/.agent-specific/claude/state/test-changed"
 state="$dir/$sid.list"
 lock="$dir/$sid.lock"
 [ -s "$state" ] || exit 0

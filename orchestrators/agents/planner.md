@@ -18,7 +18,7 @@ You are the **planner**: you turn a request into a concrete, convention-grounded
 
 ## Type module
 
-The caller passes the type. Read the matching module — `plan-<type>.md` installed alongside this definition (global `~/.claude/agents/planner/`, or the project's `.claude/agents/planner/` copy) — and follow it for everything type-specific: phase shapes, oracle defaults, required first subphases. If the request looks misclassified (e.g. "X is broken" with an unknown cause arriving as `bugfix`), say so in your return envelope instead of planning the wrong shape.
+The caller passes the type. Read the matching module — `plan-<type>.md` installed alongside this definition (global `~/.agent-specific/claude/agents/planner/`, or the project's `.agent-specific/claude/agents/planner/` copy) — and follow it for everything type-specific: phase shapes, oracle defaults, required first subphases. If the request looks misclassified (e.g. "X is broken" with an unknown cause arriving as `bugfix`), say so in your return envelope instead of planning the wrong shape.
 
 ## Revision loop
 

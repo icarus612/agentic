@@ -12,11 +12,11 @@ agentic/
 │   │                          sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
 │   └── agents/                planner.md (+ planner/plan-*.md modules), builder.md,
 │                              coder.md, contract-tester.md
-├── generic/                   ← GLOBAL: bound to no technology
+├── agent-agnostic/            ← GLOBAL: bound to no technology
 │   ├── rules/                 the always-on set (verify-dont-assume, push-policy, …)
 │   ├── skills/                explore, init-workspace, review-*, document-local, push-pr
 │   ├── hooks/                 smart-lint.sh, smart-test.sh, … (wired via settings.json)
-│   └── settings/              settings.json — versioned source of ~/.claude/settings.json
+│   └── settings/              settings.json — versioned source of ~/.agent-specific/claude/settings.json
 ├── tool-based/                ← bound to ONE technology or service
 │   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
@@ -31,11 +31,11 @@ thing is bound to:
 
 | `domain:` | Bound to | Lives in | Installs to |
 |---|---|---|---|
-| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
-| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.claude/` / `.agents/` |
+| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.agent-specific/claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.agent-specific/claude/` / `.agents/` |
 | `<project-name>` (`mythic-made`, …) | one project — its brand tokens, its layout | **that project only** | it's already there |
 
-Everything in `orchestrators/` and `generic/` is `domain: universal` — it goes
+Everything in `orchestrators/` and `agent-agnostic/` is `domain: universal` — it goes
 in once, globally, and is available everywhere. Everything under
 `tool-based/<tech>/` is `domain: <tech>` — it ships with the projects that
 actually use that tech, discovered from real manifests, never assumed
@@ -67,7 +67,7 @@ to bindings by `domain:`.
   - *Tech skills* **are** meant to match by description whenever their tech is
     in play; their names are verb-first (`write-svelte-component`).
   - *Worker agents* (`agents/*.md`) are not skills: they are spawned via the
-    Agent tool by an orchestrator (or a builder), hold their own warm context,
+    Agent/invoke_subagent tool by an orchestrator (or a builder), hold their own warm context,
     and return the shared envelope (`docs/conventions.md`).
 - **Rules** — always-on constraints, `rules/<name>.md`, short and
   frontmatter-light. No selection step. If it must hold even when nothing was
@@ -79,11 +79,11 @@ to bindings by `domain:`.
   only while that skill is active (`workflow-diff-check.sh`); global quality
   hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
   scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
-  the `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) install path but are invoked explicitly, never wired.
+  the `~/.agent-specific/claude/hooks/` (or `~/.gemini/config/hooks/`) install path but are invoked explicitly, never wired.
 
 Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
 every time, mechanically"* → hook.
 
 Guides: [`orchestrators/AGENTS.md`](orchestrators/AGENTS.md) (the dae pipeline,
-the tier model, the workers), [`generic/AGENTS.md`](generic/AGENTS.md) (the
+the tier model, the workers), [`agent-agnostic/AGENTS.md`](agent-agnostic/AGENTS.md) (the
 global layer), [`tool-based/AGENTS.md`](tool-based/AGENTS.md) (the tech layers).

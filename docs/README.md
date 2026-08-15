@@ -5,7 +5,7 @@ Root documentation for the `agentic` repo, maintained per this library's own
 
 **Read this first if you want to know how the repo itself is put together.** If
 you want the library's actual payload — the content you install — that lives in
-[`../orchestrators/`](../orchestrators/), [`../generic/`](../generic/), and
+[`../orchestrators/`](../orchestrators/), [`../agent-agnostic/`](../agent-agnostic/), and
 [`../tool-based/`](../tool-based/), indexed by the root
 [`AGENTS.md`](../AGENTS.md). This `/docs` tree does not duplicate that content;
 it explains the repo around it.
@@ -43,7 +43,7 @@ don't exist, so they refer to each other by name and to bindings by `domain:`.
 ## At a glance
 
 - **Not a runtime project.** No manifest, lockfile, build, or test suite. The
-  only executable code is the Bash under `generic/hooks/` and
+  only executable code is the Bash under `agent-agnostic/hooks/` and
   `orchestrators/hooks/`, which runs inside *consuming* projects.
 - **Everything else is markdown.**
 - **No CI, license, `CONTRIBUTING.md`, or `CHANGELOG`.**

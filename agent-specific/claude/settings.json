@@ -40,10 +40,10 @@
       "Glob",
       "Grep",
       "Skill",
-      "Read(~/.claude/skills/**)",
-      "Read(~/.claude/rules/**)",
-      "Read(~/.claude/hooks/**)",
-      "Read(~/.claude/agents/**)",
+      "Read(~/.agent-specific/claude/skills/**)",
+      "Read(~/.agent-specific/claude/rules/**)",
+      "Read(~/.agent-specific/claude/hooks/**)",
+      "Read(~/.agent-specific/claude/agents/**)",
       "Read(~/repos/**)",
       "Edit(~/repos/**/.workflows/**)",
       "Bash(cd:*)",
@@ -98,10 +98,10 @@
       "Bash(git worktree remove:*)"
     ],
     "additionalDirectories": [
-      "~/.claude/skills",
-      "~/.claude/rules",
-      "~/.claude/hooks",
-      "~/.claude/agents"
+      "~/.agent-specific/claude/skills",
+      "~/.agent-specific/claude/rules",
+      "~/.agent-specific/claude/hooks",
+      "~/.agent-specific/claude/agents"
     ]
   },
   "model": "fable",
@@ -112,11 +112,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/worktree-reminder.sh"
+            "command": "~/.agent-specific/claude/hooks/worktree-reminder.sh"
           },
           {
             "type": "command",
-            "command": "cd ~/repos/agentic 2>/dev/null && ~/.claude/hooks/sync-install.sh --check >&2 || true"
+            "command": "cd ~/repos/agentic 2>/dev/null && ~/.agent-specific/claude/hooks/sync-install.sh --check >&2 || true"
           }
         ]
       }
@@ -127,17 +127,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+            "command": "~/.agent-specific/claude/hooks/allow-workflow-cleanup.sh",
             "if": "Bash(git branch:*)"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+            "command": "~/.agent-specific/claude/hooks/allow-workflow-cleanup.sh",
             "if": "Bash(git worktree remove:*)"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/branch-squash-guard.sh"
+            "command": "~/.agent-specific/claude/hooks/branch-squash-guard.sh"
           }
         ]
       },
@@ -146,7 +146,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/branch-squash-guard.sh"
+            "command": "~/.agent-specific/claude/hooks/branch-squash-guard.sh"
           }
         ]
       }
@@ -157,15 +157,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/smart-lint.sh"
+            "command": "~/.agent-specific/claude/hooks/smart-lint.sh"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/smart-test.sh"
+            "command": "~/.agent-specific/claude/hooks/smart-test.sh"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/claude-install-drift.sh"
+            "command": "~/.agent-specific/claude/hooks/claude-install-drift.sh"
           }
         ]
       }
@@ -176,7 +176,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/ntfy-notifier.sh notification"
+            "command": "~/.agent-specific/claude/hooks/ntfy-notifier.sh notification"
           }
         ]
       }

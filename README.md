@@ -11,8 +11,8 @@ decides where it installs:
 
 | `domain:` | Bound to | Installs to |
 |---|---|---|
-| `universal` | nothing — works on any project, any stack | **user level**: `~/.claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
-| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | **project level**: that project's `.claude/` / `.agents/` |
+| `universal` | nothing — works on any project, any stack | **user level**: `~/.agent-specific/claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | **project level**: that project's `.agent-specific/claude/` / `.agents/` |
 | `<project-name>` (`mythic-made`, …) | one project — brand tokens, its own layout | lives only in that project; **never in this repo** |
 
 `domain:` is the only classifier, and it's the only one that survives: the
@@ -29,11 +29,11 @@ agentic/
 │   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
 │   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
 │   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md, contract-tester.md
-├── generic/                   # GLOBAL: bound to no technology       (domain: universal)
+├── agent-agnostic/                   # GLOBAL: bound to no technology       (domain: universal)
 │   ├── rules/                 #   the always-on set
 │   ├── skills/                #   explore, init-workspace, review-*, document-local, push-pr
 │   ├── hooks/                 #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
-│   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
+│   └── settings/              #   settings.json — versioned source of ~/.agent-specific/claude/settings.json
 ├── tool-based/                # bound to ONE technology              (domain: <tech>)
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
@@ -79,16 +79,16 @@ every time, mechanically"* → hook.
 
 ## Install
 
-1. Copy `orchestrators/skills/*` and `generic/skills/*` (whole directories —
-   several carry sibling files and `scripts/`) into `~/.claude/skills/` (or `~/.gemini/config/skills/`),
-   `orchestrators/agents/*` into `~/.claude/agents/` (or `~/.gemini/config/agents/`), and `generic/rules/*`
+1. Copy `orchestrators/skills/*` and `agent-agnostic/skills/*` (whole directories —
+   several carry sibling files and `scripts/`) into `~/.agent-specific/claude/skills/` (or `~/.gemini/config/skills/`),
+   `orchestrators/agents/*` into `~/.agent-specific/claude/agents/` (or `~/.gemini/config/agents/`), and `agent-agnostic/rules/*`
    into your `CLAUDE.md` context (or `~/.gemini/config/rules/`).
 2. Copy each `tool-based/<tech>/` layer your project uses into that **project's**
-   `.claude/` (or `.agents/`).
-3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) —
+   `.agent-specific/claude/` (or `.agents/`).
+3. Hooks (`agent-agnostic/hooks/`, `orchestrators/hooks/`) go to `~/.agent-specific/claude/hooks/` (or `~/.gemini/config/hooks/`) —
    automated by Nix home-manager in this setup; copy them manually otherwise.
-4. Grant the install standing permission in **`~/.claude/settings.json`** (global,
-   not a project file) for Claude Code, or wire up `antigravity/hooks.json` for Antigravity. Copying the payload in is not enough: every `Skill`
+4. Grant the install standing permission in **`~/.agent-specific/claude/settings.json`** (global,
+   not a project file) for Claude Code, or wire up `agent-specific/antigravity/hooks.json` for Antigravity. Copying the payload in is not enough: every `Skill`
    invocation and every read of a skill's sibling modules is permission-checked,
    and the interactive "always allow" button does not persist a `Skill` rule —
    it only fills a session-scoped skill allowlist that dies with the session.
@@ -97,22 +97,22 @@ every time, mechanically"* → hook.
    "permissions": {
      "allow": [
        "Skill",                                  // or per-skill: "Skill(dae)", "Skill(planner)", …
-       "Read(//home/<you>/.claude/skills/**)",   // sibling modules: dae/build.md, dae/sync.md, …
-       "Read(//home/<you>/.claude/rules/**)",
-       "Read(//home/<you>/.claude/hooks/**)",
-       "Read(//home/<you>/.claude/agents/**)",   // planner type modules: agents/planner/plan-*.md
+       "Read(//home/<you>/.agent-specific/claude/skills/**)",   // sibling modules: dae/build.md, dae/sync.md, …
+       "Read(//home/<you>/.agent-specific/claude/rules/**)",
+       "Read(//home/<you>/.agent-specific/claude/hooks/**)",
+       "Read(//home/<you>/.agent-specific/claude/agents/**)",   // planner type modules: agents/planner/plan-*.md
        "Edit(//home/<you>/<code-root>/**/.workflows/**)"  // workflow worktrees + run dirs
      ],
      "additionalDirectories": [
-       "/home/<you>/.claude/skills",
-       "/home/<you>/.claude/rules",
-       "/home/<you>/.claude/hooks",
-       "/home/<you>/.claude/agents"
+       "/home/<you>/.agent-specific/claude/skills",
+       "/home/<you>/.agent-specific/claude/rules",
+       "/home/<you>/.agent-specific/claude/hooks",
+       "/home/<you>/.agent-specific/claude/agents"
      ]
    }
    ```
 
-   It must be the **global** settings file. `.claude/settings.local.json` is
+   It must be the **global** settings file. `.agent-specific/claude/settings.local.json` is
    per-project, and an orchestrator run reads these paths from wherever its
    worktree happens to be — a project-scoped grant leaves the same prompt
    waiting in the next project.
@@ -131,10 +131,10 @@ every time, mechanically"* → hook.
          "matcher": "Bash",
          "hooks": [
            { "type": "command",
-             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+             "command": "~/.agent-specific/claude/hooks/allow-workflow-cleanup.sh",
              "if": "Bash(git branch:*)" },
            { "type": "command",
-             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
+             "command": "~/.agent-specific/claude/hooks/allow-workflow-cleanup.sh",
              "if": "Bash(git worktree remove:*)" }
          ]
        }
@@ -150,9 +150,9 @@ after every landing, deletions included.
 
 ## Contributing
 
-- Edit **here first**, never in `~/.claude/` — that's an install, not the source.
+- Edit **here first**, never in `~/.agent-specific/claude/` — that's an install, not the source.
 - A skill in THIS repo is bound to nothing (`domain: universal`, goes in
-  `orchestrators/` or `generic/`) or to exactly one tech (`domain: <tech>`, goes
+  `orchestrators/` or `agent-agnostic/`) or to exactly one tech (`domain: <tech>`, goes
   in `tool-based/<tech>/`). A third value, `domain: <project-name>`, exists for
   irreducibly project-local content — but that never lives here, only in the
   project itself.

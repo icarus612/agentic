@@ -1,7 +1,7 @@
 # Generic — the global layer (`domain: universal`)
 
 Everything here is **bound to no technology and no service**. It works on any
-project, any stack, so it installs once at the **user level** (`~/.claude/` or
+project, any stack, so it installs once at the **user level** (`~/.agent-specific/claude/` or
 `.agent/`) and is available everywhere.
 
 The `tech-agnostic` rule polices the boundary: a technology named in a
@@ -26,7 +26,7 @@ a rule.
 | `doc-format` | How docs are structured and placed. |
 | `plan-format` | How plans are named, phased, kept current, and moved through their lifecycle (proposals → per-plan dir → completed). |
 | `run-artifacts` | Where run files live: committed plan records inside the plan's own dir; the gitignored run dir `<worktree>/.artifacts/` (progress log, contracts, exit reports), which dies with its worktree. Verdict vocabulary script-enforced. |
-| `shell-discipline` | One command per Bash call — compounds are all-or-nothing at the permission gate; never chain `cd` with git/gh (cwd persists between calls, or `git -C`); prefer already-allowlisted invocation forms. |
+| `shell-discipline` | One command per Bash/run_command call — compounds are all-or-nothing at the permission gate; never chain `cd` with git/gh (cwd persists between calls, or `git -C`); prefer already-allowlisted invocation forms. |
 
 ## `skills/` — the tech-agnostic forks and gates
 
@@ -53,7 +53,7 @@ context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
 
 ## `settings/` — the user-level Claude Code settings
 
-`settings.json` is the versioned source of `~/.claude/settings.json`:
+`settings.json` is the versioned source of `~/.agent-specific/claude/settings.json`:
 permission allow/ask/deny lists, hook wiring, model choice, and UI flags —
 never secrets (API keys and tokens do not belong here). `sync-install.sh`
 installs it like any other universal unit. It is the one unit whose INSTALL

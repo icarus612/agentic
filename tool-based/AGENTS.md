@@ -4,7 +4,7 @@ Everything bound to a **specific technology or service**. This is where the
 `tech-agnostic` rule sends all stack-specific knowledge, so the universal layer
 can stay clean.
 
-These install at **project level** — the consuming project's `.claude/` or
+These install at **project level** — the consuming project's `.agent-specific/claude/` or
 `.agent/` — because a project ships with the tech it actually uses. Which
 layers a project loads is discovered from its real manifests and lockfiles,
 never assumed.

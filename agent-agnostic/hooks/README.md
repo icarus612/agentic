@@ -23,7 +23,7 @@ Features:
 
 ```
 > Edit operation feedback:
-  - [~/.claude/hooks/smart-lint.sh]:
+  - [~/.agent-specific/claude/hooks/smart-lint.sh]:
   🔍 Style Check - Validating code formatting...
   ────────────────────────────────────────────
   [INFO] Project type: go
@@ -51,7 +51,7 @@ Features:
 
 ```
 > Task operation feedback:
-  - [~/.claude/hooks/smart-lint.sh]:
+  - [~/.agent-specific/claude/hooks/smart-lint.sh]:
   🔍 Style Check - Validating code formatting...
   ────────────────────────────────────────────
   [INFO] Project type: go
@@ -86,7 +86,7 @@ Wire it via `settings.json` (unlike the other hooks above, this is a `SessionSta
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/worktree-reminder.sh" }
+          { "type": "command", "command": "~/.agent-specific/claude/hooks/worktree-reminder.sh" }
         ]
       }
     ]
@@ -96,7 +96,7 @@ Wire it via `settings.json` (unlike the other hooks above, this is a `SessionSta
 
 ## Installation
 
-Automatically installed by Nix home-manager to `~/.claude/hooks/`
+Automatically installed by Nix home-manager to `~/.agent-specific/claude/hooks/`
 
 ## Configuration
 
