@@ -7,15 +7,15 @@
 # DESCRIPTION
 #   Invoked by the push-main skill (step 4) right after a push lands, NOT a hook.
 #   Universal-domain content is everything under agent-agnostic/ and orchestrators/;
-#   tool-based/ (tech-bound) and this repo's own .agent-specific/claude/ (project-scoped) are
+#   tool-based/ (tech-bound) and this repo's own .claude/ (project-scoped) are
 #   never synced. Mapping, per the source-push-sync rule:
 #
-#     {generic,orchestrators}/skills/<name>/**  -> ~/.agent-specific/claude/skills/<name>/   (whole directory)
-#     {generic,orchestrators}/hooks/<file>      -> ~/.agent-specific/claude/hooks/<file>
-#     {generic,orchestrators}/rules/<name>.md   -> ~/.agent-specific/claude/rules/<name>.md
-#     orchestrators/agents/<name>.md            -> ~/.agent-specific/claude/agents/<name>.md
-#     orchestrators/agents/<dir>/**             -> ~/.agent-specific/claude/agents/<dir>/    (whole directory)
-#     agent-specific/claude/settings.json                      -> ~/.agent-specific/claude/settings.json
+#     {agent-agnostic,orchestrators}/skills/<name>/**  -> ~/.claude/skills/<name>/   (whole directory)
+#     {agent-agnostic,orchestrators}/hooks/<file>      -> ~/.claude/hooks/<file>
+#     {agent-agnostic,orchestrators}/rules/<name>.md   -> ~/.claude/rules/<name>.md
+#     orchestrators/agents/<name>.md            -> ~/.claude/agents/<name>.md
+#     orchestrators/agents/<dir>/**             -> ~/.claude/agents/<dir>/    (whole directory)
+#     agent-specific/claude/settings.json                      -> ~/.claude/settings.json
 #     agent-specific/antigravity/hooks.json                    -> ~/.gemini/config/hooks.json (if --agy)
 #     agent-specific/antigravity/{rules,skills}/**             -> ~/.gemini/config/... (if --agy; never Claude)
 #

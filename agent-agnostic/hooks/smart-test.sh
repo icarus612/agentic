@@ -136,41 +136,49 @@ if [ -t 0 ]; then
 else
     # Read JSON input from stdin
     INPUT=$(cat)
-    
-    # Extract relevant fields using flat regex to avoid jq dependency and handle AGY format
-    _extract_field() {
-        printf '%s' "$INPUT" | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"" \
-          | head -1 | sed -E "s/^\"$1\"[[:space:]]*:[[:space:]]*\"//; s/\"$//" \
-          | sed -E 's/\\(["\\/])/\1/g' || true
-    }
-    
-    TOOL_NAME=$(_extract_field tool_name)
-    [ -n "$TOOL_NAME" ] || TOOL_NAME=$(_extract_field name)
-    
-    # Only process edit-related tools
-    case "$TOOL_NAME" in
-        Edit | Write | MultiEdit | write_to_file | *:write_to_file | replace_file_content | *:replace_file_content | multi_replace_file_content | *:multi_replace_file_content)
+
+    case "$INPUT" in
+        \{*)
+            # Extract relevant fields using flat regex to avoid jq dependency and handle AGY format
+            _extract_field() {
+                printf '%s' "$INPUT" | grep -oE "\"$1\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]|\\\\.)*\"" \
+                  | head -1 | sed -E "s/^\"$1\"[[:space:]]*:[[:space:]]*\"//; s/\"$//" \
+                  | sed -E 's/\\(["\\/])/\1/g' || true
+            }
+
+            TOOL_NAME=$(_extract_field tool_name)
+            [ -n "$TOOL_NAME" ] || TOOL_NAME=$(_extract_field name)
+
+            # Only process edit-related tools
+            case "$TOOL_NAME" in
+                Edit | Write | MultiEdit | write_to_file | *:write_to_file | replace_file_content | *:replace_file_content | multi_replace_file_content | *:multi_replace_file_content)
+                    ;;
+                *)
+                    exit 0
+                    ;;
+            esac
+
+            # Extract file path
+            FILE_PATH=$(_extract_field file_path)
+            [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field TargetFile)
+            [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field target_file)
+            [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field notebook_path)
+            [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field path)
+
+            # Skip if no file path
+            [[ -z "$FILE_PATH" ]] && exit 0
+
+            # Skip tests for hook files themselves
+            if [[ "$FILE_PATH" =~ /.claude/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /claude-code/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /.gemini/config/hooks/.*\.sh$ ]]; then
+                echo -e "${BLUE}[INFO]${NC} Skipping tests for hook file: $FILE_PATH" >&2
+                exit 0
+            fi
             ;;
         *)
-            exit 0
+            # Not JSON-shaped — treat as CLI mode (restores baseline fallback).
+            FILE_PATH="./..."
             ;;
     esac
-    
-    # Extract file path
-    FILE_PATH=$(_extract_field file_path)
-    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field TargetFile)
-    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field target_file)
-    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field notebook_path)
-    [[ -n "$FILE_PATH" ]] || FILE_PATH=$(_extract_field path)
-    
-    # Skip if no file path
-    [[ -z "$FILE_PATH" ]] && exit 0
-    
-    # Skip tests for hook files themselves
-    if [[ "$FILE_PATH" =~ /.agent-specific/claude/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /claude-code/hooks/.*\.sh$ ]] || [[ "$FILE_PATH" =~ /.gemini/config/hooks/.*\.sh$ ]]; then
-        echo -e "${BLUE}[INFO]${NC} Skipping tests for hook file: $FILE_PATH" >&2
-        exit 0
-    fi
 
 fi
 

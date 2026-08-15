@@ -24,7 +24,7 @@ You run as an isolated fork — everything arrives via invocation args. Expect: 
 
 ## How it works
 
-1. **Validate the report.** Run `validate-report.sh <report>` (install `~/.agent-specific/claude/hooks/`, or the project's `.agent-specific/claude/hooks/` copy). A FAIL stops you cold: return `failed` naming the FAIL lines — the fix belongs to `review-pr`.
+1. **Validate the report.** Run `validate-report.sh <report>` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy). A FAIL stops you cold: return `failed` naming the FAIL lines — the fix belongs to `review-pr`.
 2. **Render the comment.** `scripts/render-pr-comment.sh <report>` (ships with this skill, next to this file) turns the LAST round into the comment body: a verdict badge line, the finding counts, the findings table, and open questions. Use its output verbatim as the body — the rendering is the contract; don't hand-write a variant.
 3. **Confirm, then post.** Posting to a PR is outward-facing: it rides on the explicit user approval your args assert (and the permission prompt). Post as a single PR comment via `gh pr comment <pr> --body-file <rendered>` or the GitHub MCP. If a previous comment from an earlier round exists, post the new round as a new comment — the PR thread is the history; never edit or delete earlier ones.
 4. **Never go further.** No merging, closing, approving, requesting changes, or review-state changes — a comment is the entire footprint.

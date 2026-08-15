@@ -1,7 +1,7 @@
 # Generic — the global layer (`domain: universal`)
 
 Everything here is **bound to no technology and no service**. It works on any
-project, any stack, so it installs once at the **user level** (`~/.agent-specific/claude/` or
+project, any stack, so it installs once at the **user level** (`~/.claude/` or
 `.agent/`) and is available everywhere.
 
 The `tech-agnostic` rule polices the boundary: a technology named in a
@@ -53,7 +53,7 @@ context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
 
 ## `settings/` — the user-level Claude Code settings
 
-`settings.json` is the versioned source of `~/.agent-specific/claude/settings.json`:
+`settings.json` is the versioned source of `~/.claude/settings.json`:
 permission allow/ask/deny lists, hook wiring, model choice, and UI flags —
 never secrets (API keys and tokens do not belong here). `sync-install.sh`
 installs it like any other universal unit. It is the one unit whose INSTALL

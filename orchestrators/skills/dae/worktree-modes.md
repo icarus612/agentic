@@ -4,7 +4,7 @@ How a `dae` run gets its working directory. One flag, three mutually exclusive m
 
 ## `new` (default)
 
-Run `~/.agent-specific/claude/hooks/workflow-setup.sh --type <branch-type> --name <name>` (or the project's `.agent-specific/claude/hooks/` copy), deriving `<name>` as a short slug of the task — unique per run so parallel runs don't collide; `<branch-type>` comes from the router's selection table. The script resolves the workflows dir (`CLAUDE_WORKFLOWS_DIR` chain, default `.workflows/`, gitignored) and the base branch (`CLAUDE_BASE_BRANCH` chain) itself — pass `--base` only on explicit user override; NEVER ask the base conversationally. This creates the run's **parent** worktree on `<branch-type>/<name>` (no suffix — this is the branch the PR publishes); builder lanes later cut children off it as `<branch-type>/<name>-l<n>` (`build-dispatch.md`).
+Run `~/.claude/hooks/workflow-setup.sh --type <branch-type> --name <name>` (or the project's `.claude/hooks/` copy), deriving `<name>` as a short slug of the task — unique per run so parallel runs don't collide; `<branch-type>` comes from the router's selection table. The script resolves the workflows dir (`CLAUDE_WORKFLOWS_DIR` chain, default `.workflows/`, gitignored) and the base branch (`CLAUDE_BASE_BRANCH` chain) itself — pass `--base` only on explicit user override; NEVER ask the base conversationally. This creates the run's **parent** worktree on `<branch-type>/<name>` (no suffix — this is the branch the PR publishes); builder lanes later cut children off it as `<branch-type>/<name>-l<n>` (`build-dispatch.md`).
 
 ## `resume [<name>]`
 

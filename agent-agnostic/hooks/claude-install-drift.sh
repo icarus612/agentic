@@ -7,7 +7,7 @@
 #   orchestrators/hooks/sync-install.sh. Nothing enforces that direction, so two
 #   mistakes are easy and both lose work silently:
 #
-#     1. Editing ~/.agent-specific/claude/hooks/foo.sh directly. It works immediately, so the
+#     1. Editing ~/.claude/hooks/foo.sh directly. It works immediately, so the
 #        mistake is invisible — until the next sync-install.sh run overwrites it
 #        from the source and the change is gone.
 #     2. Editing agent-agnostic/hooks/foo.sh in the repo and not syncing. The source is
@@ -21,14 +21,14 @@
 #   not do it by accident.
 #
 #   Mapping mirrors sync-install.sh, which owns the real thing:
-#     {generic,orchestrators}/hooks/<f>   <-> ~/.agent-specific/claude/hooks/<f>
-#     {generic,orchestrators}/rules/<f>   <-> ~/.agent-specific/claude/rules/<f>
-#     {generic,orchestrators}/skills/<n>/ <-> ~/.agent-specific/claude/skills/<n>/
-#     orchestrators/agents/<f>            <-> ~/.agent-specific/claude/agents/<f>
+#     {agent-agnostic,orchestrators}/hooks/<f>   <-> ~/.claude/hooks/<f>
+#     {agent-agnostic,orchestrators}/rules/<f>   <-> ~/.claude/rules/<f>
+#     {agent-agnostic,orchestrators}/skills/<n>/ <-> ~/.claude/skills/<n>/
+#     orchestrators/agents/<f>            <-> ~/.claude/agents/<f>
 #
-#   Never flagged: ~/.agent-specific/claude/settings.json and settings.local.json (user-owned,
+#   Never flagged: ~/.claude/settings.json and settings.local.json (user-owned,
 #   deliberately not distributable — see the repo README), tool-based/ (tech-
-#   bound, never synced), and the repo's own .agent-specific/claude/ (project-scoped).
+#   bound, never synced), and the repo's own .claude/ (project-scoped).
 #
 # CONFIG
 #   AGENTIC_REPO  path to the source checkout (default: $HOME/repos/agentic)
@@ -37,7 +37,7 @@
 set -uo pipefail
 
 AGENTIC_REPO="${AGENTIC_REPO:-$HOME/repos/agentic}"
-CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.agent-specific/claude}"
+CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
 
 # Advisory hook: never block, never fail a tool call.
 trap 'exit 0' ERR
@@ -78,7 +78,7 @@ case "$file" in
     rest="${rel#*/}"
 
     src=""
-    for top in generic orchestrators; do
+    for top in agent-agnostic orchestrators; do
       cand="$AGENTIC_REPO/$top/$kind/$rest"
       [ -e "$cand" ] && { src="$cand"; break; }
     done
@@ -104,7 +104,7 @@ esac
 
 # --- source -> install ------------------------------------------------------
 case "$file" in
-  "$AGENTIC_REPO"/tool-based/*|"$AGENTIC_REPO"/.agent-specific/claude/*)
+  "$AGENTIC_REPO"/tool-based/*|"$AGENTIC_REPO"/.claude/*)
     exit 0 ;;                                   # never synced
   "$AGENTIC_REPO"/agent-agnostic/*|"$AGENTIC_REPO"/orchestrators/*)
     rel="${file#"$AGENTIC_REPO"/}"              # e.g. agent-agnostic/hooks/smart-lint.sh

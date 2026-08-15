@@ -5,7 +5,7 @@ domain: universal
 ---
 
 # Artifact locations
-Five artifact kinds, five locations. Four resolve through the SAME chain — project `.agent-specific/claude/settings.local.json` → project `.agent-specific/claude/settings.json` → global `~/.agent-specific/claude/settings.json` → a local default — via the shared resolver `resolve-config.sh` (`orchestrators/hooks/`, sibling to `workflow-setup.sh`; global install path `~/.agent-specific/claude/hooks/resolve-config.sh`, or the project's `.agent-specific/claude/hooks/` copy if installed project-specific):
+Five artifact kinds, five locations. Four resolve through the SAME chain — project `.claude/settings.local.json` → project `.claude/settings.json` → global `~/.claude/settings.json` → a local default — via the shared resolver `resolve-config.sh` (`orchestrators/hooks/`, sibling to `workflow-setup.sh`; global install path `~/.claude/hooks/resolve-config.sh`, or the project's `.claude/hooks/` copy if installed project-specific):
 
 - **Docs** — `CLAUDE_DOCS_DIR`, local default root `/docs`. The single source of truth for all documentation; the value's SHAPE also selects the documenting skill:
   - A filesystem path (or unset → `/docs`): docs live locally at that path, structure per `doc-format`; the documentation phase is `document-local`.
@@ -19,9 +19,9 @@ Five artifact kinds, five locations. Four resolve through the SAME chain — pro
 Worktree isolation isn't only an orchestrator convention: `agent-agnostic/hooks/worktree-reminder.sh` (a `SessionStart` hook) reminds ANY session — with or without the `dae` orchestrator driving it — to set one up via `workflow-setup.sh` before mutating files, and to route pushes/PR reviews through `push-pr`/`review-pr` rather than raw `git`/`gh` commands.
 
 ## Resolution chain
-1. `<project-root>/.agent-specific/claude/settings.local.json` → `env.<VAR>`
-2. `<project-root>/.agent-specific/claude/settings.json` → `env.<VAR>`
-3. `~/.agent-specific/claude/settings.json` (global/user) → `env.<VAR>`
+1. `<project-root>/.claude/settings.local.json` → `env.<VAR>`
+2. `<project-root>/.claude/settings.json` → `env.<VAR>`
+3. `~/.claude/settings.json` (global/user) → `env.<VAR>`
 4. The local default named above (static for docs/plans/worktrees; a git heuristic for the base branch).
 
 The run dir has no var of its own — it is `.artifacts/` inside the worktree the workflows-dir chain already resolved.
@@ -29,6 +29,6 @@ The run dir has no var of its own — it is `.artifacts/` inside the worktree th
 The first scope that DEFINES the key wins — per-key fallback, not "whichever settings.json exists wins wholesale."
 
 ## The env-block gotcha
-Claude Code's `env` block does NOT deep-merge across scopes: a higher-precedence settings file's `env` block WHOLESALE-REPLACES a lower one, not per key (code.claude.com/docs/en/configuration.md). A plain `${CLAUDE_DOCS_DIR:-...}` Bash read only sees whatever Claude Code itself merged into the process at session start — if a project's `.agent-specific/claude/settings.json` defines an `env` block AT ALL (even for unrelated keys), it can silently hide a global-only value for a key the project never mentions. The inherited process `$VAR` is NOT a substitute for this resolution chain; always resolve via `resolve-config.sh`, which reads the JSON files directly.
+Claude Code's `env` block does NOT deep-merge across scopes: a higher-precedence settings file's `env` block WHOLESALE-REPLACES a lower one, not per key (code.claude.com/docs/en/configuration.md). A plain `${CLAUDE_DOCS_DIR:-...}` Bash read only sees whatever Claude Code itself merged into the process at session start — if a project's `.claude/settings.json` defines an `env` block AT ALL (even for unrelated keys), it can silently hide a global-only value for a key the project never mentions. The inherited process `$VAR` is NOT a substitute for this resolution chain; always resolve via `resolve-config.sh`, which reads the JSON files directly.
 
 Never save these artifacts anywhere else, and don't consult `docs/AGENTS.md` or anything else for their locations.

@@ -11,7 +11,7 @@ Every skill and rule declares exactly one classifying field. Its value is what
 the thing is bound to, and that decides where it installs:
 
 - **`domain: universal`** — bound to nothing. Every orchestrator, every generic
-  phase skill, every always-on rule. Installs at **user level** (`~/.agent-specific/claude/`
+  phase skill, every always-on rule. Installs at **user level** (`~/.claude/`
   or `.agent/`).
 - **`domain: <tech>`** — bound to one technology or service (`svelte`,
   `tailwind`, `typescript`, `django`, `godot`, `medusa`, `confluence`, …).
@@ -67,7 +67,7 @@ description conventions are load-bearing:
   them ("Part of the dae workflow, invoked by the dae orchestrator…"). Several
   are single words (`explore`); this guard is
   what keeps them from auto-firing on an incidental keyword match in the flat
-  `~/.agent-specific/claude/skills/` namespace.
+  `~/.claude/skills/` namespace.
 - **Tech skills** lead with the action (`write-svelte-component`,
   `run-godot-test`) — they *are* meant to match whenever their tech is in play,
   so they need no guard.
@@ -173,7 +173,7 @@ phase behaves in any project that adopts this library:
 | Implementation plans + their committed records | root `/project-plans/` — `proposals/` → `<slug>-MM-DD-YY/` → `completed/`, per `plan-format` | `CLAUDE_PROJECT_PLANS_DIR` |
 | Workflow worktrees | root `.workflows/` (gitignored, branch `<type>/<name>`) | `CLAUDE_WORKFLOWS_DIR` |
 
-Config vars are set in a project's own `.agent-specific/claude/settings.json` `env` block. This
+Config vars are set in a project's own `.claude/settings.json` `env` block. This
 repo has none, so this `/docs` tree uses the plain defaults.
 
 ## Plan format
@@ -207,11 +207,11 @@ narrative, acceptance criteria, Jira keys), which becomes the plan dir's
 
 ## Antigravity Adoption
 
-Consuming projects adopting Antigravity should create an `.agents/GEMINI.md` file that references their existing `.agent-specific/claude/` tech layers. Do not attempt to sync or duplicate files between `.agent-specific/claude/` and `.agents/`; instead, reference the existing source of truth.
+Consuming projects adopting Antigravity should create an `.agents/GEMINI.md` file that references their existing `.claude/` tech layers. Do not attempt to sync or duplicate files between `.claude/` and `.agents/`; instead, reference the existing source of truth.
 
 ## Contribution convention
 
-- Edit **in this repo first**, never in `~/.agent-specific/claude/` — that's an install, not
+- Edit **in this repo first**, never in `~/.claude/` — that's an install, not
   the source.
 - A skill is bound to nothing (`domain: universal` → `orchestrators/` or
   `agent-agnostic/`) or to exactly one tech (`domain: <tech>` → `tool-based/<tech>/`).
@@ -222,4 +222,4 @@ Consuming projects adopting Antigravity should create an `.agents/GEMINI.md` fil
 - Never let a skill or rule name a directory in this repo.
 - Distribution is deliberately copy-paste, not symlinks or a setup script, so it
   behaves identically across platforms. (Hooks are the one automated path: Nix
-  home-manager installs them to `~/.agent-specific/claude/hooks/`.)
+  home-manager installs them to `~/.claude/hooks/`.)

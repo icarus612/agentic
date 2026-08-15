@@ -16,7 +16,7 @@ agentic/
 │   ├── rules/                 the always-on set (verify-dont-assume, push-policy, …)
 │   ├── skills/                explore, init-workspace, review-*, document-local, push-pr
 │   ├── hooks/                 smart-lint.sh, smart-test.sh, … (wired via settings.json)
-│   └── settings/              settings.json — versioned source of ~/.agent-specific/claude/settings.json
+│   └── settings/              settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                ← bound to ONE technology or service
 │   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
@@ -31,8 +31,8 @@ thing is bound to:
 
 | `domain:` | Bound to | Lives in | Installs to |
 |---|---|---|---|
-| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.agent-specific/claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
-| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.agent-specific/claude/` / `.agents/` |
+| `universal` | nothing — any project, any stack | this repo | **user level**: `~/.claude/` (Claude) or `~/.gemini/config/` (Antigravity) |
+| `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.claude/` / `.agents/` |
 | `<project-name>` (`mythic-made`, …) | one project — its brand tokens, its layout | **that project only** | it's already there |
 
 Everything in `orchestrators/` and `agent-agnostic/` is `domain: universal` — it goes
@@ -79,7 +79,7 @@ to bindings by `domain:`.
   only while that skill is active (`workflow-diff-check.sh`); global quality
   hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
   scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
-  the `~/.agent-specific/claude/hooks/` (or `~/.gemini/config/hooks/`) install path but are invoked explicitly, never wired.
+  the `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) install path but are invoked explicitly, never wired.
 
 Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
 every time, mechanically"* → hook.

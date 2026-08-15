@@ -929,11 +929,6 @@ if [[ -z "${TARGET_FILE:-}" ]] && [[ ! -t 0 ]]; then
         [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field target_file)
         [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field notebook_path)
         [[ -n "$TARGET_FILE" ]] || TARGET_FILE=$(_extract_field path)
-        
-        if [[ -z "$TARGET_FILE" ]]; then
-            log_info "Hook mode invoked but no target file found in payload (fail-open) — exiting 0"
-            exit 0
-        fi
     fi
 fi
 export TARGET_FILE="${TARGET_FILE:-}"

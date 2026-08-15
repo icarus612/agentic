@@ -17,12 +17,12 @@ the thing installs:
 
 | `domain:` | Bound to | Installs to |
 |---|---|---|
-| `universal` | nothing — any project, any stack | user level: `~/.agent-specific/claude/` (or `.agent/`) |
-| `<tech>` | one technology or service | project level: that project's `.agent-specific/claude/` / `.agent/` |
+| `universal` | nothing — any project, any stack | user level: `~/.claude/` (or `.agent/`) |
+| `<tech>` | one technology or service | project level: that project's `.claude/` / `.agent/` |
 
 Two consequences drive the whole design:
 
-1. **The install target is flat.** `~/.agent-specific/claude/skills/<name>/SKILL.md` has no
+1. **The install target is flat.** `~/.claude/skills/<name>/SKILL.md` has no
    room for this repo's folders. So `domain:` is the *only* thing that carries
    the binding once the tree is gone — which is why it must exist, and why
    `type:` was removed (it could only restate what the folder already said, and
@@ -56,7 +56,7 @@ agentic/
 │   ├── rules/                 #   the always-on set (8)
 │   ├── skills/                #   the 7 tech-agnostic forks/gates
 │   ├── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired)
-│   └── settings/              #   settings.json — versioned source of ~/.agent-specific/claude/settings.json
+│   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # the tech layers                 (domain: <tech>)
 │   ├── AGENTS.md
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence
@@ -95,7 +95,7 @@ See [`pipeline.md`](pipeline.md) for the dae pipeline and
 > only while that skill is active (`workflow-diff-check.sh`); global quality
 > hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
 > scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
-> the `~/.agent-specific/claude/hooks/` install path but are invoked explicitly, never wired.
+> the `~/.claude/hooks/` install path but are invoked explicitly, never wired.
 >
 > Litmus: "must always hold" → rule; "how to do a job" → skill; "must happen
 > every time, mechanically, without model judgment" → hook.

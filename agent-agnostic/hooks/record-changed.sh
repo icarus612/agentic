@@ -24,10 +24,10 @@ fp=$(field file_path)
 
 # Don't track edits to the hook scripts themselves.
 case "$fp" in
-  */.agent-specific/claude/hooks/*) exit 0 ;;
+  */.claude/hooks/*) exit 0 ;;
 esac
 
-dir="$HOME/.agent-specific/claude/state/test-changed"
+dir="$HOME/.claude/state/test-changed"
 mkdir -p "$dir"
 lock="$dir/$sid.lock"
 

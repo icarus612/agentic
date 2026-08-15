@@ -15,7 +15,7 @@
 #   DEFINES the key wins):
 #     1. <root>/.agents/settings.local.json (or .claude/)    env.<VAR_NAME>
 #     2. <root>/.agents/settings.json (or .claude/)          env.<VAR_NAME>
-#     3. ~/.gemini/config/settings.json (or ~/.claude/)      env.<VAR_NAME>
+#     3. ~/.claude/settings.json (or ~/.gemini/config/)      env.<VAR_NAME>
 #     4. --default <value>, or (--base-branch-default) 'dev' globally.
 #
 #   No jq dependency, matching this repo's other hooks (record-changed.sh,
@@ -58,7 +58,7 @@ env_value_from() { # env_value_from <file> <key>
 resolved=""; source=""
 for f in "$root/.agents/settings.local.json" "$root/.claude/settings.local.json" \
          "$root/.agents/settings.json" "$root/.claude/settings.json" \
-         "$HOME/.gemini/config/settings.json" "$HOME/.claude/settings.json"; do
+         "$HOME/.claude/settings.json" "$HOME/.gemini/config/settings.json"; do
   v=$(env_value_from "$f" "$var" 2>/dev/null) || continue
   if [ -n "$v" ]; then resolved="$v"; source="$f"; break; fi
 done
