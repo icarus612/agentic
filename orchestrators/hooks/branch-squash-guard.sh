@@ -183,6 +183,7 @@ case "$tool" in
     [ -n "$target" ] || target=$(field notebook_path)
     [ -n "$target" ] || target=$(field path)
     [ -n "$target" ] || target=$(field target_file)
+    [ -n "$target" ] || target=$(field TargetFile)
     [ -n "$target" ] || exit 0 # can't locate the target — no opinion, never guess via cwd
     ctx=$(resolve_ctx "$(dirname "$target")") || exit 0
     { read -r branch; read -r base; read -r mode_a; read -r hotfix; } <<<"$ctx"
@@ -203,6 +204,7 @@ case "$tool" in
 esac
 
 cwd=$(field cwd)
+[ -n "$cwd" ] || cwd=$(field Cwd)
 [ -n "$cwd" ] || cwd=$(pwd)
 
 # set_ctx <dir> — resolve the git context for <dir> into the globals the
@@ -230,6 +232,7 @@ set_ctx "$cwd" || exit 0
 cur_dir="$cwd"
 
 cmd=$(field command)
+[ -n "$cmd" ] || cmd=$(field CommandLine)
 [ -n "$cmd" ] || exit 0
 
 # command substitution can hide anything — no opinion rather than guess

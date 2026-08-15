@@ -47,8 +47,12 @@ field() {
 }
 
 tool=$(field tool_name)
-[ "$tool" = "Bash" ] || exit 0
+case "$tool" in
+  Bash | run_command | *:run_command) : ;;
+  *) exit 0 ;;
+esac
 cmd=$(field command)
+[ -n "$cmd" ] || cmd=$(field CommandLine)
 [ -n "$cmd" ] || exit 0
 case "$cmd" in
   *'&&'*|*';'*|*'|'*|*'$('*|*'`'*) exit 0 ;;

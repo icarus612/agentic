@@ -43,12 +43,15 @@ input=$(cat 2>/dev/null || true)
 tool=$(printf '%s' "$input" | grep -oE '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
   | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/')
 case "$tool" in
-  Write|Edit|NotebookEdit) : ;;
+  Write | Edit | MultiEdit | NotebookEdit | \
+    write_to_file | *:write_to_file | \
+    replace_file_content | *:replace_file_content | \
+    multi_replace_file_content | *:multi_replace_file_content) : ;;
   *) exit 0 ;;
 esac
 
-# target path: file_path (Write/Edit) or notebook_path (NotebookEdit)
-path=$(printf '%s' "$input" | grep -oE '"(file_path|notebook_path)"[[:space:]]*:[[:space:]]*"[^"]*"' \
+# target path: file_path (Write/Edit) or notebook_path (NotebookEdit) or TargetFile (Antigravity)
+path=$(printf '%s' "$input" | grep -oE '"(file_path|notebook_path|TargetFile)"[[:space:]]*:[[:space:]]*"[^"]*"' \
   | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/')
 [ -n "$path" ] || exit 0
 path=$(realpath -m -- "$path" 2>/dev/null || printf '%s' "$path")

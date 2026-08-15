@@ -48,7 +48,7 @@ input=$(cat 2>/dev/null) || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 echo "$input" | jq . >/dev/null 2>&1 || exit 0
 
-file=$(echo "$input" | jq -r '.tool_input.file_path // empty')
+file=$(echo "$input" | jq -r '(.tool_input.file_path // .arguments.TargetFile) // empty')
 [ -n "$file" ] || exit 0
 
 # Normalise without requiring the file to still exist.
