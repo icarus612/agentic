@@ -83,7 +83,7 @@ if [ "$agy" = 1 ] || { [ "$claude" = 0 ] && [ "$agy" = 0 ]; }; then targets+=("a
 # --- preconditions ----------------------------------------------------------
 root=$(git rev-parse --show-toplevel 2>/dev/null) || err "not inside a git repository"
 cd "$root"
-[ -d "$root/generic" ] && [ -d "$root/orchestrators" ] \
+[ -d "$root/agent-agnostic" ] && [ -d "$root/orchestrators" ] \
   || err "source dirs agent-agnostic/ and orchestrators/ not found — run from the agentic repo"
 gitdir=$(git rev-parse --git-dir)
 common=$(git rev-parse --git-common-dir)
@@ -98,7 +98,7 @@ for TARGET_MODE in "${targets[@]}"; do
   if [ "$TARGET_MODE" = "agy" ]; then
     claude_home="${custom_home:-$HOME/.gemini/config}"
   else
-    claude_home="${custom_home:-$HOME/.agent-specific/claude}"
+    claude_home="${custom_home:-$HOME/.claude}"
   fi
   mkdir -p "$claude_home"
   
@@ -163,7 +163,7 @@ for TARGET_MODE in "${targets[@]}"; do
   }
 
   all_source_files() {
-    find generic orchestrators antigravity claude -type f ! -name AGENTS.md ! -name .gitkeep \
+    find agent-agnostic orchestrators agent-specific -type f ! -name AGENTS.md ! -name .gitkeep \
       \( -path '*/skills/*' -o -path '*/hooks/*' -o -path '*/rules/*' -o -path '*/agents/*' \
          -o -path 'agent-specific/claude/settings.json' -o -path 'agent-specific/antigravity/hooks.json' \) \
       2>/dev/null | sort
@@ -209,7 +209,7 @@ for TARGET_MODE in "${targets[@]}"; do
         rel=$(install_path "$q"); [ -n "$rel" ] || continue
         units="$units$(unit_of "$rel")\n"
       done
-    done < <(git diff --name-status "$range" -- generic orchestrators)
+    done < <(git diff --name-status "$range" -- agent-agnostic orchestrators agent-specific)
   fi
 
   units=$(printf '%b' "$units" | sort -u | sed '/^$/d')
