@@ -88,7 +88,7 @@ every time, mechanically"* → hook.
 3. Hooks (`generic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) —
    automated by Nix home-manager in this setup; copy them manually otherwise.
 4. Grant the install standing permission in **`~/.claude/settings.json`** (global,
-   not a project file) for Claude Code, or wire up `generic/settings/hooks.json` for Antigravity. Copying the payload in is not enough: every `Skill`
+   not a project file) for Claude Code, or wire up `antigravity/hooks.json` for Antigravity. Copying the payload in is not enough: every `Skill`
    invocation and every read of a skill's sibling modules is permission-checked,
    and the interactive "always allow" button does not persist a `Skill` rule —
    it only fills a session-scoped skill allowlist that dies with the session.

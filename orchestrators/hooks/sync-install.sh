@@ -15,12 +15,13 @@
 #     {generic,orchestrators}/rules/<name>.md   -> ~/.claude/rules/<name>.md
 #     orchestrators/agents/<name>.md            -> ~/.claude/agents/<name>.md
 #     orchestrators/agents/<dir>/**             -> ~/.claude/agents/<dir>/    (whole directory)
-#     generic/settings/settings.json            -> ~/.claude/settings.json
-#     generic/settings/hooks.json               -> ~/.gemini/config/hooks.json (if --agy)
+#     claude/settings.json                      -> ~/.claude/settings.json
+#     antigravity/hooks.json                    -> ~/.gemini/config/hooks.json (if --agy)
+#     antigravity/{rules,skills}/**             -> ~/.gemini/config/... (if --agy; never Claude)
 #
 #   settings.json is the one unit the INSTALL side also mutates: Claude Code
 #   appends "always allow" grants to the live file. --check reports that as
-#   STALE; fold wanted grants back into generic/settings/settings.json before
+#   STALE; fold wanted grants back into claude/settings.json before
 #   the next push, or the sync will overwrite them.
 #
 #   Files named AGENTS.md and .gitkeep are repo documentation/scaffolding and
@@ -106,12 +107,14 @@ for TARGET_MODE in "${targets[@]}"; do
     local p="$1"
     case "$(basename "$p")" in AGENTS.md|.gitkeep) return 0 ;; esac
     case "$p" in
+      antigravity/skills/*/*)                      [ "$TARGET_MODE" = "agy" ] && echo "skills/${p#*/skills/}" ;;
+      antigravity/rules/*)                         [ "$TARGET_MODE" = "agy" ] && echo "rules/${p#*/rules/}" ;;
       generic/skills/*/*|orchestrators/skills/*/*) echo "skills/${p#*/skills/}" ;;
       generic/hooks/*|orchestrators/hooks/*)       echo "hooks/${p#*/hooks/}" ;;
       generic/rules/*|orchestrators/rules/*)       echo "rules/${p#*/rules/}" ;;
       orchestrators/agents/*)                      echo "agents/${p#orchestrators/agents/}" ;;
-      generic/settings/settings.json)              [ "$TARGET_MODE" = "claude" ] && echo "settings.json" ;;
-      generic/settings/hooks.json)                 [ "$TARGET_MODE" = "agy" ] && echo "hooks.json" ;;
+      claude/settings.json)                        [ "$TARGET_MODE" = "claude" ] && echo "settings.json" ;;
+      antigravity/hooks.json)                      [ "$TARGET_MODE" = "agy" ] && echo "hooks.json" ;;
     esac
   }
 
@@ -129,12 +132,12 @@ for TARGET_MODE in "${targets[@]}"; do
     for cand in "generic/$unit" "orchestrators/$unit" \
                 "generic/${unit#skills/}" ; do :; done
     case "$unit" in
-      skills/*) for cand in "generic/$unit" "orchestrators/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
+      skills/*) for cand in "generic/$unit" "orchestrators/$unit" $([ "$TARGET_MODE" = "agy" ] && echo "antigravity/$unit"); do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
       hooks/*)  for cand in "generic/$unit" "orchestrators/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
-      rules/*)  for cand in "generic/$unit" "orchestrators/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
+      rules/*)  for cand in "generic/$unit" "orchestrators/$unit" $([ "$TARGET_MODE" = "agy" ] && echo "antigravity/$unit"); do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
       agents/*) cand="orchestrators/$unit"; [ -e "$cand" ] && echo "$cand" ;;
-      settings.json) cand="generic/settings/settings.json"; [ "$TARGET_MODE" = "claude" ] && [ -e "$cand" ] && echo "$cand" ;;
-      hooks.json)    cand="generic/settings/hooks.json"; [ "$TARGET_MODE" = "agy" ] && [ -e "$cand" ] && echo "$cand" ;;
+      settings.json) cand="claude/settings.json"; [ "$TARGET_MODE" = "claude" ] && [ -e "$cand" ] && echo "$cand" ;;
+      hooks.json)    cand="antigravity/hooks.json"; [ "$TARGET_MODE" = "agy" ] && [ -e "$cand" ] && echo "$cand" ;;
     esac
   }
 
@@ -160,10 +163,10 @@ for TARGET_MODE in "${targets[@]}"; do
   }
 
   all_source_files() {
-    find generic orchestrators -type f ! -name AGENTS.md ! -name .gitkeep \
+    find generic orchestrators antigravity claude -type f ! -name AGENTS.md ! -name .gitkeep \
       \( -path '*/skills/*' -o -path '*/hooks/*' -o -path '*/rules/*' -o -path '*/agents/*' \
-         -o -path 'generic/settings/*' \) \
-      | sort
+         -o -path 'claude/settings.json' -o -path 'antigravity/hooks.json' \) \
+      2>/dev/null | sort
   }
 
   # --- --check: report drift, copy nothing ------------------------------------
