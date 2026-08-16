@@ -8,8 +8,9 @@ fi
 
 input=$(cat)
 
-tool=$(echo "$input" | jq -r '.toolCall.name // empty')
-cmd=$(echo "$input" | jq -r '.toolCall.arguments.CommandLine // empty')
+tool=$(echo "$input" | jq -r '.tool_name // .toolCall.name // empty')
+cmd=$(echo "$input" | jq -r '.tool_arguments.CommandLine // .toolCall.arguments.CommandLine // empty')
+cwd=$(echo "$input" | jq -r '.tool_arguments.Cwd // .toolCall.arguments.Cwd // empty')
 
 if [ "$tool" != "default_api:run_command" ]; then
     # Allowlist all other tools since they aren't raw bash execution
@@ -42,6 +43,20 @@ if [[ "$cmd" == "git clean -f"* ]] || \
     exit 0
 fi
 
+# Mutation Commands
+if [[ "$cmd" == "rm "* ]] || [[ "$cmd" == "rm" ]] || \
+   [[ "$cmd" == "mv "* ]] || [[ "$cmd" == "mv" ]] || \
+   [[ "$cmd" == "cp "* ]] || [[ "$cmd" == "cp" ]] || \
+   [[ "$cmd" == "mkdir "* ]] || [[ "$cmd" == "mkdir" ]] || \
+   [[ "$cmd" == "touch "* ]] || [[ "$cmd" == "touch" ]]; then
+    if [[ "$cwd" == "$HOME/repos/"*/.worktrees/* ]] || [[ "$cwd" == "$HOME/repos/"*/.workflows/* ]]; then
+        if [[ "$cmd" != *" /"* ]] && [[ "$cmd" != *"~/"* ]] && [[ "$cmd" != *"../"* ]]; then
+            echo '{"decision": "allow"}'
+            exit 0
+        fi
+    fi
+fi
+
 # Ask list (specific overrides)
 if [[ "$cmd" == "git push"* ]] || \
    [[ "$cmd" == "sed -i"* ]] || \
@@ -54,11 +69,18 @@ if [[ "$cmd" == "git push"* ]] || \
 fi
 
 # Allow list (broad prefixes based on settings.json)
-if [[ "$cmd" == "pnpm "* ]] || [[ "$cmd" == "pnpm" ]] || \
+if [[ "$cmd" == "$HOME/.gemini/config/hooks/"* ]] || \
+   [[ "$cmd" == "~/.gemini/config/hooks/"* ]] || \
+   [[ "$cmd" == "locate "* ]] || [[ "$cmd" == "locate" ]] || \
+   [[ "$cmd" == "fd "* ]] || [[ "$cmd" == "fd" ]] || \
+   [[ "$cmd" == "xargs "* ]] || [[ "$cmd" == "xargs" ]] || \
+   [[ "$cmd" == "less "* ]] || [[ "$cmd" == "less" ]] || \
+   [[ "$cmd" == "more "* ]] || [[ "$cmd" == "more" ]] || \
+   [[ "$cmd" == "bat "* ]] || [[ "$cmd" == "bat" ]] || \
+   [[ "$cmd" == "pnpm "* ]] || [[ "$cmd" == "pnpm" ]] || \
    [[ "$cmd" == "grep "* ]] || [[ "$cmd" == "grep" ]] || \
    [[ "$cmd" == "git "* ]] || [[ "$cmd" == "git" ]] || \
    [[ "$cmd" == "ls "* ]] || [[ "$cmd" == "ls" ]] || \
-   [[ "$cmd" == "cp "* ]] || [[ "$cmd" == "cp" ]] || \
    [[ "$cmd" == "cat "* ]] || [[ "$cmd" == "cat" ]] || \
    [[ "$cmd" == "find "* ]] || [[ "$cmd" == "find" ]] || \
    [[ "$cmd" == "echo "* ]] || [[ "$cmd" == "echo" ]] || \
@@ -89,8 +111,6 @@ if [[ "$cmd" == "pnpm "* ]] || [[ "$cmd" == "pnpm" ]] || \
    [[ "$cmd" == "cd "* ]] || [[ "$cmd" == "cd" ]] || \
    [[ "$cmd" == "pushd "* ]] || [[ "$cmd" == "pushd" ]] || \
    [[ "$cmd" == "popd "* ]] || [[ "$cmd" == "popd" ]] || \
-   [[ "$cmd" == "mkdir "* ]] || [[ "$cmd" == "mkdir" ]] || \
-   [[ "$cmd" == "touch "* ]] || [[ "$cmd" == "touch" ]] || \
    [[ "$cmd" == "jq "* ]] || [[ "$cmd" == "jq" ]] || \
    [[ "$cmd" == "node_modules/.bin/"* ]] || \
    [[ "$cmd" == "gh pr view"* ]] || \
