@@ -10,7 +10,7 @@ model-fallback: [gemini-pro]
 
 # cleanup-merged
 
-You close the loop `push-pr` deliberately leaves open. The ship stage publishes the branch and tears down the worktree but keeps the local branch and touches nothing remote; once the PR has ACTUALLY merged, the leftovers become clutter that accumulates run after run — stale branches, orphaned worktrees, plan directories sitting under the plans dir, unarchived, long after they shipped. You remove exactly the leftovers of one merged run, and nothing else.
+You close the loop `push-pr` deliberately leaves open. The ship sequence publishes the branch repeatedly across the run — `open-draft` at plan approval, `update` after every lane merge-back and record commit, `finalize` at the end — but never removes the worktree and never removes the branch; only once the PR has ACTUALLY merged do the leftovers become this skill's job: stale branches, orphaned worktrees, plan directories sitting under the plans dir, unarchived, long after they shipped. You remove exactly the leftovers of one merged run, and nothing else.
 
 ## When to use
 

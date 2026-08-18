@@ -109,12 +109,17 @@ off to" or "is composed with."
   Confluence, creates the parent worktree via `workflow-setup.sh`, classifies
   the request into ONE workflow (`build.md` / `diagnose.md` / `document.md` /
   `sync.md`), then drives: `planner` (‖ `init-workspace`) → `review-plan`
-  (gate; capped; revisions via SendMessage to the warm planner) → `builder`
-  lanes (event-driven dispatch; each in its own child worktree, running the
-  packet model with `coder`/`contract-tester` sub-agents; merge-back + cleanup
-  per lane) → `review-code` (gate; capped; reason-code kickbacks) →
-  `document-local` **or** `document-confluence` → `push-pr`, with `review-pr`
-  as an optional independent pass.
+  (gate; capped; revisions via SendMessage to the warm planner) → approval →
+  `push-pr --stage open-draft` (draft PR opens right after the gate) →
+  `builder` lanes (event-driven dispatch; each in its own child worktree,
+  running the packet model with `coder`/`contract-tester` sub-agents;
+  merge-back + `push-pr --stage update` + cleanup per lane) → `review-code`
+  (gate; capped; reason-code kickbacks) → `document-local` **or**
+  `document-confluence` → `push-pr --stage update` (commits + pushes the
+  record output) → `review-pr` — the mandatory PR gate, run before
+  `finalize` on EVERY run, never optional or independent — (`ready`/
+  `tentative` → `push-pr --stage finalize`; `rejected` → replan / rebuild /
+  leave the PR as a draft + `comment-pr`).
 - **Documentation dispatch** (`artifact-locations`): a local docs path →
   `document-local` (universal); a Confluence location → `document-confluence`
   (`domain: confluence`), which also pulls in `external-storage-cap` and sends

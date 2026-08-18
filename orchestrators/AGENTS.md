@@ -45,8 +45,13 @@ runs*:
 dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
                         ▲ SendMessage revisions        │ approved
                         │                              ▼
-              plan-wrong kickback          builder lanes (event-driven dispatch,
-                        │                  child worktree each, merge-back+cleanup)
+              plan-wrong kickback        push-pr --stage open-draft (draft PR
+                        │                opens, 1 confirmation)
+                        │                              │
+                        │                              ▼
+                        │                  builder lanes (event-driven dispatch,
+                        │                  child worktree each, merge-back +
+                        │                  push-pr --stage update + cleanup per lane)
                         │                              │ all lanes merged
                         └──── review-code gate (human, capped; reason codes
                               impl-wrong │ plan-wrong │ map-wrong) ◀── integration
@@ -55,11 +60,15 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
                           document-local | document-confluence
                                                │
                                                ▼
-                     review-pr gate (branch vs base; ready │ tentative │
-                     rejected → replan / rebuild / draft+comment-pr)
+                       push-pr --stage update (commit+push record output)
                                                │
                                                ▼
-                                            push-pr
+                     review-pr gate (mandatory, before finalize; branch vs
+                     base; ready │ tentative │ rejected → replan / rebuild /
+                     leave as draft + comment-pr)
+                                               │
+                                               ▼
+                          push-pr --stage finalize (draft → ready)
 ```
 
 Inside each builder: contract expansion → one parallel wave of `coder` ‖

@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: The PR gate of the dae workflow — review the ENTIRE branch diff against the base branch (or a published PR) using the plan or a Jira ticket as the spec, and write a script-enforced verdict report (ready | tentative | rejected) whose kickback code routes replan/rebuild. Invoked by the dae orchestrator before push-pr on every run, or standalone with a PR/branch.
+description: The PR gate of the dae workflow — review the ENTIRE branch diff against the base branch (or a published PR) using the plan or a Jira ticket as the spec, and write a script-enforced verdict report (ready | tentative | rejected) whose kickback code routes replan/rebuild. Invoked by the dae orchestrator before `finalize`, on a PR that is already open as a draft, or standalone with a PR/branch.
 domain: universal
 context: fork
 rules: [verify-dont-assume, respect-versions-and-conventions, tech-agnostic, artifact-locations, run-artifacts]
@@ -14,7 +14,7 @@ You review the WHOLE deliverable — every commit that will land when this branc
 
 ## When to use
 
-- As the mandatory PR gate the `dae` orchestrator runs before `push-pr` on EVERY run — the branch-vs-base diff is reviewed before anything is published.
+- As the mandatory PR gate the `dae` orchestrator runs before `finalize` on EVERY run — by this point the branch is already published and the PR is already open as a draft, and the branch-vs-base diff is reviewed before the PR is flipped to ready.
 - Standalone with a PR URL/number: review a published PR (yours or a teammate's) the same way.
 - Standalone with a branch (or nothing): review that branch — default the current one — against the base.
 - NOT a replacement for the `review-code` gate: that gate checks the build against the plan lane by lane; this gate checks the assembled, shippable whole.
@@ -29,7 +29,7 @@ You run as an isolated fork — everything arrives via invocation args. Expect:
 
 ## How it works
 
-1. **Fetch the real diff.** PR mode: `gh pr view` / `gh pr diff` (or the GitHub MCP) — description, full diff, commits, CI status, existing comments. Branch mode: `git diff <base>...<branch>`, the commit list, and the project's own checks run locally. The diff is the artifact; never review from a summary or memory of the branch.
+1. **Fetch the real diff.** PR mode: `gh pr view` / `gh pr diff` (or the GitHub MCP) — description, full diff, commits, CI status, existing comments. Branch mode: `git diff <base>...<branch>`, the commit list, and the project's own checks run locally. Branch mode stays the dae gate's target — cheaper, diff-based — since the branch is already pushed from `open-draft` onward; PR mode is available for a fresh standalone pass. The diff is the artifact; never review from a summary or memory of the branch.
 2. **Re-read the spec NOW.** Open the plan file (and/or ticket) at review time — plans are amended mid-run, and you must judge against what it says at this moment, not a cached account. The syllabus plus acceptance criteria (or the ticket's) are the checklist.
 3. **Check completeness against the spec.** Every syllabus subphase / acceptance criterion: shipped, partial, dropped, or diverged — evidenced in the diff, not in commit messages. Silently dropped work and undisclosed scope creep are findings. When a run dir arrives in your args (`<parent-worktree>/.artifacts/`), also run `verify-run-scope.sh <parent-worktree> <base> <run-dir>` (install `~/.claude/hooks/`): every `UNCLAIMED:` line is a product change no builder exit report owns — someone (usually the orchestrator) edited the product directly, violating the harness-scoped-writes invariant. Each is a BLOCKING finding, quoted verbatim.
 4. **Check conventions and the stack.** The changes use the project's actual patterns and MAJOR-version idioms (verify from manifests and neighboring code, not assumption).
@@ -45,7 +45,7 @@ You run as an isolated fork — everything arrives via invocation args. Expect:
 
 ## Hand-off / next
 
-Return the shared worker envelope (see the conventions doc "Worker return envelope"): `status` (`success` = ready/tentative; `failed` = rejected; `needs-input` = questions bar a verdict); `artifacts[]` = [report path]; `next` = the round's `next` value verbatim; `blockers[]` = the blocking findings. Body: a digest only — verdict, counts, the top findings — never the full report; the caller reads the file. The caller (dae's PR gate) presents the verdict with the push confirmation and routes a non-ready outcome: replan, rebuild, or publish-as-draft with the report posted via `comment-pr`.
+Return the shared worker envelope (see the conventions doc "Worker return envelope"): `status` (`success` = ready/tentative; `failed` = rejected; `needs-input` = questions bar a verdict); `artifacts[]` = [report path]; `next` = the round's `next` value verbatim; `blockers[]` = the blocking findings. Body: a digest only — verdict, counts, the top findings — never the full report; the caller reads the file. The caller (dae's PR gate) presents the verdict with the ready-flip confirmation and routes a non-ready outcome: replan, rebuild, or leave the PR as a draft, report posted via `comment-pr`.
 
 ## Notes
 

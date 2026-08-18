@@ -1,6 +1,6 @@
 ---
 name: comment-pr
-description: Post a review-pr verdict report to GitHub as a PR comment — render the report file through the contract script and publish it with confirmation. Part of the dae workflow, invoked by the dae orchestrator after review-pr (draft-publish path) or standalone with a report path and PR; never reviews anything itself.
+description: Post a review-pr verdict report to GitHub as a PR comment — render the report file through the contract script and publish it with confirmation. Part of the dae workflow, invoked by the dae orchestrator after review-pr at any verdict, on the PR already open, or standalone with a report path and PR; never reviews anything itself.
 domain: universal
 context: fork
 rules: [verify-dont-assume, push-policy, artifact-locations, run-artifacts]
@@ -14,7 +14,7 @@ You publish a verdict that already exists. The `review-pr` skill wrote a report 
 
 ## When to use
 
-- By the `dae` orchestrator's PR gate when the user chooses to publish despite a non-ready verdict (draft PR + posted report), or wants a `ready`/`tentative` report on the PR record.
+- By the `dae` orchestrator's PR gate to post the verdict report at any outcome (`ready`, `tentative`, or `rejected`) — whether the PR stays a draft is the caller's separate decision, made at the PR gate, not something this skill's posting triggers.
 - Standalone: post any existing `pr-review.md` report to its PR.
 - NEVER to write a review comment from scratch — no report file, no comment.
 
@@ -37,4 +37,4 @@ Return the shared worker envelope (see the conventions doc "Worker return envelo
 
 - The report file is the single source of the comment's content; if it reads wrong, the report is wrong — kick back, don't patch in flight.
 - One comment per verdict round; never spam rounds the PR already carries.
-- The `push-pr` skill links the report path in the PR body; your comment is the readable rendering of it.
+- The `push-pr` skill's `finalize` stage links the report path in the PR body; your comment is the readable rendering of it.

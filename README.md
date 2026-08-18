@@ -50,10 +50,12 @@ and drives two workers through cold gates:
 
 ```
 planner ‖ init-workspace → review-plan ⇄ (human gate, capped)
+   → push-pr --stage open-draft (draft PR opens)
    → builder lanes (each: contract → coder ‖ contract-tester per packet
-     → debug-mediated rework → builder's own e2e exit)
+     → debug-mediated rework → builder's own e2e exit → push-pr --stage update)
    → review-code ⇄ (human gate; kickback codes impl-wrong|plan-wrong|map-wrong)
-   → document-local | document-confluence → push-pr (⇢ review-pr)
+   → document-local | document-confluence → push-pr --stage update
+   → review-pr ⇄ (mandatory gate) → push-pr --stage finalize
 ```
 
 Coders never see tests; contract-testers never see implementation — the

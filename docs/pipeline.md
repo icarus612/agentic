@@ -12,8 +12,13 @@ the record stage, when the docs target is Confluence.
 dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
                         ▲ SendMessage revisions        │ approved
                         │                              ▼
-              plan-wrong kickback          builder lanes (event-driven dispatch,
-                        │                  child worktree each, merge-back+cleanup)
+              plan-wrong kickback        push-pr --stage open-draft (draft PR
+                        │                opens, 1 confirmation)
+                        │                              │
+                        │                              ▼
+                        │                  builder lanes (event-driven dispatch,
+                        │                  child worktree each, merge-back +
+                        │                  push-pr --stage update + cleanup per lane)
                         │                              │ all lanes merged
                         └──── review-code gate (human, capped; reason codes
                               impl-wrong │ plan-wrong │ map-wrong) ◀── integration
@@ -21,10 +26,13 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
                                                ▼
                           document-local | document-confluence
                                                ▼
-                        review-pr gate (branch vs base; ready │ tentative │
-                        rejected → replan / rebuild / draft+comment-pr)
+                       push-pr --stage update (commit+push record output)
                                                ▼
-                                            push-pr
+                     review-pr gate (mandatory, before finalize; branch vs
+                     base; ready │ tentative │ rejected → replan / rebuild /
+                     leave as draft + comment-pr)
+                                               ▼
+                          push-pr --stage finalize (draft → ready)
 ```
 
 ## Workflows (`--type`)
@@ -37,7 +45,8 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
 | `sync` | `sync.md` | planner (`plan-reconcile`: classify done/partial/dropped/diverged vs the real diff) → confirm-the-diff gate → reconciliation-driven record |
 
 All share the router's **setup** (docs target, Confluence requirements capture,
-parent worktree `<type>/<name>`) and **ship** (record → `push-pr`)
+parent worktree `<type>/<name>`) and **ship** (`open-draft` at plan approval →
+per-lane/record `push-pr --stage update` pushes → PR gate → `finalize`)
 stages. `bugfix` vs `diagnose`: known cause → bugfix; unknown cause → diagnose.
 
 ## The three tiers
@@ -67,10 +76,21 @@ context.
 Each builder works in its own **child worktree** (`workflow-setup.sh --parent`)
 with its own `init-workspace`; on report, `dae` verifies the lane
 (`verify-scope.sh`), merges the child branch into the parent (a conflict IS a
-scope violation), removes the lane's worktree/branch, ticks the syllabus
-(`mark-syllabus.sh`), re-scans the `(after:)` frontier, and dispatches
-immediately — no wave barriers. At run end one worktree/branch remains: the
-parent, which `push-pr` publishes.
+scope violation), ticks the syllabus (`mark-syllabus.sh`), updates the
+progress log, and pushes the parent (`push-pr --stage update` — no
+confirmation) BEFORE removing the lane's worktree/branch — cleanup waits for
+the push because the child is the only place a lane's work exists outside the
+parent's local history. A failed or declined push defers that lane's cleanup
+(worktree and branch kept, recorded in the progress log, retried after a later
+successful push) without blocking the schedule; a run with no remote or PR
+tooling at all cleans up normally, since there's nothing to wait for. `dae`
+then re-scans the `(after:)` frontier and dispatches immediately — no wave
+barriers. At run end the parent is the only worktree/branch remaining IF every
+lane's push succeeded — already published (pushed, PR opened as draft, since
+plan approval and kept current by every lane-merge push) — `finalize`
+completes that publication by flipping draft → ready; any lane still carrying
+a deferred cleanup is surfaced to the user with its worktree path and branch
+name.
 
 ## Gates
 
@@ -86,10 +106,11 @@ gates' `next` carries a kickback reason code: `impl-wrong` → redispatch the
 lane; `plan-wrong` → message the warm planner; `map-wrong` → re-run `explore`,
 then the planner — the redispatched worker gets the report PATH, never a
 paraphrase. Cheapest sufficient re-entry always. The PR gate runs on EVERY
-run before `push-pr`: the whole branch-vs-base diff against the plan/ticket
-as amended (plans are amendable at any stage; gates re-read the file at
-verdict time). A rejected verdict offers replan / rebuild / publish-as-draft
-(+ `comment-pr` posting the report), `(Recommended)` per its kickback code.
+run, mandatory, before `push-pr --stage finalize`: the whole branch-vs-base
+diff against the plan/ticket as amended (plans are amendable at any stage;
+gates re-read the file at verdict time). A rejected verdict offers replan /
+rebuild / leave the PR as a draft (+ `comment-pr` posting the report),
+`(Recommended)` per its kickback code.
 
 ## Documentation dispatch
 
