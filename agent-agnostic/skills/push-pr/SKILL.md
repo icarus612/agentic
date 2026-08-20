@@ -36,7 +36,7 @@ Every stage starts the same way: inside the worktree, confirm the working tree i
 
 1. **Commit the promoted plan dir.** Commit `<plans-dir>/<slug>-MM-DD-YY/` (`plan.md`, `plan-review.md`, `story.md`) if not already committed — a PR needs at least one commit ahead of base, and the promoted plan is that first commit.
 2. **Push.** `git push -u origin <branch>`. Never `--force` in any form, never push main or the base branch. This is an outward-facing PR-state change, so hold a conversational confirmation first ("push and open the draft PR?"). If declined, record that the branch exists locally with the commit, skip the PR step, and report — this is a valid outcome, not an error. A push that fails outright (not just a declined confirmation) is the same "failed-or-declined" bucket and is handled the same way; a repo with no remote configured at all is the distinct third outcome ("publishing impossible for this run") — detect it here, once, record it, and continue local-only rather than blocking. The open is retried at the next `update` event (or at `finalize` if `update` never gets the chance either) — no stage blocks on it.
-3. **Open the draft PR.** After a successful push, open a PR from the workflow branch to the base branch as a draft — `gh pr create --draft` or the GitHub MCP capability with `draft: true`, whichever is available. This rides the same confirmation as the push, already held above.
+3. **Open the draft PR.** After a successful push, open a PR from the workflow branch to the base branch as a draft — `gh pr create --draft`, or the GitHub MCP capability with `draft: true` **only if `gh` is not installed**. "Available" means installed, never permitted: if `gh` exists but the call is denied, blocked by a permission rule, or stopped by the auto-mode classifier, STOP and report the denial — do not reach for the MCP path (see **A denial is not unavailability** below). This rides the same confirmation as the push, already held above.
    - Check for a PR template (`.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE/`) and structure the body with it.
    - Title: a one-line summary of the work, from the plan-derived summary in your args. Body: what the plan sets out to do, and a pointer to the plan file.
    - If a PR already exists for this branch, report it — never create a duplicate. This is also what makes `open-draft` idempotent on resume: rerunning it against a branch that already has an open PR is a no-op past the report.
@@ -54,7 +54,7 @@ Every stage starts the same way: inside the worktree, confirm the working tree i
 1. **Commit last stragglers.** Commit any remaining authorized record stragglers.
 2. **Push.** `git push origin <branch>`, before any PR-state change. Never `--force`, never main or the base branch. Report which of the three push outcomes occurred — a successful push here is what clears any lane cleanups deferred earlier in the run.
 3. **Retry a missing PR, if needed.** If `open-draft` was declined or impossible and `update` never got the chance to retry either, open the draft PR now (same action as `open-draft` step 3) — this is the last retry point; no stage blocks on it.
-4. **Flip draft to ready.** Refresh the PR title/body with the final work summary and a pointer to `pr-review.md`, then flip the PR from draft to ready — `gh pr ready` or the GitHub MCP `update_pull_request` with `draft: false`. This is the second outward-facing PR-state change, so hold a conversational confirmation before it ("push and mark the PR ready?") — the push in step 2 already happened by this point, so the confirmation gates only the ready-flip. Unless the caller passes keep-draft, in which case leave the PR as a draft and report why.
+4. **Flip draft to ready.** Refresh the PR title/body with the final work summary and a pointer to `pr-review.md`, then flip the PR from draft to ready — `gh pr ready`, or the GitHub MCP `update_pull_request` with `draft: false` **only if `gh` is not installed**. A blocked or denied `gh pr ready` is never a reason to switch to MCP, `gh api`, or a GraphQL mutation (see **A denial is not unavailability** below). This is the second outward-facing PR-state change, so hold a conversational confirmation before it ("push and mark the PR ready?") — the push in step 2 already happened by this point, so the confirmation gates only the ready-flip. Unless the caller passes keep-draft, in which case leave the PR as a draft and report why.
    - If the confirmation is declined, leave the PR as a draft, record the exact command to flip it later, and report — a declined PR action is a valid outcome, not an error to route around.
    - If the repo has no remote hosting or no PR tooling is available, say so and report the branch as pushed-only.
 
@@ -80,6 +80,20 @@ in the run.
   tooling is available (`gh` and the GitHub MCP both absent). Detected once,
   recorded, and the run continues local-only — this is NOT the same as a
   failed/declined push: there is nothing to wait for.
+
+## A denial is not unavailability
+
+`gh` and the GitHub MCP are alternatives for exactly ONE condition: the tool is **not installed**. They are never alternatives for a tool that is installed but **refused**.
+
+If any call in this skill is denied by a permission rule, blocked by the auto-mode classifier, or stopped by a hook or gate:
+
+- **STOP.** Do not retry the same action through the GitHub MCP, `gh api`, a GraphQL mutation, `curl`, or any other path.
+- **Report the denial** to the caller, naming the exact command that was blocked, and let them decide.
+- A denial is a **valid outcome**, exactly like a declined confirmation — not an obstacle to route around.
+
+A caller's confirmation authorizes the **outcome**; it never authorizes a **route** the harness refused. Rerouting past a block defeats the permission system whether or not the outcome was wanted, and from the outside it is indistinguishable from an agent doing the same thing for an outcome that was not. "The user already confirmed this stage" is therefore not a reason to proceed past a block — it is orthogonal to it.
+
+This governs every stage and every action here: pushes, PR creation, title/body edits, and the draft→ready flip.
 
 ## Hand-off / next
 

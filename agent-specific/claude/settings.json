@@ -64,7 +64,9 @@
       "Bash(gh run list:*)",
       "Bash(gh repo view:*)",
       "Bash(gh search:*)",
-      "Bash(gh auth status:*)"
+      "Bash(gh auth status:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git push:*)"
     ],
     "deny": [
       "Bash(git clean -f:*)",
@@ -72,7 +74,6 @@
       "Bash(git push --force:*)",
       "Bash(git push --force-with-lease:*)",
       "Bash(git push -f:*)",
-      "Bash(git branch -D:*)",
       "Bash(git branch --delete --force:*)",
       "Bash(git config:*)",
       "Bash(git remote:*)",
@@ -83,6 +84,9 @@
       "Bash(git gc --prune:*)",
       "Bash(git filter-branch:*)",
       "Bash(git push origin --delete:*)",
+      "Bash(git push origin -d:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git push -d:*)",
       "Bash(git reset --mixed HEAD~:*)",
       "Bash(git reset --soft HEAD~:*)",
       "Bash(git submodule deinit:*)",
@@ -90,7 +94,7 @@
       "Bash(git update-ref -d:*)"
     ],
     "ask": [
-      "Bash(git push:*)",
+      "Bash(git branch -D:*)",
       "Bash(sed -i:*)",
       "Bash(sed --in-place:*)",
       "Bash(awk -i:*)",
