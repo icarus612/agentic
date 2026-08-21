@@ -542,7 +542,7 @@ later reconciles that tree is `document-local`, whose job explicitly includes de
 or delete accordingly"; `:72` — "remove what no longer applies"). A note in `analyze.md` is
 invisible to it: `analyze.md` is a `dae` sibling, loaded by the router, never by the documenting
 fork. The carve-out therefore has to live in the fork's own file (C8). Same shape on the
-Confluence side: `document-confluence/SKILL.md:24` enumerates its input shapes and the
+Confluence side: `document-confluence/SKILL.md:29` enumerates its input shapes and the
 map-driven one is worded as "the explore skill's full structured map"; 2.1 routes an analysis
 report through that shape, so the wording is widened by one clause to actually cover it.
 
@@ -551,7 +551,7 @@ report through that shape, so the wording is widened by one clause to actually c
 | File:line | Current content | Change |
 |---|---|---|
 | `agent-agnostic/skills/document-local/SKILL.md` — `## Notes`, next to the `:72` "remove what no longer applies" bullet | the Notes bullet list | Add ONE bullet: `<docs>/analysis/` holds dated consensus-analysis reports, one per analyze run — append-style, never updated in place, never consolidated, and **never pruned** by a docs pass; it is a deliberate exception to `doc-format`'s "one page per topic, kept current" |
-| `tool-based/confluence/skills/document-confluence/SKILL.md:24` | the map-driven `## Inputs` bullet — "**Map-driven** (from the `map` orchestrator): the explore skill's full structured map instead of plan/story/diff — publish the technical map only; skip the story sections." | Widen to also name a consensus analysis report from an analyze run as a valid technical document for this shape; publish it as a page under an `Analysis` parent. No other change to the skill |
+| `tool-based/confluence/skills/document-confluence/SKILL.md:29` | the map-driven `## Inputs` bullet — "**Map-driven** (from the `map` orchestrator): the explore skill's full structured map instead of plan/story/diff — publish the technical map only; skip the story sections." | Widen to also name a consensus analysis report from an analyze run as a valid technical document for this shape; publish it as a page under an `Analysis` parent. No other change to the skill |
 
 **Pattern to follow:** both files' existing bullet density and voice — one sentence each, no new
 section, no frontmatter change. `document-local`'s Notes bullets are the model for the first;
@@ -605,7 +605,7 @@ under D1 and is now an explicit no-touch criterion instead (3.1 criterion 6, 3.2
 | `README.md:48` | `build (feature\|bugfix\|rework\|migration\|hotfix), diagnose, document, sync` | Add `analyze` |
 | `orchestrators/AGENTS.md:11` | the cold-fork tier row listing `explore, review-plan, …` | Add `deep-analysis` |
 | `orchestrators/AGENTS.md:39` | the `dae` entry-point row's workflow enumeration | Add `analyze` |
-| `orchestrators/AGENTS.md:73-74` | "The other workflows swap the middle: `diagnose` …, `document` …, `sync` …" | Add `analyze` (three blind analyses → consensus → findings gate) |
+| `orchestrators/AGENTS.md:71-73` | "The other workflows swap the middle: `diagnose` …, `document` …, `sync` …" | Add `analyze` (three blind analyses → consensus → findings gate) |
 
 **Pattern to follow:** each table/list already has a house style — match the density and the
 verb form of the neighbouring rows rather than inventing a longer entry.
@@ -738,7 +738,7 @@ route the report through `document-confluence`'s existing **map-driven** shape �
 document only, no story sections, no Jira key unless the user supplies one — published as a page
 under an `Analysis` parent, with 2.3 widening that shape's one-line wording so the contract
 actually names an analysis report instead of only "the explore skill's full structured map"
-(`document-confluence/SKILL.md:24`). *Why not the alternative (declare Confluence unsupported and
+(`document-confluence/SKILL.md:29`). *Why not the alternative (declare Confluence unsupported and
 leave the report in the run dir):* the run dir dies with the worktree (`run-artifacts`), so an
 unsupported mode would silently destroy the deliverable — worse than a one-line contract widening.
 **Stated limitation:** the published page carries no analysis-specific structure (it is a
