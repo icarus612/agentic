@@ -108,7 +108,7 @@
       "~/.claude/agents"
     ]
   },
-  "model": "fable",
+  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
