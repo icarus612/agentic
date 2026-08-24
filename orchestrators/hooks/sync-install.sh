@@ -19,10 +19,25 @@
 #     agent-specific/antigravity/hooks.json                    -> ~/.gemini/config/hooks.json (if --agy)
 #     agent-specific/antigravity/{rules,skills}/**             -> ~/.gemini/config/... (if --agy; never Claude)
 #
-#   settings.json is the one unit the INSTALL side also mutates: Claude Code
-#   appends "always allow" grants to the live file. --check reports that as
-#   STALE; fold wanted grants back into agent-specific/claude/settings.json before
-#   the next push, or the sync will overwrite them.
+#   settings.json is the one unit the INSTALL side also OWNS in part: Claude
+#   Code writes to the live file during normal use — `/model` persists into
+#   "model", and "always allow" appends to permissions.allow. A whole-file copy
+#   therefore clobbers the user's live state on every push, which is why this
+#   unit MERGES instead of copying:
+#
+#     - a key the SOURCE defines is authoritative (the repo wins)
+#     - a key only the INSTALL has is PRESERVED (never dropped)
+#     - permissions.allow is UNIONED: source entries first, then live-only
+#       grants, deduped — so "always allow" survives a sync
+#
+#   Dropping a key from the source therefore hands it to the install
+#   permanently. That is exactly why "model" is deliberately ABSENT from
+#   agent-specific/claude/settings.json: `/model` is a per-user, per-session
+#   choice and the repo has no business pinning it.
+#
+#   Corollary: this merge cannot express a DELETION. Removing a key from the
+#   source leaves the installed value in place rather than removing it; delete
+#   it from the install by hand if that is what you meant.
 #
 #   Files named AGENTS.md and .gitkeep are repo documentation/scaffolding and
 #   are skipped. Skill and agent directories sync as WHOLE directories (the
@@ -141,6 +156,44 @@ for TARGET_MODE in "${targets[@]}"; do
     esac
   }
 
+  # --- settings.json merge (see header) ---------------------------------------
+  merge_settings() { # <source-file> <install-file> -> merged JSON on stdout
+    python3 - "$1" "$2" << 'PY'
+import json, sys
+
+def merge(src, inst):
+    if isinstance(src, dict) and isinstance(inst, dict):
+        out = {k: (merge(v, inst[k]) if k in inst else v) for k, v in src.items()}
+        for k, v in inst.items():           # install-only keys survive
+            if k not in src:
+                out[k] = v
+        return out
+    return src                              # source wins on scalars and lists
+
+src_path, inst_path = sys.argv[1], sys.argv[2]
+with open(src_path) as f:
+    src = json.load(f)
+try:
+    with open(inst_path) as f:
+        inst = json.load(f)
+except (FileNotFoundError, ValueError):
+    inst = {}
+
+out = merge(src, inst)
+
+# permissions.allow is append-only on the install side ("always allow"), so
+# union it rather than letting the source replace it wholesale.
+src_allow = src.get("permissions", {}).get("allow")
+inst_allow = inst.get("permissions", {}).get("allow")
+if isinstance(src_allow, list) and isinstance(inst_allow, list):
+    out.setdefault("permissions", {})["allow"] = \
+        src_allow + [x for x in inst_allow if x not in src_allow]
+
+json.dump(out, sys.stdout, indent=2, ensure_ascii=False)
+sys.stdout.write("\n")
+PY
+  }
+
   fail=0
   sync_unit() {
     local unit="$1" src dest
@@ -151,6 +204,21 @@ for TARGET_MODE in "${targets[@]}"; do
       return
     fi
     mkdir -p "$(dirname "$dest")"
+    if [ "$unit" = "settings.json" ]; then
+      # Never a plain copy: that would clobber live-owned keys (see header).
+      if ! command -v python3 >/dev/null 2>&1; then
+        echo "sync-install: python3 not found — REFUSING to sync settings.json (a plain copy would clobber live keys)" >&2
+        fail=1; return
+      fi
+      local tmp="$dest.sync-tmp.$$"
+      if ! merge_settings "$src" "$dest" > "$tmp"; then
+        echo "sync-install: merge failed for settings.json ($TARGET_MODE)" >&2
+        rm -f "$tmp"; fail=1; return
+      fi
+      mv "$tmp" "$dest" || { echo "sync-install: install failed for settings.json ($TARGET_MODE)" >&2; rm -f "$tmp"; fail=1; return; }
+      echo "MERGED ($TARGET_MODE): $unit"
+      return
+    fi
     if [ -d "$src" ]; then
       rm -rf "$dest"
       cp -R "$src" "$dest" || { echo "sync-install: copy failed for $unit ($TARGET_MODE)" >&2; fail=1; return; }
@@ -175,6 +243,14 @@ for TARGET_MODE in "${targets[@]}"; do
     while IFS= read -r p; do
       rel=$(install_path "$p"); [ -n "$rel" ] || continue
       if [ ! -f "$claude_home/$rel" ]; then echo "MISSING ($TARGET_MODE): $rel (source: $p)"; drift=1
+      elif [ "$rel" = "settings.json" ]; then
+        # Merged, not copied — drift is "the merge would change the install",
+        # not "the two files differ" (they differ by design: live-owned keys).
+        if ! command -v python3 >/dev/null 2>&1; then
+          echo "SKIPPED ($TARGET_MODE): $rel (python3 not found — cannot verify a merged unit)" >&2
+        elif ! merge_settings "$p" "$claude_home/$rel" | diff -q - "$claude_home/$rel" >/dev/null 2>&1; then
+          echo "STALE ($TARGET_MODE): $rel (merging $p would change it)"; drift=1
+        fi
       elif ! diff "$p" "$claude_home/$rel" >/dev/null; then echo "STALE ($TARGET_MODE): $rel (differs from $p)"; drift=1
       fi
     done < <(all_source_files)

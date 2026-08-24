@@ -108,7 +108,6 @@
       "~/.claude/agents"
     ]
   },
-  "model": "opus",
   "hooks": {
     "SessionStart": [
       {
