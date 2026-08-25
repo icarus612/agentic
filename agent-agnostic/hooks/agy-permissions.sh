@@ -23,7 +23,6 @@ if [[ "$cmd" == "git clean -f"* ]] || \
    [[ "$cmd" == "git clean -fd"* ]] || \
    [[ "$cmd" == "git push --force"* ]] || \
    [[ "$cmd" == "git push -f"* ]] || \
-   [[ "$cmd" == "git branch -D"* ]] || \
    [[ "$cmd" == "git branch --delete --force"* ]] || \
    [[ "$cmd" == "git config"* ]] || \
    [[ "$cmd" == "git remote"* ]] || \
@@ -58,12 +57,19 @@ if [[ "$cmd" == "rm "* ]] || [[ "$cmd" == "rm" ]] || \
 fi
 
 # Ask list (specific overrides)
+# `git branch -D` ASKS, it is not denied: `push-policy` makes SQUASH the universal
+# integration route, and a squash merge leaves no merge ancestry, so `git branch -d`
+# refuses EVERY landed branch however completely its content merged. Denying `-D` too
+# left no way to delete a landed branch at all. The prompt is the safety check. Only
+# the long form `git branch --delete --force` stays on the deny list, and force-PUSH
+# remains denied in every form.
 if [[ "$cmd" == "git push"* ]] || \
    [[ "$cmd" == "sed -i"* ]] || \
    [[ "$cmd" == "sed --in-place"* ]] || \
    [[ "$cmd" == "awk -i"* ]] || \
    [[ "$cmd" == "awk --in-place"* ]] || \
-   [[ "$cmd" == "git worktree remove"* ]]; then
+   [[ "$cmd" == "git worktree remove"* ]] || \
+   [[ "$cmd" == "git branch -D"* ]]; then
     echo '{"decision": "ask"}'
     exit 0
 fi

@@ -110,10 +110,14 @@ per lane instead), `scope-writes.sh` (`PreToolUse` deny-outside-allowlist;
 live config = orchestrator scope; the builder-lane config was retired —
 worktree isolation replaced it), `allow-workflow-cleanup.sh`
 (`PreToolUse` on `Bash(git branch:*)` and `Bash(git worktree remove:*)` —
-auto-allows safe deletes of workflow-namespace branches tied to the
+auto-allows `-d` deletes of workflow-namespace branches tied to the
 project's workflows dir and plain removals of lane-child worktrees
 (`-l<n>` under the workflows dir; parents still prompt), no opinion on
-everything else).
+everything else). Note `-d` refuses any SQUASH-merged branch — squash
+leaves no merge ancestry and `push-policy` makes squash universal — so
+on a landed branch the real delete is `git branch -D`, which is NOT
+auto-allowed and prompts; that prompt is the safety check, and the
+content diff against the base is what establishes the branch landed.
 
 ## Agents (`agents/`)
 

@@ -22,7 +22,14 @@
 #       the MAIN repo root): its checkout in `git worktree list` is under
 #       that dir, or — the lane-cleanup case, worktree already removed — the
 #       command runs from inside that dir.
-#     `git branch -d` refusing unmerged branches remains the backstop.
+#     NOTE: `git branch -d` refuses ANY squash-merged branch — squash leaves no
+#     merge ancestry — and `push-policy` makes squash the universal integration
+#     route. So this auto-allow rarely fires on a landed branch: the real delete
+#     is `git branch -D`, which is deliberately NOT auto-allowed here and prompts
+#     instead. That prompt is the backstop; `-d`'s refusal is not, since after a
+#     squash it refuses merged and unmerged branches alike and so distinguishes
+#     nothing. The content check (`git diff <base> <branch>`) is what actually
+#     establishes a branch landed — see cleanup-merged/SKILL.md.
 #
 #   Case 2 — `git worktree remove <path>`: auto-allow when
 #     - single plain command, NO --force, no other flags, no chaining, AND
