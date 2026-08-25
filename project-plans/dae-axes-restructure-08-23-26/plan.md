@@ -1,41 +1,91 @@
 # dae Restructure — Types as Presets over Axes
 
-**Status:** Proposal, awaiting the plan gate (rev 5 — converted from spec to `plan-format` on 08-23-26; design unchanged from the rev 5 spec, which is preserved verbatim under **Design reference** below).
+**Status:** APPROVED at the plan gate and promoted (08-24-26); in flight on `feature/dae-axes-restructure`. Rev 5 design, amended in three rounds — two at the gate, one post-approval:
+
+- **Round 1 (08-23-26):** the missing `after: 1.1` edge on 2.1; a refreshed Stack table; the recorded resolutions of **D1** (rigor as substitute) and **D2** (warn and continue).
+- **Round 2 (08-24-26):** §2.4's run-shape diagram corrected to match §2.2's table for `document`; the last stale test-suite count (§2.12 item 14).
+- **Round 3 (08-24-26, post-approval, driven by 1.1's own findings — lane `l0`):** 1.1's acceptance criteria rewritten around what a baseline can actually carry, and the subphase marked `- [done]` (it closed differently than planned); 5.2's byte-for-byte oracle replaced with four structural checks after it was measured impossible; 3.2 and 10.1 re-worded to the layer they are checkable at; 10.1's `bug/`-branch and `triage`-error corrections; the committee's member-artifact convention — one file per member under `committees/<skill>/`, member id `c<n>`, the committee type carried by the directory — stated once, in 5.1; and `--rigor`'s alias/bracket assignment (`-r`, `--rig[or]`), which moved `--against` to `-a`. Evidence: `<run-dir>/reports/l0-exit.md` and `<run-dir>/contracts/l0.md`.
+
+The stale count was a *repeated* fact, not one line — `tests/sync-install-settings-merge.test.sh` landed in `5644e79`, after the rev 5 fact-gathering, and the old counts appeared in **four** places: the Stack table's suite count and its script count (both flagged at round 1), §2.11 D3 (found while amending, round 1), and §2.12 item 14 (found by the gate, round 2). All four now read correctly against the tree — **4** suites, **17** `#!/usr/bin/env bash` scripts. Design unchanged from the rev 5 spec, preserved under **Design reference** below, which enumerates the edits made to it.
+
 **Supersedes:** nothing. This is the first plan for this work.
 
 ## Phase syllabus
 
 - [ ] Phase 1: Baseline
-  - [ ] 1.1: Capture the pre-migration regression reference
-- [ ] Phase 2: Publisher hardening
-  - [ ] 2.1: `finalize` refuses without a passing `pr-review.md`     (lane 1)
-  - [ ] 2.2: `push-pr` accepts `docs/` and `sync/` branches          (lane 1, after: 2.1)
+  - [done] 1.1: Capture the pre-migration regression reference
+- [ ] Phase 2: Run-tooling hardening
+  - [x] 2.1: `finalize` refuses without a passing `pr-review.md`     (lane 1, after: 1.1)
+  - [x] 2.2: `push-pr` accepts `docs/` and `sync/` branches          (lane 1, after: 2.1)
+  - [x] 2.3: `--reuse` recovers a surviving worktree, not just a branch (lane 7)
 - [ ] Phase 3: Anchors
-  - [ ] 3.1: `resolve-anchor.sh` + tests                             (lane 1, after: 1.1)
-  - [ ] 3.2: `--ref` → `--against` in the two middles that use it    (lane 1, after: 3.1)
+  - [x] 3.1: `resolve-anchor.sh` + tests                             (lane 1, after: 1.1)
+  - [x] 3.2: `--ref` → `--against` in the two middles that use it    (lane 1, after: 3.1)
 - [ ] Phase 4: Type table + resolver
-  - [ ] 4.1: `workflows.yaml`                                        (lane 2, after: 1.1)
-  - [ ] 4.2: `resolve-type.sh`                                       (lane 2, after: 4.1)
-  - [ ] 4.3: `tests/resolve-type.test.sh`                            (lane 2, after: 4.2)
+  - [x] 4.1: `workflows.yaml`                                        (lane 2, after: 1.1)
+  - [x] 4.2: `resolve-type.sh`                                       (lane 2, after: 4.1)
+  - [x] 4.3: `tests/resolve-type.test.sh`                            (lane 2, after: 4.2)
 - [ ] Phase 5: Committee + rigor
-  - [ ] 5.1: The `committee` agent                                   (lane 3, after: 1.1)
-  - [ ] 5.2: `explore` emits claims; committee wraps it              (lane 3, after: 5.1)
-  - [ ] 5.3: Gate skills: collector/gate tie-break + wrap            (lane 3, after: 5.1)
-  - [ ] 5.4: `review-pr` docs-branch accuracy check                  (lane 3, after: 5.3)
+  - [x] 5.1: The `committee` agent                                   (lane 3, after: 1.1)
+  - [x] 5.2: `explore` emits claims; committee wraps it              (lane 3, after: 5.1)
+  - [x] 5.3: Gate skills: collector/gate tie-break + wrap            (lane 3, after: 5.1)
+  - [x] 5.4: `review-pr` docs-branch accuracy check                  (lane 3, after: 5.3)
 - [ ] Phase 6: Report pipeline
-  - [ ] 6.1: `report.md` + skeleton + the `ship: chat` short-circuit (lane 4, after: 1.1)
+  - [x] 6.1: `report.md` + skeleton + the `ship: chat` short-circuit (lane 4, after: 1.1)
 - [ ] Phase 7: Plan handoff
-  - [ ] 7.1: `plan-lifecycle.sh adopt` + tests                       (lane 5, after: 1.1)
-  - [ ] 7.2: Staleness guard + cold-amend kickback routing           (lane 5, after: 7.1)
+  - [x] 7.1: `plan-lifecycle.sh adopt` + tests                       (lane 5, after: 1.1)
+  - [x] 7.2: Staleness guard + cold-amend kickback routing           (lane 5, after: 7.1)
 - [ ] Phase 8: Docs workflow + reconcile grammar
-  - [ ] 8.1: `document.md` PR-gate oracle split                      (lane 6, after: 1.1)
-  - [ ] 8.2: `plan-reconcile` emits full build grammar               (lane 6, after: 1.1)
+  - [x] 8.1: `document.md` PR-gate oracle split                      (lane 6, after: 1.1)
+  - [x] 8.2: `plan-reconcile` emits full build grammar               (lane 6, after: 1.1)
 - [ ] Phase 9: Integration
-  - [ ] 9.1: `dae/SKILL.md` — the shared touchpoint                  (after: 2.2, 3.2, 4.3, 5.4, 6.1, 7.2, 8.2)
-  - [ ] 9.2: Doc sweep across the five real files                    (after: 9.1)
+  - [x] 9.1: `dae/SKILL.md` — the shared touchpoint                  (after: 2.2, 3.2, 4.3, 5.4, 6.1, 7.2, 8.2)
+  - [x] 9.2: Doc sweep + the `run-artifacts` rule                    (after: 9.1)
 - [ ] Phase 10: Verification
-  - [ ] 10.1: Regression against the Phase 1 baseline                (after: 9.2)
-  - [ ] 10.2: The `audit` new-type drill                             (after: 10.1)
+  - [x] 10.1: Regression against the Phase 1 baseline                (after: 9.2, 2.3)
+  - [x] 10.2: The `audit` new-type drill                             (after: 10.1)
+
+## Outcome — what shipped, before and after
+
+*Written at closeout, after the ship gate returned `ready`/`proceed`. The verbatim original ask is
+preserved below at **Part 1**; this section is what it turned into.*
+
+**The ask, in one line:** a new run type should cost a table row, not a new workflow.
+
+| | before | after |
+|---|---|---|
+| **Types** | 8, each a bespoke workflow with its own logic | 10 rows over 5 orthogonal axes (`pipeline`, `explore`, `rigor`, `against`, `ship`) |
+| **Router** | `dae/SKILL.md` interpreted the type table itself; type names hardcoded in it | consumes `resolve-type.sh`'s `KEY=value` output — **the router no longer knows the type vocabulary** |
+| **Cost of a new type** | new workflow file + router edits + planner module + doc updates | **one `workflows.yaml` row**, plus at most one planner module |
+| **Anchors** | `--ref`, exactly one value | `--against`/`-a`, an **array** — git refs, tickets, plan paths — resolved by `resolve-anchor.sh`, all-or-nothing |
+| **Verification depth** | one pass, always solo, not addressable | `--rigor`/`-r`: a four-phase profile (`explore`/`plan`/`code`/`pr`) at `low`\|`med`\|`high` |
+| **Cross-checking claims** | none — one agent's output was the answer | generic `committee` agent wrapping any claim-emitting skill; artifacts at `committees/<skill>/<file>-c<n>.md` |
+| **Quick questions** | none — every run cut a branch and a worktree | `map` (fast) and `analyze` (careful) share one `report` middle; `ship: chat` produces **zero git side effects** |
+| **sync → build** | re-plan by hand | `plan-lifecycle.sh adopt` — provenance recorded, staleness guard, cold-amend routing |
+| **Docs PR gate** | judged the docs against the survey **only**, so a wrong fact copied faithfully passed | survey = **coverage** spec, code = **accuracy** oracle |
+| **`map`** | an alias off `document` — gave you the whole docs workflow | its own type: `{pipeline: report, explore: auto, rigor: low, against: forbid, ship: chat}` |
+| **`debug` / `triage`** | `debug` → `bugfix`; `triage` was an unlisted-value **error** | both → `diagnose` |
+| **Test suites / hooks** | 4 / 13 | 8 / 15 |
+
+**Four live defects fixed along the way**, none of them in the original analysis — three were found by
+the run's own builders, one by its own crash recovery:
+
+- `push-pr` rejected `docs/` and `sync/` branches — its own publisher tripped document and sync runs.
+- `push-pr --stage finalize` could flip a PR to ready with **no passing `pr-review.md`** at all.
+- `explore` declared `agent: Explore`, an agent type with **no write tool**, while its entire contract
+  was writing a map to disk. Runs either improvised a shell heredoc or silently wrote nothing.
+- `workflow-setup.sh --reuse` recovered a surviving *branch* but not a surviving *worktree* — and a
+  crash leaves both. Added to scope mid-run at the user's request as **2.3**.
+
+**What the migration deliberately did NOT do:** `low` is the pre-existing solo path, byte-for-byte
+untouched, never routed through the committee. That was the plan's own stated worst case
+(`committee(skill, n=1)`), and 5.2's four structural checks exist to catch it.
+
+**Proof the headline claim holds.** 10.2 stood up a throwaway `audit` type and measured what it cost:
+**one row, zero templates, zero orchestration changes** — and the unedited resolver derived correct
+behavior for a type it had never seen. 10.1 confirmed nothing else moved: 8/8 routing probes unanimous
+across 3 independent blind trials, exactly two intended differences, and the four pre-existing middles'
+stage sequences **byte-identical**.
 
 ## Goal & scope
 
@@ -65,13 +115,24 @@ Verified from the repo itself, not from memory:
 | thing | version / fact | verified from |
 |---|---|---|
 | Shell | GNU bash **5.1.16** | `bash --version` |
-| Script interpreter | `#!/usr/bin/env bash` on all 16 scripts under `orchestrators/hooks/` + `tests/` | shebang scan of both dirs |
+| Script interpreter | `#!/usr/bin/env bash` on all 17 scripts under `orchestrators/hooks/` + `tests/` (13 hooks + 4 suites) | shebang scan of both dirs, 08-23-26 at `5644e79` |
 | Package manifest | **none** — no `package.json`, `pnpm-lock.yaml`, `go.mod`, `pyproject.toml`, or `Makefile` at the repo root | `ls` at root |
 | Payload | Markdown skills/rules/agents + bash hooks. No compiled language, no dependency graph. | repo tree |
 | JSON/YAML parsing | **no `jq`, deliberately** — hooks hand-parse with `awk`/`sed` | `orchestrators/hooks/resolve-config.sh:21` |
-| Test harness | plain bash fixture suites, three of them, run directly | `tests/*.test.sh` |
+| Test harness | plain bash fixture suites, four of them, run directly — `plan-lifecycle`, `resolve-config-precedence`, `sync-install-settings-merge`, `verify-scope-parsing` | `tests/*.test.sh` |
 | Agent frontmatter | `name`, `description`, `model` | `orchestrators/agents/coder.md:1-5` |
 | Skill frontmatter | `name`, `description`, `domain`, `context`, `rules`, `model`, `model-fallback` | `agent-agnostic/skills/explore/SKILL.md:1-9` |
+
+> **These are BASELINE counts, as of `5644e79` — deliberately not updated to post-migration numbers.**
+> This section pins what the plan was built against, and the as-of stamp is doing real work: overwriting
+> it with current numbers would erase the provenance every "verified from" column exists to provide.
+> For reference, the run itself has since added **2 hooks** (`resolve-anchor.sh`, `resolve-type.sh`) and
+> **4 suites** (`push-pr-gate-refusal`, `resolve-anchor`, `resolve-type`, `workflow-setup-reuse`), so the
+> tree now holds **23** bash scripts (15 hooks + 8 suites) against the table's 17 (13 + 4). Both numbers
+> are correct for their respective points in time. *(Raised as staleness by lane 7 in round 4; recorded
+> this way rather than by overwriting, because the fourth recurrence of a "stale count" turned out not
+> to be stale at all — the earlier three were genuinely wrong, this one is a dated snapshot doing its
+> job.)*
 
 **Consequence for this plan:** every new script must parse without a dependency, which is why `workflows.yaml` is constrained to one-line flow maps (4.1).
 
@@ -93,15 +154,27 @@ Hard constraints, not preferences:
 
 ### 1.1 — Capture the pre-migration regression reference
 
-- **File scope:** none in this repo. Transcripts and resulting artifacts are written to the run dir (`<run-dir>/baseline/`), which is gitignored.
-- **Pattern to follow:** the spec's Step 0. A sandbox repo, not this one, so a run's own side effects don't contaminate the reference.
-- **Acceptance criteria:** one representative invocation per existing type — `feature`, `bugfix`, `diagnose`, `document`, `sync` — captured end to end. For each: the transcript, the produced plan/report files, and the branch diff. This is the artifact every later `equivalence check` and `existing suite` oracle in this plan compares against.
-- **Test approach:** none — this subphase *is* the fixture. Its own acceptance is that all five runs completed and their artifacts are on disk.
+- **Status: closed as `done`, not as planned.** Ran as lane `l0` and returned `needs-input`. The acceptance criteria below are the **amended** ones, rewritten from what the capture proved was actually possible; the original wording assumed a dae run is a program whose output can be recorded and replayed. Full record: `<run-dir>/contracts/l0.md` and `<run-dir>/reports/l0-exit.md`.
+- **File scope:** none in this repo — verified zero product files touched (`git diff feature/dae-axes-restructure...HEAD --stat` empty on `l0`). All output lands in the gitignored run dir at `<run-dir>/baseline/`.
+- **Pattern to follow:** the spec's Step 0 — a pinned sandbox repo, not this one, so a run's own side effects cannot contaminate the reference. Delivered as `baseline/sandbox` (`tallyq`, dependency-free bash, mirroring this repo's no-manifest shape), base commit `30ff0cf`, five branches created through the real `workflow-setup.sh`, one per branch type.
+- **Acceptance criteria (amended).** A baseline is accepted when **every downstream consumer named in this plan has either a re-runnable oracle on the deterministic layer, or an explicit, evidenced statement that it cannot have one.** Possessing captured artifacts is not the criterion; carrying an oracle is. The governing split:
+  - **Deterministic layer** — hook behavior, git state, file content, closed-vocabulary decisions. Every oracle lives here.
+  - **Stochastic layer** — planner prose, explore maps, gate reasoning, builder transcripts. Reference only, **never** an oracle. Measured rather than assumed: four controlled `explore` runs on identical input produced maps differing by **218 of 276 lines** (7855 vs 10581 bytes, different sha256) — `baseline/repro/RESULT.md`. An oracle placed here is not a weak check but a **false** one: it fails correct implementations and passes incorrect ones, at random.
+
+  What the delivered baseline provides, per consumer:
+  - **2.2** — `baseline/bin/check-push-pr-enum.sh`, which reds pre-migration with exactly `FAIL: push-pr branch enum missing: docs sync`, plus the `docs/` and `sync/` sandbox branches.
+  - **3.2** — `baseline/fixtures/3.2-anchor-resolution.md`: all three single-anchor forms with their resolved git ranges and canonical diffs, plus a seeded defect whose failure output reproduces byte-identically; `--ref` sites enumerated at `baseline/signatures/ref-flag-occurrences.md`.
+  - **8.1** — `baseline/fixtures/8.1-seeded-map.md` (input) and `8.1-contradictions.md` (ground truth: two facts contradicting source at cited `file:line`), read through the closed `verdict`/`next` vocabulary plus a substring check, never a prose diff.
+  - **10.1** — `baseline/bin/extract-signature.sh` + `signatures/router-signature.txt` (flags, type-selection table, per-workflow stage sequences, both branch enums, anchor-flag sites, hook/suite inventory), and the eight pinned probes in `fixtures/routing-probes.md`, measured **8/8 unanimous across 3 independent trials**.
+  - **Existing-suite oracle** — all four `tests/*.test.sh` green pre-migration (`baseline/substrate/test-suite-baseline.txt`).
+  - **5.2** — recorded as **not servable at the byte layer**, with the substitute written into 5.2 itself.
+- **Deliberately NOT captured: an end-to-end transcript corpus for the five types.** This is a recorded decision, not a shortfall to be made up later. A transcript cannot carry an oracle (the 218/276 measurement above), so the corpus would have been authoritative-looking and uncheckable — and 10.1, written against it, would have degraded silently into a human eyeball comparison. The human gates compound it: an auto-approved run is not the run a human would have shaped, so the capture would not even be of the thing it claimed to record. A stated gap beats a false baseline.
+- **Test approach:** none — this subphase *is* the fixture. Its acceptance is the per-consumer list above, each item re-runnable today.
 - **Test oracle:** n/a (fixture capture).
 
-> **Blocking dependency.** Every lane's first subphase declares `after: 1.1`. Without this capture, `low`-tier byte-for-byte equivalence (5.2) and the Phase 10 regression are unverifiable claims rather than checks.
+> **Blocking dependency.** Every subphase that *enters* a lane declares `after: 1.1` — that is 2.1, 3.1, 4.1, 5.1, 6.1, 7.1, 8.1, and 8.2. Note lane 1 has **two** independent entry points (2.1 and 3.1), so "one per lane" is the wrong count; the invariant is that no lane subphase is reachable without 1.1. Without this capture, 5.2's `low`-path structural checks and the Phase 10 regression are unverifiable claims rather than checks.
 
-## Phase 2: Publisher hardening
+## Phase 2: Run-tooling hardening
 
 ### 2.1 — `finalize` refuses without a passing `pr-review.md`
 
@@ -119,6 +192,41 @@ Hard constraints, not preferences:
 - **Test approach:** replay the Phase 1 `document` and `sync` baselines through `push-pr`; neither trips branch verification.
 - **Test oracle:** `existing suite` (the Phase 1 baseline).
 
+### 2.3 — `--reuse` recovers a surviving worktree, not just a branch
+
+- **File scope:** `orchestrators/hooks/workflow-setup.sh`; `tests/workflow-setup-reuse.test.sh` *(new)*.
+- **Pattern to follow:** the script's own `err()` discipline and exit-code contract, and the fixture
+  style of `tests/resolve-config-precedence.test.sh`.
+- **Verified defect** (confirmed independently by lanes 1 and 3 during this run's crash recovery, then
+  by the orchestrator against the source): `workflow-setup.sh:142` runs
+  `[ -e "$path" ] && err "worktree path already exists"` **unconditionally**, before the `--reuse`
+  logic at `:145`. So `--reuse` recovers a surviving BRANCH but never a surviving WORKTREE — and a
+  crash leaves *both* standing. Every respawned lane therefore hits it, which is exactly the moment
+  the recovery path is supposed to work. Both lanes worked around it by running the merge step by
+  hand; hand-improvising git during crash recovery is the failure mode this script exists to prevent.
+- **Acceptance criteria:** with `--reuse`, an existing path that IS a registered worktree of this repo
+  on the expected `<type>/<name>` branch is **adopted** — the base branch is merged in exactly as the
+  branch-only path already does, and `REUSED: yes` is reported. Without `--reuse`, an existing path
+  still errors as it does today. **The adoption must be guarded, not blanket:** a path that exists but
+  is NOT a registered worktree, or is a worktree on a DIFFERENT branch, still errors — silently
+  adopting an unrelated directory would be worse than the defect. Conflicts on the merge abort as they
+  already do. **The scope of this subphase is that path check alone**; no other behavior changes.
+- **Test approach:** bash fixture suite over a throwaway repo. Cases: (a) `--reuse` with both branch
+  and worktree surviving → adopts, merges base, reports `REUSED: yes`; (b) `--reuse` with branch only
+  (the case that already works) → unchanged; (c) no `--reuse`, path exists → still errors; (d) path
+  exists but is not a worktree → errors; (e) path is a worktree on a different branch → errors;
+  (f) a merge conflict during adoption → aborts cleanly, leaving no half-made worktree.
+  **Assert on output content, not exit status alone** — a failed git call inside a pipeline can exit 0.
+- **Test oracle:** `new contract tests`.
+
+> **Added to scope by the user, mid-run.** Found by this run's own crash recovery rather than by the
+> original analysis, which is why it appears here rather than in the approved plan's first draft.
+> Phase 2's title broadened from "Publisher hardening" to "Run-tooling hardening" to cover it: 2.1 and
+> 2.2 hardened `push-pr`, this hardens `workflow-setup.sh`, and all three are defects in the run's own
+> infrastructure. It carries no `after:` edge — its file scope is disjoint from every other subphase,
+> so it may run concurrently with Phase 9. **10.1 gains it as a dependency** so the regression pass
+> runs against a tree with everything in it.
+
 ## Phase 3: Anchors
 
 ### 3.1 — `resolve-anchor.sh` + tests
@@ -133,9 +241,12 @@ Hard constraints, not preferences:
 
 - **File scope:** `orchestrators/skills/dae/diagnose.md`, `orchestrators/skills/dae/sync.md`. **`dae/SKILL.md` is deliberately excluded — it is the shared touchpoint, serialized into 9.1.**
 - **Pattern to follow:** each file's existing "capture the suspect/shipped work" prose.
-- **Acceptance criteria:** no `--ref` remains in either file; both describe an anchor **array**; both delegate resolution to `resolve-anchor.sh`. `-r` survives as the short alias.
-- **Test approach:** `grep -r -- '--ref'` over both files returns nothing; the Phase 1 `diagnose` baseline with one anchor behaves identically.
-- **Test oracle:** `existing suite` (the Phase 1 baseline).
+- **Acceptance criteria:** no `--ref` remains in either file; both describe an anchor **array**; both delegate resolution to `resolve-anchor.sh`. **`-r` no longer means an anchor** — it is reassigned to `--rigor` (9.1 owns the table entry), and `--against` takes **`-a`**. Neither file may document `-r` in the anchor sense. A stale `-r <branch>` is expected to fail on the *value* vocabulary (`low`/`med`/`high`/`<phase>:<value>`), never to resolve silently into a rigor setting.
+- **Test approach:** two halves, at the layer each can actually be checked.
+  - *Textual* — `grep -r -- '--ref'` over both files returns nothing; the two pre-migration sites are pinned at `<run-dir>/baseline/signatures/ref-flag-occurrences.md` (`diagnose.md:7`, `sync.md:7`).
+  - *Behavioral, at the **anchor-resolution** layer* — each of the three single-anchor forms (branch, range, sha) captured in `<run-dir>/baseline/fixtures/3.2-anchor-resolution.md` must still resolve to the same git range and produce the same diff, and the seeded defect's failure output — byte-stable across runs — must still be the reproduction the run targets. 3.1's `resolve-anchor.sh` is tested directly against that table.
+  - **Not** "the diagnose baseline's investigation behaves identically": 1.1 established that an LLM investigation's narrative is not diffable (218 of 276 lines differed across identical runs), so the claim is asserted over **what the anchor resolves to and what the reproduction does**, never over what the investigation says about it. This is a change of layer, not a relaxation — the resolution table is a stricter check than reading two narratives side by side.
+- **Test oracle:** `existing suite` (the Phase 1 anchor-resolution table).
 
 ## Phase 4: Type table + resolver
 
@@ -151,7 +262,8 @@ Hard constraints, not preferences:
 
 - **File scope:** `orchestrators/hooks/resolve-type.sh` *(new)*.
 - **Pattern to follow:** `resolve-config.sh` — same parsing style, same `err()`/exit-code discipline, same no-dependency rule.
-- **Acceptance criteria:** resolves a type (or alias) to its row; applies the **free / constrained / locked** override tiers; runs §2.1's five-step rigor resolution including per-phase patching and absent-phase dropping; validates `against` arity per the row's `require|optional|forbid` and `--plan` placement (`pipeline: build` only); rejects `--pipeline` as locked and unknown flags outright. **All errors fire before setup**, with a plain-language ask. Prints resolved axes as `KEY=value` lines; the router consumes that output rather than interpreting the yaml itself.
+- **Acceptance criteria:** resolves a type (or alias) to its row; applies the **free / constrained / locked** override tiers; runs §2.1's five-step rigor resolution including per-phase patching and absent-phase handling (below); validates `against` arity per the row's `require|optional|forbid` and `--plan` placement (`pipeline: build` only); rejects `--pipeline` as locked and unknown flags outright. Resolves single-dash aliases and bracketed long-form prefixes **before** validation — `-r`, `--rig`, `--rigo`, `--rigor` all resolve to the rigor axis, `-a` to `--against` — and rejects a below-minimum prefix (`--r`) as an unknown flag rather than guessing at it. **All errors fire before setup**, with a plain-language ask. Prints resolved axes as `KEY=value` lines; the router consumes that output rather than interpreting the yaml itself.
+- **Absent-phase rigor — warn and continue (D2, resolved; a deliberate exception to the "all errors" rule above).** A rigor entry that **explicitly names** a phase this run does not have (per §2.1's `f(pipeline, ship)` table) is dropped, a warning naming the phase and the type is written to **stderr**, and resolution **continues normally**. This case is a **warning, not an error**: it never aborts, never blocks setup, and **a non-zero exit for it is forbidden** — the "all errors fire before setup" sentence governs the error set (`against` arity, `--plan` placement, locked `--pipeline`, unknown flags), which this case is not a member of. The warning does **not** distinguish a user-typed `--rigor <phase>:<value>` from a row's map-form cell: both warn, both continue. "Explicitly names" means a `<phase>:<value>` entry — the step-2 scalar expansion to all four phases is not an explicit naming and drops silently, otherwise every `map` run would warn about the three phases its pipeline structurally cannot have.
 - **Test approach:** 4.3.
 - **Test oracle:** `new contract tests`.
 
@@ -159,7 +271,7 @@ Hard constraints, not preferences:
 
 - **File scope:** `tests/resolve-type.test.sh` *(new)*.
 - **Pattern to follow:** `tests/resolve-config-precedence.test.sh` — fixture dirs, assert-on-output helpers, one case per behavior.
-- **Acceptance criteria:** covers scalar expansion to all four phases; per-phase patching **over** row defaults (an unmentioned phase keeps the row value, never falls to `low`); the mixed form `med,explore:high`; absent-phase dropping per `f(pipeline, ship)`; every constraint violation in 4.2; alias resolution.
+- **Acceptance criteria:** covers scalar expansion to all four phases; per-phase patching **over** row defaults (an unmentioned phase keeps the row value, never falls to `low`); the mixed form `med,explore:high`; absent-phase dropping per `f(pipeline, ship)`; every constraint violation in 4.2; alias resolution — both **type** aliases (`debug` → `diagnose`) and **flag** aliases: `-r`, `--rig`, `--rigo`, `--rigor` each resolve to the rigor axis and `-a` to `--against`; `--r` is rejected as below the bracket minimum rather than resolved; and a stale anchor-style `-r <branch>` fails on the rigor value vocabulary rather than being silently accepted. **Absent-phase warning case (D2):** an explicitly named absent phase — e.g. `dae map --rigor pr:high`, whose `ship: chat` run has no `pr` phase — asserts **both** that the warning text is emitted on stderr (naming the dropped phase) **and** that the exit status is **0**, with the remaining axes still printed as `KEY=value` lines. A row's map-form cell naming an absent phase asserts the same pair, since the two are not distinguished. The scalar-expansion path asserts the opposite: no warning, exit 0.
 - **Test approach:** the suite is the test.
 - **Test oracle:** `new contract tests`.
 
@@ -169,17 +281,42 @@ Hard constraints, not preferences:
 
 - **File scope:** `orchestrators/agents/committee.md` *(new)*.
 - **Pattern to follow:** `orchestrators/agents/builder.md` — the tree's existing mini-orchestrator agent that spawns cold sub-agents and consolidates. Same frontmatter shape (`name`, `description`, `model`), same "Invariants (authoritative — stated once, here)" structure.
-- **Acceptance criteria:** implements §2.10 exactly. Skill-parameterised — owns fan-out, claim collection to `.artifacts/claims/`, matching by evidence location, dispute/singleton re-verification **against the source**, consolidation, and the §2.8 #1 worker envelope. Knows nothing about what it is verifying. `model: opus`; the N sub-agents inherit the **wrapped skill's** model. **Writes no verdict rounds of its own** — where it wraps a gate, that gate writes its own round exactly as at `rigor: low`.
-- **Test approach:** exercised by 5.2 and 5.3; its genericity is proven by 10.2 (a fourth skill wrapped with zero committee-side edits).
+- **Acceptance criteria:** implements §2.10 exactly. Skill-parameterised — owns fan-out, claim collection, matching by evidence location, dispute/singleton re-verification **against the source**, consolidation, and the §2.8 #1 worker envelope. Knows nothing about what it is verifying. `model: opus`; the N sub-agents inherit the **wrapped skill's** model. **Writes no verdict rounds of its own** — where it wraps a gate, that gate writes its own round exactly as at `rigor: low`.
+- **Member identity and artifacts — stated ONCE here, authoritatively.** This subphase owns the convention; **5.2 and 5.3 consume it and must neither restate nor redefine it**, the same discipline that makes `dae/SKILL.md` the single shared touchpoint in 9.1.
+  - **Every member writes a FILE; nothing is returned in-band.** A member's claims land on disk and its return is a **path**, never a payload — the same pointer-not-payload contract as `contracts/<lane-id>.md` and `reports/<lane-id>-exit.md` (§2.8 #5, `run-artifacts`). **The committee consolidates by reading the member FILES**, not member return values. A claim that exists only in an agent's return cannot be re-read by a resumed run, audited by a gate, or diffed by the consolidator.
+  - **Member id is `c<n>`, exactly paralleling the lane's `l<n>`** — plain, unqualified, `c1`…`c5`. It stays that simple because **the committee type is a DIRECTORY, not a filename segment**: every committee gets its own dir under `committees/`, so member 1 of the explore committee and member 1 of the code-gate committee are both `c1` and cannot collide.
+  - **Layout:** `<run-dir>/committees/<skill>/<kind>-c<n>.md` for per-member artifacts, with the committee-level files beside them in the same per-skill dir.
+
+    ```
+    <run-dir>/committees/explore/claims-c1.md      # member 1's claims
+    <run-dir>/committees/explore/claims-c2.md      #   … c3 … c5 per tier
+    <run-dir>/committees/explore/reverify.md       # committee-level: re-verification trace
+    <run-dir>/committees/explore/accepted.md       # committee-level: consolidated artifact (§2.5 names it)
+    <run-dir>/committees/review-code/claims-c1.md  # a different committee, same plain c1
+    ```
+
+    `<kind>` names the per-member artifact — today only `claims`; the committee-level files carry no `c<n>` because they belong to no member. On `ship: chat` runs the same relative layout lives under the scratch dir (§2.8 chat exception) — identical layout, only the root moves.
+  - **`<skill>` is the wrapped skill's own `name:`, verbatim** (`explore`, `review-plan`, `review-code`, `review-pr`) — **derived, never a hardcoded enum**. It is a directory name rather than a filename segment now, but the requirement and its reason are unchanged: the committee is skill-parameterised and must not know the list, or 10.2's drill — a fourth skill wrapped with zero `committee.md` edits — would fail on the enum instead of proving genericity. A new committee type creates a new directory and nothing else.
+  - **No round segment, deliberately — do not reintroduce one.** `review-code` sits inside the cap-3 revision loop, so the same committee type can stand up more than once in a run, and a later round simply **overwrites** the earlier round's files in that dir. This is a decision, not an oversight: a superseded review is stale and worth nothing, so losing it costs nothing, and nothing downstream consumes an old round's claims. A later implementer who wants round history must raise it as a design change, not add an `r<n>` segment on the assumption its absence was a gap.
+  - **At `rigor: low` none of this exists.** No committee runs, so **there is no `committees/` directory at all** — no per-skill dir, no member file, no `accepted.md`. `c1` is **not** the solo path's name for itself: a `committees/` tree appearing on a `low` run is the diagnostic signature of the forbidden `committee(skill, n=1)` implementation (§2.1 implementation note), and 5.2's check (d) is precisely the assertion that catches it.
+- **Test approach:** exercised by 5.2 and 5.3; its genericity is proven by 10.2 (a fourth skill wrapped with zero committee-side edits). The id contract is checked directly: a `med` run leaves exactly three member files `claims-c1…c3` under `committees/<skill>/`, a `high` run five, each non-empty, with `<skill>` equal to the wrapped skill's declared `name:`; the consolidated `committees/<skill>/accepted.md` cites them; and two committees of different types in one run produce two sibling directories, each with its own `c1`, nothing overwritten across types.
 - **Test oracle:** `new contract tests`.
 
 ### 5.2 — `explore` emits claims; committee wraps it
 
 - **File scope:** `agent-agnostic/skills/explore/SKILL.md`.
+- **Already landed on the parent branch — NOT this lane's work.** The `agent: Explore` frontmatter pin was deleted from this file in commit `d24ac5e`, before any lane dispatched. That agent type carries no Write/Edit tool while the skill's core contract is writing the map to disk, so artifact *existence* was nondeterministic: in 1.1's four controlled runs both SHALLOW runs refused to write and returned the map inline, and both DEEP runs improvised a Bash heredoc (`<run-dir>/baseline/repro/RESULT.md`, contract finding F2). `explore` was the only skill in the tree pinning `agent:`; no `context: fork` skill pins one now (verified across all ten). **Lane 3 must not re-fix this and must not read its absence as a defect.** The file stays in scope because 5.2 still edits it — for the claims work below, and nothing else about the frontmatter.
 - **Pattern to follow:** explore's existing map-to-disk + envelope contract. Depth (`AUTO`/`SHALLOW`/`DEEP`) is untouched — rigor is orthogonal to it.
-- **Acceptance criteria:** claims are atomized and evidence-anchored (`file:line`). At `rigor ≥ med` the committee returns the **same artifact type** a solo explore returns, with claims as its evidence layer, so no downstream consumer branches on rigor. **The `low` path is not routed through the committee** — it is the existing code path, unchanged (§2.1 implementation note).
-- **Test approach:** `low` output diffs byte-for-byte against the Phase 1 baseline; `med` produces a map plus per-explorer claim files plus a re-verification trace for a seeded dispute; a seeded singleton is re-verified, never dropped.
-- **Test oracle:** `equivalence check` for the `low` path (old behavior is the truth source); `new contract tests` for `med`/`high`.
+- **Acceptance criteria:** claims are atomized and evidence-anchored (`file:line`). At `rigor ≥ med` the committee returns the **same artifact type** a solo explore returns, with claims as its evidence layer, so no downstream consumer branches on rigor. **The `low` path is not routed through the committee** — it is the existing code path, unchanged (§2.1 implementation note). Member files and their ids follow 5.1's convention; **5.2 does not restate it**.
+- **Test approach:**
+  - ***`low` path — four structural checks.*** The run must satisfy all four:
+    1. **(a)** it reports `low`/solo mode and does **not** route through the committee;
+    2. **(b)** it produces exactly **one** map artifact, at the requested path;
+    3. **(c)** that artifact contains the required structured sections;
+    4. **(d)** **no** claim files and **no** re-verification trace are emitted — those are the `med`/`high` markers (per 5.1, that means **no `committees/` directory exists at all** for this run — not an empty one, and no `c1` file inside one).
+  - ***`med`/`high`.*** A map plus per-member claim files plus a re-verification trace for a seeded dispute; a seeded singleton is re-verified, never dropped.
+- **Why the byte-for-byte oracle was dropped — a change of layer, not a weakening.** The original test approach read *"`low` output diffs byte-for-byte against the Phase 1 baseline."* 1.1 measured it and it is **empirically impossible**: four runs of the same path on identical input produced maps differing by **218 of 276 lines** (7855 vs 10581 bytes, different sha256) — `<run-dir>/baseline/repro/RESULT.md`. Byte-equality is a test for deterministic output; the artifact is generated prose, which has no canonical form, so that oracle would fail a correct implementation and pass a broken one at random. What 5.2 exists to catch is the plan's own stated worst case — ***"`low` must not be implemented as `committee(skill, n=1)`"*** — and that is a question of **which code path ran**, which checks (a)–(d) decide, not a question of prose wording, which no oracle can decide. The substitution is supported by the same capture: 1.1's routing probes were **8/8 unanimous across 3 independent trials**, so closed-vocabulary decisions are stable exactly where prose generation is not. Reading this as a relaxed check inverts it — the four checks test the property that matters; the byte diff never could.
+- **Test oracle:** `new contract tests` at every tier. (Was `equivalence check` for `low`; retired for the reason above — the Phase 1 baseline cannot serve as a byte-level truth source for an LLM-authored artifact, and 1.1 records this consumer as not servable at that layer.)
 
 ### 5.3 — Gate skills: collector/gate tie-break + wrap
 
@@ -193,7 +330,7 @@ Hard constraints, not preferences:
 
 - **File scope:** `agent-agnostic/skills/review-pr/SKILL.md`.
 - **Pattern to follow:** its own steps 3–5 structure (completeness → conventions → correctness).
-- **Acceptance criteria:** the docs-only branch gains a check step that verifies the docs' **factual claims against source**. The map remains the *coverage* spec; the code becomes the *accuracy* oracle. **Verified gap:** its current step list has no such check, so a wrong fact faithfully copied from the map passes today.
+- **Acceptance criteria:** the docs-only branch gains a check step that verifies the docs' **factual claims against source**. The map remains the *coverage* spec; the code becomes the *accuracy* oracle. **Round-4 addition — the spec sentence itself, not just a new step.** `review-pr/SKILL.md:27` still names *"an explore map (docs-only runs) — judge the diff against the map and the doc rules"* as the whole spec of record. Adding a check step while leaving that sentence intact lands the oracle split HALF-APPLIED: the file would simultaneously say the map is the spec and that the code is the accuracy oracle. Update it to match. The file is already 5.3/5.4's scope, so no boundary moves. **Verified gap:** its current step list has no such check, so a wrong fact faithfully copied from the map passes today.
 - **Test approach:** a docs diff carrying a seeded fact that contradicts the code produces a blocking finding.
 - **Test oracle:** `new contract tests`.
 
@@ -232,6 +369,7 @@ Hard constraints, not preferences:
 - **File scope:** `orchestrators/skills/dae/document.md`.
 - **Pattern to follow:** the file's own stage-4 prose.
 - **Acceptance criteria:** stage 4 names **the map as the coverage spec and the code as the accuracy oracle**, replacing *"The PR gate's spec of record is the explore map."* **Verified defect:** a document run has two transformations (code→map, map→docs) and the gate currently audits only the second, so a wrong fact in the map is reproduced into the docs and passes correctly.
+- **Also 8.1's, assigned in round 4 — the retired `map` alias in this file's own header.** `document.md:1` reads *"# document — the docs workflow (`--type document`, alias `map`, `doc`)"*, but the plan retires `map` as an alias off `document` (§2.5; 9.1's criteria; §2.12 item 2). That line had **no owner**: 9.1's file scope is `dae/SKILL.md` ONLY so it cannot reach it, and 8.1's criteria named only the stage-4 oracle split. Left unfixed, `document.md` keeps advertising an alias the router no longer routes — a live contradiction on the very surface 10.1's signature diff reads. **Drop `map` from the header, keep `doc`.** Assigned here because the FILE is already 8.1's exclusive scope, so this moves no scope boundary and cannot collide with another lane. Found by lane 6, which correctly refused to touch it until ownership was settled.
 - **Test approach:** run the Phase 1 `document` baseline against a map carrying a seeded fact that contradicts the code; the gate must now catch it instead of confirming it.
 - **Test oracle:** `new contract tests`.
 
@@ -249,27 +387,85 @@ Hard constraints, not preferences:
 
 - **File scope:** `orchestrators/skills/dae/SKILL.md`. **This is the only subphase permitted to touch it.** Six lanes converge here; a lane editing it directly is a scope violation `verify-scope.sh` will catch at merge-back.
 - **Pattern to follow:** the file's existing Flags and Workflow-selection tables.
-- **Acceptance criteria:** flag table gains `--rigor` (scalar + per-phase), array `--against`, `--plan`, `--ship`; `--pipeline` documented as internal-only and never as a user flag. The router consumes `resolve-type.sh`'s output rather than interpreting `workflows.yaml` itself. Seam loading per §2.6. Alias flips land here: `debug`/`triage` → `diagnose`, and `map` off `document`. Part 0 terminology adopted throughout — "workflow" stops meaning two things.
+- **Acceptance criteria:** flag table gains `--rigor` (scalar + per-phase), array `--against`, `--plan`, `--ship`; `--pipeline` documented as internal-only and never as a user flag. The router consumes `resolve-type.sh`'s output rather than interpreting `workflows.yaml` itself. Seam loading per §2.6. Alias flips land here: `debug`/`triage` → `diagnose`, and `map` off `document`. **Round-4 addition — `SKILL.md:59` specifically.** The PR-gate bullet still names *"document: the explore map"* as the whole spec of record, which is the map-only oracle 8.1 and 5.4 retire. 9.1 must update it so the split is applied on all three surfaces (`document.md` → 8.1, `review-pr/SKILL.md` → 5.4, `dae/SKILL.md` → here). Two of three would leave the router contradicting the skills it dispatches. Part 0 terminology adopted throughout — "workflow" stops meaning two things.
+- **Flag aliases and bracket minimums (round 3, user-assigned).** `--rig[or]` with the short alias **`-r`** — `--rig`, `--rigo`, `--rigor` all resolve, per the vim-style bracket convention the table already documents (`dae/SKILL.md:24`). **`--against` takes `-a`**; `-r` is no longer an anchor alias (3.2). **Verified free against the current table** (`dae/SKILL.md:27-32`, which takes `-t`, `-e`, `-w`, `-r` → `--ref`, `-b`, `-n`): retiring `--ref` releases `-r`, and `-a`, `-p`, `-s` are unused anywhere in `orchestrators/skills/dae/`. **The `r` long-form prefix space is clear** — with `--ref` retired, `--rigor` is the only `r`-initial flag in the resolved set, so even `--r` would parse unambiguously. The minimum is nonetheless **`--rig`**, deliberately: a stale `--r`/`--ref` typed from muscle memory must ERROR rather than silently resolve to a different axis. Recorded so a later reader does not re-litigate `--r[igor]` as an oversight. **One collision not to resolve into:** `--plan` and `--pipeline` share the `--p` prefix, so neither bracket minimum may be `--p` (`--pla` / `--pip` at the shortest); `-p` and `-s` stay free for `--plan` and `--ship` if the table gives them aliases.
 - **Test approach:** a feature run's context contains no `report.md` and no committee; `dae --type debug "auth randomly 500s"` routes to `diagnose.md`; `dae map` no longer routes to `document.md`.
 - **Test oracle:** `new contract tests`.
 
-### 9.2 — Doc sweep across the five real files
+### 9.2 — Doc sweep across the five real files, plus the `run-artifacts` rule
 
-- **File scope:** `docs/architecture.md`, `docs/pipeline.md`, `docs/conventions.md`, `docs/README.md`, `orchestrators/AGENTS.md`.
-- **Pattern to follow:** each doc's existing register; `orchestrators/AGENTS.md` is the canonical pipeline guide (type list at `:39`, `--type` enum at `:88`) and the others summarize it.
-- **Acceptance criteria:** Part 0 terminology adopted; run-shape diagram gains the chat branch; §2.3, §2.6, §2.8, §2.9 recorded as the review rules for future types. Two specific reconciliations: the conflicting descriptions of `review-code`'s scope (it runs **after every lane has merged** — it is not lane-scoped), and the `pipeline` naming collision with `docs/pipeline.md`, which uses the word for the whole run arc. **Verified:** the old Step 9's `agent-skills-architecture-overview.md` does not exist; these five files are the real surface.
-- **Test approach:** `grep` proves no doc still describes `review-code` as lane-scoped and no doc uses "workflow" for both senses.
-- **Test oracle:** `existing implementation` (the shipped behavior is the truth source; docs are derived from it).
+- **File scope:** `docs/architecture.md`, `docs/pipeline.md`, `docs/conventions.md`, `docs/README.md`, `orchestrators/AGENTS.md`, **`agent-agnostic/rules/run-artifacts.md`**, **`orchestrators/agents/planner.md`**, **`agent-agnostic/skills/review-pr/SKILL.md`**, **`orchestrators/agents/builder.md`**.
+- **Pattern to follow:** each doc's existing register; `orchestrators/AGENTS.md` is the canonical pipeline guide (type list at `:39`, `--type` enum at `:88`) and the others summarize it. For the rule file, its own existing run-dir bullets — `contracts/<lane-id>.md` at `:28` and `reports/<lane-id>-exit.md` at `:29` — which state a path, who writes it, and what reads it.
+- **Round-4 addition — `planner.md`'s oracle set is short by one, and it is the AUTHORITY.**
+  `orchestrators/agents/planner.md:14` declares the oracle vocabulary as three values — `new contract
+  tests` | `existing suite` | `equivalence check` — but this plan uses a **fourth**, `existing
+  implementation` (§2.2.1, §2.8 #4), and **9.2 declares that very oracle for itself**. The tree
+  therefore has planner modules offering a value their own authority does not list, and the builder's
+  packet machine reads that field to size its contract-tester fan-out — so an unlisted value is not
+  cosmetic. Add `existing implementation` to the set with the same one-line gloss style the other
+  three carry. **Verified gap:** `planner.md` was in NO subphase's file scope; found by lane 6, which
+  correctly refused to reach outside its own. It lands here for the same reason the `run-artifacts`
+  rule does — 9.2 is serialized after every lane merges, so it records what shipped, and no lane's
+  scope touches `orchestrators/agents/planner.md`.
+- **Test approach for it:** `grep -n 'existing implementation' orchestrators/agents/planner.md`
+  returns the added value, and the four values in `planner.md:14` match the set actually used across
+  this plan's subphase detail blocks — checked by extracting every `**Test oracle:**` line from
+  `plan.md` and diffing the distinct values against the module's list. **A value used but unlisted is
+  a finding; a value listed but unused by THIS PLAN is NOT.** The oracle vocabulary is the UNION
+  across all planner modules, not one plan's usage — `equivalence check` is unused here but is
+  `plan-migration.md:7`'s declared default, and `plan-reconcile.md:24` already enumerates the full
+  four-value closed set. Pruning a value this plan happens not to use would silently break the
+  migration module. *(Corrected in round 4: the original wording said "listed but unused is a
+  finding", which applied literally would have deleted `equivalence check`. Caught by the Phase 9
+  builder, which declined to apply it literally and flagged it instead.)*
+- **Round-4 addition — `review-pr/SKILL.md:20` is the ONLY actually-wrong description of `review-code`'s scope in the tree.**
+  It reads *"that gate checks the build against the plan **lane by lane**"*, contradicted by
+  `review-code/SKILL.md:17` (*"After every builder lane has merged…"*). §2.12 item 10 names this exact
+  line and assigns the fix here; 9.2's reconciliation list already names "the conflicting descriptions
+  of `review-code`'s scope". But the file was **not in 9.2's scope** — it was lane 3's (5.3/5.4), and
+  lane 3 correctly left the line alone because neither of its criteria named it. **Without this, 9.2
+  would certify by grep that "no doc still describes `review-code` as lane-scoped" — true of the five
+  docs, false of the tree.** Fix is one clause: it checks the assembled implementation after every
+  lane has merged. Found by the Phase 9 builder, which raised it rather than absorbing it.
+- **Round-4 addition — `builder.md:24` has the same short oracle set as `planner.md:14`, and IS the consumer.**
+  It enumerates three values — `new contract tests` (default), `existing suite`, `equivalence check` —
+  omitting `existing implementation`. The stated rationale for fixing `planner.md` is that *"the
+  builder's packet machine reads that field to size its contract-tester fan-out"*; `builder.md` IS that
+  packet machine, so fixing the authority alone leaves authority and consumer disagreeing in the
+  opposite direction. **Not hypothetical:** the Phase 9 builder hit it on this very run — 9.2 declares
+  `existing implementation` and `builder.md` gave it no spawn shape, so it derived one from §2.2.1 and
+  recorded that reading in `contracts/l9.md`. Add the fourth value **with its spawn shape**, matching
+  the wording that lands in `planner.md:14`. Note §2.2.1's literal shape ("contract-tester only, no
+  coder") is written for tests-only work and fits prose-derived-from-shipped-behavior poorly; say what
+  the shape actually is rather than copying a clause that does not fit.
+- **The rule file is BEHAVIOR, not documentation.** `agent-agnostic/rules/run-artifacts.md` is `domain: universal`, so `sync-install.sh` copies it to `~/.claude/rules/` on push and it is then loaded by every agent that declares it — including agents on runs that have nothing to do with this plan. Treat it with the same care as a skill edit: it is the only place the claim-file layout becomes binding on anyone who did not read this plan. It sits here rather than in a lane because 9.2 is serialized after every lane has merged, so `committee.md` (5.1) already exists and the rule can describe what shipped rather than what was intended, and because no lane's file scope touches `agent-agnostic/rules/` — putting it in one would manufacture the cross-lane collision Phase 9 exists to avoid.
+- **Acceptance criteria:** Part 0 terminology adopted; run-shape diagram gains the chat branch; §2.3, §2.6, §2.8, §2.9 recorded as the review rules for future types. Two specific reconciliations: the conflicting descriptions of `review-code`'s scope (it runs **after every lane has merged** — it is not lane-scoped), and the `pipeline` naming collision with `docs/pipeline.md`, which uses the word for the whole run arc. **Verified:** the old Step 9's `agent-skills-architecture-overview.md` does not exist; those five files are the real doc surface.
+- **Acceptance criteria — the `run-artifacts` rule addition.** The rule's run-dir contents list gains one bullet for committee artifacts, sibling to the `contracts/` and `reports/` bullets and in their style, stating exactly:
+  - the path — **`committees/<skill>/claims-c<n>.md`**, one file per committee member, with the **committee type as a DIRECTORY** so every member id is a plain `c<n>` (`c1`…`c5`) that cannot collide across concurrent committees;
+  - that **`<skill>` is the wrapped skill's own `name:`, verbatim — derived, never a hardcoded enum**, so a newly wrapped skill creates a new directory and nothing else;
+  - the two committee-level files beside the members in the same per-skill dir — **`committees/<skill>/accepted.md`** (the consolidated artifact) and **`committees/<skill>/reverify.md`** (the re-verification trace) — which carry no `c<n>` because they belong to no member;
+  - that a member **returns a path, never a payload**, and the committee consolidates by reading the files (the same pointer-not-payload contract the rule already states for contracts and exit reports);
+  - that a later round of the same committee **overwrites** the earlier one's files, deliberately — a superseded review is stale and nothing consumes it, which is why there is no round segment in the name;
+  - and that **none of it exists at `rigor: low`** — no `committees/` directory at all — because no committee runs. 5.1 is the authority for all of this; the rule states it, it does not redefine it.
+- **Test approach:** `grep` proves no doc still describes `review-code` as lane-scoped and no doc uses "workflow" for both senses. For the rule, the same concreteness: `grep -n 'committees/<skill>/claims-c<n>.md' agent-agnostic/rules/run-artifacts.md` returns the new bullet; `grep -n 'rigor: low' agent-agnostic/rules/run-artifacts.md` returns the sentence stating no `committees/` directory exists there; and after `sync-install.sh`, `diff agent-agnostic/rules/run-artifacts.md ~/.claude/rules/run-artifacts.md` is empty — proving the behavior change actually reached the install rather than stopping at the repo.
+- **Test oracle:** `existing implementation` (the shipped behavior is the truth source; docs and rules are derived from it — the rule describes the layout 5.1 shipped, never the reverse).
 
 ## Phase 10: Verification
 
 ### 10.1 — Regression against the Phase 1 baseline
 
 - **File scope:** none — verification only.
-- **Pattern to follow:** the Phase 1 capture, replayed.
-- **Acceptance criteria:** all five baseline invocations reproduce, modulo exactly two intended differences: `debug`/`triage` now route to `diagnose`, and `map` is its own type. Any third difference is a regression and blocks.
-- **Test approach:** replay and diff against the Phase 1 artifacts.
-- **Test oracle:** `existing suite` (Phase 1 baseline).
+- **Pattern to follow:** 1.1's signature extractor and pinned routing probes, re-run against the migrated tree.
+- **Acceptance criteria:** the structural signature and the probe results reproduce, modulo exactly **two** intended differences:
+  1. **`debug`/`triage` now route to `diagnose`.** This **includes `-t triage`**, which pre-migration is a stable **ERROR** — measured 3/3 trials, the router declines to coerce it to anything (`<run-dir>/baseline/signatures/routing-probe-results.md`). Its error → `diagnose` transition is part of intended difference #1, **not** a third difference. Counting it separately would make a correct migration look like a regression.
+  2. **`map` is its own type**, no longer an alias off `document`.
+
+  Any third difference is a regression and blocks. **`bugfix` and `diagnose` share the `bug/` branch type**, so setup-stage output alone cannot tell them apart: compare the **workflow/middle file and planner module** from the signature, never the branch prefix. A check written against branch name will report agreement it did not actually observe.
+- **Test approach:** signature diff plus routing probes — **not** a transcript replay.
+  - *Structural* — re-run `<run-dir>/baseline/bin/extract-signature.sh` against the post-migration tree and diff against `signatures/router-signature.txt`. It covers flags, the type-selection table, per-workflow stage sequences, both branch enums, anchor-flag occurrences, and the hook/suite inventory; every difference is discrete and attributable.
+  - *Behavioral* — re-run the eight pinned probes (`<run-dir>/baseline/fixtures/routing-probes.md`). **P2, P6, and P8 must move** to their stated post-migration values; the controls **P1, P3, P4, P5, P7 must not move**. A control that moves is the blocking third difference.
+  - *Why not replay-and-diff* — 1.1 proved LLM transcripts are not diffable (218 of 276 lines differed across identical runs), while the same capture measured routing probes at 8/8 unanimous across 3 trials. The signature+probe pair tests the same claim the original wording aimed at — that nothing changed except the two intended routing changes — on ground that can actually carry it.
+- **Test oracle:** `existing suite` (the Phase 1 baseline's re-runnable oracles: the signature extractor and the probe set).
 
 ### 10.2 — The `audit` new-type drill
 
@@ -281,11 +477,11 @@ Hard constraints, not preferences:
 
 ## Risks, open questions, decision points
 
-### Decision points — a human must choose (carried from §2.11)
+### Decision points — recorded decisions and remaining open questions (carried from §2.11)
 
-**D1 — `document`'s spec of record has no gate.** Every other run type's spec passed an independent gate before the PR gate leaned on it; the explore map goes straight from explorer to spec. Options: **(a)** rigor as substitute — `document: rigor: {explore: med}`, which the table currently encodes: cheaper, no new gate, preserves document's deliberate "no gates" character, but statistical rather than structural. **(b)** A real map-confirm gate before the record pass, mirroring diagnose's pick gate and sync's confirm gate: closes the hole rather than narrowing it, at one more human interaction per document run. Not exclusive — (b) with `rigor: low` is also coherent. **Affects 8.1 and the `document` row in 4.1.**
+**D1 — `document`'s spec of record has no gate. RESOLVED at the plan gate, round 1: option (a), rigor as substitute.** The question was real: every other run type's spec of record passed an independent gate before the PR gate leaned on it, while `document`'s explore map goes straight from explorer to spec. The user chose **(a)** — the `document` workflow **stays gate-free**, with **no human confirm step on the explore survey**. The hole is closed by the two automatic safeguards the plan already carries: `rigor: {explore: med}` on the `document` row in **4.1** (several agents produce the survey, their claims are cross-checked, and a singleton claim is re-verified against source rather than dropped), plus subphase **8.1**, which makes **the code the accuracy oracle at the PR gate** and demotes the survey to the coverage spec. **The accepted trade-off, stated plainly:** because both safeguards sit downstream of the survey, the catch lands *after* the docs are written — rework is later and larger than a confirm gate would make it. That is bought deliberately, in exchange for never interrupting a docs run with a human confirm. Option (b), a real map-confirm gate, is rejected for this reason and remains available if the trade proves wrong in practice. **No structural change: 4.1's type table already encodes (a), and 8.1 is unchanged.**
 
-**D2 — an explicitly typed `--rigor <phase>:<value>` naming an absent phase.** 4.2 currently **drops it silently**, per instruction. The alternative errors in the style `against: forbid` already uses, on the reasoning that `--rigor pr:high` on a `ship: chat` run probably meant `--ship publish`, and silent swallowing produces a run that quietly did not do what was asked. If adopted, distinguish the cases: a **row default** naming an absent phase always drops silently; only a **user-typed** override errors. **Affects 4.2 and 4.3.**
+**D2 — an explicitly typed `--rigor <phase>:<value>` naming an absent phase. RESOLVED at the plan gate, round 1: warn and continue.** Neither of the original options was taken whole. Silent dropping loses the signal (`--rigor pr:high` on a `ship: chat` run probably meant `--ship publish`, and a run that quietly did not do what was asked is the failure mode the spec's flag strictness exists to prevent); erroring makes a cost dial fatal, which a **free**-tier axis must never be. The resolution is the middle: **emit a warning on stderr and continue** — the case is never fatal and never blocks the run, and a non-zero exit for it is forbidden. The proposed **row-default vs user-typed** distinction is **not adopted**: both warn, both continue, and the resolver never needs to know where the entry came from. The only line the rule draws is between an explicit `<phase>:<value>` naming (warns) and the step-2 scalar expansion (silent) — without that line, every `map` run would warn about three phases its pipeline structurally cannot have. **Landed in 4.2 (behavior, and its status as a deliberate exception to that subphase's "all errors fire before setup" rule) and 4.3 (a case asserting both the warning text and exit status 0).**
 
 **D3 — `workflows.yaml` parsing.** Settled in this plan as `resolve-type.sh` + one-line flow maps + a test suite (4.1–4.3), because a table the router is merely *asked* to obey is prompt discipline, not enforcement, and acceptance criterion 1 promises parse-time errors before setup. Recorded here because it was an open question in rev 4 and the alternative — trusting the router — remains available if the resolver proves more trouble than it is worth.
 
@@ -316,7 +512,11 @@ Hard constraints, not preferences:
 
 # Design reference
 
-The rev 5 spec, preserved verbatim. This is the rationale behind every phase above; the plan is not readable as a design document without it.
+The rev 5 spec. This is the rationale behind every phase above; the plan is not readable as a design document without it. It is preserved as written except for the gate edits below, each marked in place. Where a marker and the surrounding prose disagree about whether something is still open, the marker and the plan's decision-points section win.
+
+- **Round 1:** the D1 and D2 *resolution markers* (§2.1, §2.5, §2.11); the stale test-suite count in §2.11 D3.
+- **Round 2:** the stale test-suite count in §2.12 item 14 — the fourth and last instance of it (see the status block at the top); and §2.4's `document` run shape, which read `explore(deep,low)` while §2.2's table has carried `rigor: {explore: med}` since rev 5. §2.2 is authoritative and 4.1 anchors to it, so nothing was ever going to be built wrong — but the diagram was contradicting the med-rigor cross-check that is *half the reason* D1 was resolvable without a confirm gate, so it is corrected rather than left as a cosmetic slip. Per §2.4's own legend (*"`rigor` decides whether the reconcile loop wraps explore"*), the row also gains the `⟳ reconcile` marker its two sibling `med` rows already carry; leaving that off would have swapped one contradiction for another.
+- **Round 3 (post-approval):** the §2.1 "Retire `--ref` entirely" paragraph, whose *"Keep `-r` as the short alias if desired"* is superseded — `-r` now belongs to `--rigor` (`--rig[or]`), and `--against` takes `-a`. Marked in place; the assignment itself lives in 9.1, which owns the flag table. Also three **path markers**: §2.1, §2.8 #5, and §2.10 name the committee claim directory as `.artifacts/claims/`, which the user has since restructured to `.artifacts/committees/<skill>/` — 5.1 is authoritative, and each spot is marked rather than silently rewritten.
 
 ## Part 0 — Terminology (pinned; use these words exactly)
 
@@ -390,7 +590,7 @@ The router remains a router: parse → resolve type → apply preset → validat
 
 **Unchanged and orthogonal:** `--worktree` (`new|resume [<name>]|none`) is **run continuity** — dae's own state (progress log, plan file, worktree). NOT an anchor. Opposite validators: a resume target must point at something *dae created*; an anchor must point at something *git / Jira / the filesystem can resolve*. If the log died with the worktree, say so plainly and reconstruct only what the plan dir, syllabus, and git history evidence — existing `worktree-modes.md` rule stands.
 
-**Retire `--ref` entirely.** Grep the skill tree; replace every anchor-sense use with `--against`. Keep `-r` as the short alias if desired.
+**Retire `--ref` entirely.** Grep the skill tree; replace every anchor-sense use with `--against`. *(Resolution marker, round 3: the "keep `-r`" option is superseded — the user assigned **`-r` to `--rigor`**, long form `--rig[or]`; `--against` takes **`-a`**. See 3.2 and 9.1.)*
 
 #### Why explore split into depth × rigor
 
@@ -416,15 +616,36 @@ Always odd — odd panels guarantee a strict majority on every claim; "tie" is u
 
 | tier | agents | machinery | accept threshold | re-verify |
 |---|---|---|---|---|
-| `low` | 1 | none — the existing solo path, byte-for-byte | n/a | n/a |
+| `low` | 1 | none — the existing solo path, **unchanged** | n/a | n/a |
 | `med` | 3 | claims → `committee` consolidation | ≥ 2 of 3 | disputed + singleton claims |
 | `high` | 5 | claims → `committee` consolidation | ≥ 3 of 5 | disputed + minority claims |
 
 `low` is **not** "a committee of one." It is the existing code path, untouched, and the `committee` agent is not loaded at all (§2.6).
 
-> **Implementation note (rev 5, load-bearing).** Do NOT implement `low` as `committee(skill, n=1)` for uniformity. Doing so puts every currently-working behaviour downstream of new code and destroys the byte-for-byte regression baseline Step 4 checks against. `low` = invoke the skill directly. `med|high` = invoke it through the committee.
+> **⚠ ROUND-4 RESOLUTION MARKER — the `low` oracle (this marker WINS over any surrounding rev 5 prose).**
+> The rev 5 spec preserved below asserts in several places that `low`'s output is **byte-for-byte**
+> identical to pre-migration, and directs verification by transcript spot-check and artifact diff.
+> **That oracle is retired.** Phase 1.1 measured it impossible: four controlled `explore` runs with
+> identical inputs produced maps differing by **218 of 276 lines** (7855 vs 10581 bytes, different
+> sha256), and both SHALLOW runs wrote no file at all. Generated prose has no canonical form, so
+> byte-equality tests a property the artifact never had.
+>
+> **What is UNCHANGED and still binding:** `low` IS the existing solo path, it is NOT routed through
+> the committee, and implementing it as `committee(skill, n=1)` remains prohibited — that
+> prohibition is the whole point and it is stronger than ever.
+>
+> **What replaced the oracle:** 5.2's four structural checks — (a) solo routing, no committee;
+> (b) exactly one map artifact at the requested path; (c) required sections present; (d) **no
+> `committees/` directory exists at all**. A change of LAYER, not a weakening: the question "did the
+> cheap path get silently reimplemented on new code" is about WHICH CODE PATH RAN, which these
+> decide, not about prose wording, which no oracle can decide.
+>
+> Recorded because lane 4's coder read the stale half in good faith and wrote a false claim into
+> `report.md` (caught and fixed in-lane). **5.2 and 10.1 read these same lines.**
 
-Mechanics at `rigor ≥ med` are the `committee` agent's, described once in §2.10. Claim files live under `.artifacts/claims/` on publish runs and in the scratch dir on chat runs — **files, not context** (§2.8 #5) — and the consolidated artifact is passed onward as a **path**.
+> **Implementation note (rev 5, load-bearing).** Do NOT implement `low` as `committee(skill, n=1)` for uniformity. Doing so puts every currently-working behaviour downstream of new code and destroys the regression baseline Step 4 checks against *(round 4: the baseline is still load-bearing and this prohibition still stands verbatim; only its ORACLE changed — see the marker below)*. `low` = invoke the skill directly. `med|high` = invoke it through the committee.
+
+Mechanics at `rigor ≥ med` are the `committee` agent's, described once in §2.10. Claim files live under `.artifacts/claims/` on publish runs and in the scratch dir on chat runs — **files, not context** (§2.8 #5) — and the consolidated artifact is passed onward as a **path**. *(Path marker, round 3: the directory is `.artifacts/committees/<skill>/`, not `.artifacts/claims/` — member files `claims-c<n>.md`, committee-level `accepted.md`/`reverify.md`. See 5.1, which is authoritative.)*
 
 #### Where rigor attaches — four phases
 
@@ -458,7 +679,7 @@ Each point is justified by a *different* argument, which is why they are set ind
 
 Step 3 patches **over** whatever is already there: `--rigor explore:high` sets explore and leaves plan, code, and pr at their row defaults. An unmentioned phase never falls to `low`. Scalar-then-patch ordering makes the mixed form work with no special case — `--rigor med,explore:high` is "everything med except explore."
 
-Step 4 drops **silently**: a row naming a phase its pipeline lacks is a config detail, not user intent. (Whether an *explicitly typed* override naming an absent phase should error instead is open — §2.11 D2.)
+Step 4 drops **silently** where the phase was never named explicitly — i.e. the step-2 scalar expansion. *(Resolution marker, gate round 1: §2.11 D2 is settled — an **explicitly named** `<phase>:<value>` the run does not have is dropped **with a warning on stderr**, and the run continues; never an error, and the row-default/user-typed distinction is not adopted. See the plan's decision-points section and subphase 4.2.)*
 
 Row format follows the same scalar-or-explicit pattern as `--against`: a bare scalar expands by the step-2 rule, and the map form appears only where phases actually diverge.
 
@@ -599,7 +820,7 @@ bugfix/rework via --plan   [staleness guard §2.7] → lanes ⟳ → **code gate
 diagnose                   explore(deep,low) → plan-diagnosis (ranked report = plan.md) → **pick gate** → lanes ⟳ (picked only) → **code gate** ⟳ → record → **PR gate** ⟳
 map                        explore(auto,low) → report skeleton → chat + scratch file                                        (zero gates, zero git side effects)
 analyze                    explore(deep,med) ⟳ reconcile → report skeleton → chat        [--ship publish: + record → **PR gate** ⟳]
-document                   explore(deep,low) → record pass (docs tree + symlinks + changelog only) → **PR gate** ⟳          (open-draft fires at the record commit)
+document                   explore(deep,med) ⟳ reconcile → record pass (docs tree + symlinks + changelog only) → **PR gate** ⟳   (open-draft fires at the record commit)
 sync                       explore(deep,med) ⟳ reconcile → plan-reconcile → **confirm gate** → record → **PR gate** ⟳ → [offer handoff §2.7]
 ```
 
@@ -628,7 +849,7 @@ The gate is not *fenced off* from the code — it carries `verify-dont-assume`, 
 1. `document.md` step 4 names **the map as the coverage spec and the code as the accuracy oracle**.
 2. `review-pr`'s docs-only branch gains an actual check step for verifying prose claims against source; its current step list has none.
 
-This is why `document` carries `rigor: {explore: med}` — see §2.11 D1, which is the open question of whether rigor there is a fix or a mitigation.
+This is why `document` carries `rigor: {explore: med}` — see §2.11 D1. *(Resolution marker, gate round 1: D1 is settled as option (a). Rigor there is a **mitigation accepted as the fix** — `document` stays gate-free, and the catch lands after the docs are written.)*
 
 ### §2.6 Skill inventory — cut along the seams
 
@@ -693,7 +914,7 @@ The restructure moves seams; it must not move these. Sourced from `docs/conventi
 2. **Kickbacks pass the report path, never a paraphrase.** Reason codes route to the cheapest sufficient re-entry (`impl-wrong` → lane from its contract; `plan-wrong` → planner per §2.7; `map-wrong` → re-explore). Reports append `## Round <n>` per iteration — the revision history reads straight from the file.
 3. **Report contracts stay script-enforced.** `report-verdict.sh` is the only way a verdict enters a report; `validate-report.sh` re-checks enums, count consistency, and open-questions on `needs-input`; `--kind exit` checks builder exit reports (fenced `status:`, non-empty `## Files touched`, non-empty `## Evidence`). The committee does **not** write verdict rounds of its own: it is a worker returning the §2.8 #1 envelope, never a gate. Where it wraps a gate skill, that skill writes its verdict round through these scripts exactly as it does at `rigor: low` — which is why the committee needs no place in the `ready|tentative|rejected` vocabulary, a vocabulary rev 4's reconciler never fit.
 4. **Plan → contract flow is preserved under every path into build — adoption included.** The plan carries lane syllabus + per-subphase detail blocks + oracle declarations (`new contract tests` | `existing suite` | `equivalence check` | `existing implementation`); each builder decomposes its lane into packets and writes `contracts/<lane-id>.md` in the **parent** worktree; `coder` never reads or writes tests; `contract-tester` reads the contract text alone — the blindness is architectural, and red-packet redispatch carries contract + diagnosis, never the opposing artifact's source. Only the builder's own e2e tail — verified against the **plan's** acceptance criteria, not the contract — exits the lane loop.
-5. **State lives in files, not context — interruption loses nothing.** Progress log rewritten in place at every state change; the plan's current path travels in every message; `.artifacts/` layout unchanged (`progress-log.md`, `contracts/`, `reports/`, explore maps, **plus `claims/`** *(new)* and the `anchors:` block *(new)* in plan front-matter + progress log). Run dir lives in the parent worktree only; its lifetime is the worktree's; `cleanup-merged` is the only teardown; deferred cleanup on failed push stands. Plans-dir/run-dir split stays absolute in both directions.
+5. **State lives in files, not context — interruption loses nothing.** Progress log rewritten in place at every state change; the plan's current path travels in every message; `.artifacts/` layout unchanged (`progress-log.md`, `contracts/`, `reports/`, explore maps, **plus `committees/<skill>/`** *(new — see 5.1; the rev 5 spec said `claims/`)* and the `anchors:` block *(new)* in plan front-matter + progress log). Run dir lives in the parent worktree only; its lifetime is the worktree's; `cleanup-merged` is the only teardown; deferred cleanup on failed push stands. Plans-dir/run-dir split stays absolute in both directions.
 6. **Ownership is machine-audited, never prompt-disciplined.** `verify-scope.sh` per lane before merge; merge conflicts between "independent" lanes ARE scope violations — stop, don't resolve past them; `verify-run-scope.sh` at the PR gate treats every UNCLAIMED product change as blocking. dae's writes stay harness-scoped; a stalled lane is never a license to do its work yourself. **Footprint-restricted types (§2.9) hang their restrictions on exactly these scripts.**
 7. **Cold forks cannot ask mid-run.** Unresolved questions become flagged questions in the final report (the changelog-preference default-to-none-and-flag pattern is the model); loop-backs are recommendations in the report, never phases the fork invokes itself. Applies to the `committee` agent and every report-middle fork. Its corollary at `rigor ≥ med` is §2.1's divergent tie-break: a claim still unverified at consolidation time is an open question, never a blocking finding.
 8. **Nothing publishes without passing the PR gate — mechanically.** `review-pr` runs on every `ship: publish` run, whole branch-vs-base diff, no exception for adopted plans, doc-only runs, or published reports. Enforcement is code, not prose: `push-pr --stage finalize` validates that the run's `pr-review.md` exists, passes `validate-report.sh`, and its **last** round carries `verdict: ready` + `next: proceed` — refusing with a plain error otherwise. Amending anything after a passing gate (a late plan amendment, a re-opened lane) invalidates the round: the gate re-runs before finalize is attempted again, consistent with "every gate re-reads the plan file at verdict time." No axis, type row, or future flag may route around this — a hypothetical `ship` value that skipped the gate while still pushing is a design rejection, not a configuration.
@@ -741,7 +962,7 @@ committee(skill: review-code, n: 3) -> findings + the gate's own verdict round
 committee(skill: review-pr,   n: 3) -> findings + the gate's own verdict round
 ```
 
-**What the committee owns (the how).** Fan out N cold sub-agents over the wrapped skill; collect each one's claims to its own file under `.artifacts/claims/`; match claims by evidence location; route disputes and singletons to targeted re-verification **against the source**; consolidate; return the shared worker envelope pointing at the result.
+**What the committee owns (the how).** Fan out N cold sub-agents over the wrapped skill; collect each one's claims to its own file under `.artifacts/claims/`; match claims by evidence location; route disputes and singletons to targeted re-verification **against the source**; consolidate; return the shared worker envelope pointing at the result. *(Path marker, round 3: the directory is `.artifacts/committees/<skill>/`, not `.artifacts/claims/` — member files `claims-c<n>.md`, committee-level `accepted.md`/`reverify.md`. See 5.1, which is authoritative.)*
 
 **What the wrapped skill owns (the what).** What a claim is, what evidence looks like, what the consolidated artifact should be, and how a still-unverified claim is treated at the end (§2.1's collector/gate tie-break).
 
@@ -758,7 +979,9 @@ Four consequences fall out of that split, each of which was a defect in rev 4's 
 
 ### §2.11 Open decision points (rev 5 — a human must choose)
 
-**D1 — document's spec of record has no gate. Rigor substitute, or a real gate?**
+> *Resolution marker, gate round 1: **D1 and D2 are no longer open.** D1 → option (a), rigor as substitute; D2 → warn on stderr and continue, with the row-default/user-typed distinction rejected. D3 was already settled in the plan body. The arguments below are kept as the reasoning behind those calls; the plan's decision-points section carries what was actually chosen.*
+
+**D1 — document's spec of record has no gate. Rigor substitute, or a real gate? (RESOLVED: (a).)**
 
 Verified across the tree, every run type's spec of record passed an independent gate before the PR gate leaned on it — except one:
 
@@ -776,13 +999,13 @@ The map goes straight from the explorer to being the artifact the ship gate judg
 
 These are not exclusive; (b) with `rigor: low` is also coherent. **The table currently encodes (a).** Note that (a) is what makes explore rigor worth its cost on document runs specifically — the argument is "it stands in for the missing gate," not merely "docs should be accurate."
 
-**D2 — an explicitly typed `--rigor <phase>:<value>` naming a phase this run does not have.**
+**D2 — an explicitly typed `--rigor <phase>:<value>` naming a phase this run does not have. (RESOLVED: warn and continue.)**
 
 §2.1 step 4 currently **drops it silently**, per the instruction that absent phases are simply ignored. The alternative is to error, in the style `against: forbid` already uses (*"did you mean rework/sync?"*): `--rigor pr:high` on a `ship: chat` run probably means `--ship publish` was intended, and silently swallowing it produces a run that quietly did not do what was asked — the failure mode the spec's strictness about unknown flags exists to prevent. Distinguish the two cases if this is adopted: a **row default** naming an absent phase always drops silently (config, not intent); only a **user-typed** override errors.
 
 **D3 — `workflows.yaml` needs a parser, and this repo has a no-jq policy.**
 
-`resolve-config.sh:21` states the constraint explicitly ("No jq dependency, matching this repo's other hooks"), and no YAML parser exists anywhere in the tree. A table the router is merely *asked* to obey is prompt discipline, not enforcement — the thing this repo elsewhere refuses to rely on (`report-verdict.sh`, `validate-report.sh`, `verify-scope.sh` are scripts precisely because prose does not hold), and acceptance criterion 1 promises parse-time errors *before setup*, which is a script's job. **Recommended:** ship `resolve-type.sh` beside the yaml — reads the row, applies the free/constrained/locked tiers, runs §2.1's rigor resolution, validates `against` arity and `--plan` placement, prints resolved axes as `KEY=value` lines for the router to consume. Keep rows to **one-line flow maps** so sed/awk can parse them without a dependency, and add `tests/resolve-type.test.sh` beside the three suites already in `tests/`.
+`resolve-config.sh:21` states the constraint explicitly ("No jq dependency, matching this repo's other hooks"), and no YAML parser exists anywhere in the tree. A table the router is merely *asked* to obey is prompt discipline, not enforcement — the thing this repo elsewhere refuses to rely on (`report-verdict.sh`, `validate-report.sh`, `verify-scope.sh` are scripts precisely because prose does not hold), and acceptance criterion 1 promises parse-time errors *before setup*, which is a script's job. **Recommended:** ship `resolve-type.sh` beside the yaml — reads the row, applies the free/constrained/locked tiers, runs §2.1's rigor resolution, validates `against` arity and `--plan` placement, prints resolved axes as `KEY=value` lines for the router to consume. Keep rows to **one-line flow maps** so sed/awk can parse them without a dependency, and add `tests/resolve-type.test.sh` beside the four suites already in `tests/`. *(Count corrected in round 1: the rev 5 spec said three, written before `tests/sync-install-settings-merge.test.sh` landed in `5644e79`.)*
 
 ### §2.12 What changed in rev 5
 
@@ -791,7 +1014,7 @@ Design changes:
 1. **`reconcile-claims` → the generic `committee` agent** (§2.10). Wraps any claim-emitting skill; owns structure only. Resolves three rev-4 defects at once: who owns the committee, output-contract drift between rigor tiers, and the reconciler's non-fit with the `ready|tentative|rejected` verdict vocabulary.
 2. **Rigor generalised from an explore-only knob to a four-phase profile** — `explore`, `plan`, `code`, `pr` — with explicit resolution rules, scalar-or-per-phase syntax, and attachment determined by `f(pipeline, ship)` (§2.1).
 3. **`code` added as an addressable phase, defaulted `low` everywhere.** Capability without default cost; justified by cross-lane duplication and kickback routing having no oracle, bounded by the cap-3 loop and the `code > pr > plan` false-rejection severity ordering.
-4. **`low` pinned as the existing solo path, byte-for-byte**, with an explicit prohibition on implementing it as `committee(skill, n=1)`.
+4. **`low` pinned as the existing solo path, unchanged** *(round 4: was "byte-for-byte" — verified impossible, see §2.1's round-4 marker)*, with an explicit prohibition on implementing it as `committee(skill, n=1)`.
 5. **Rigor reframed around "oracle of last resort"**, with the two committee rules made explicit: it allocates verification budget rather than voting truth into existence, and the threshold routes rather than rejects.
 6. **The collector/gate tie-break** (§2.1) — three of four attachment points wrap gates, so an unverified claim must land as an open question, never as a blocking finding. Uses the existing `needs-input` vocabulary; no new machinery.
 7. **`document`'s PR-gate oracle split** (§2.5) — map for coverage, code for accuracy — plus the matching check step in `review-pr`'s docs branch.
@@ -804,7 +1027,7 @@ Corrections verified against the tree (not design changes — the spec asserted 
 11. **`push-pr` rejects `docs/` and `sync/` branches today** — `push-pr/SKILL.md:24` verifies the branch is `feature`, `bug`, or `hotfix`. Document and sync runs already trip their own publisher. Pre-existing bug, inside the seam this restructure re-cuts.
 12. **`agent-skills-architecture-overview.md` does not exist.** The real doc surface is five files (Step 9).
 13. **`workflow-setup.sh` and `allow-workflow-cleanup.sh` hardcode the branch-prefix enum**, so acceptance criterion 8 as written is already false (now rescoped).
-14. **`tests/` was never mentioned in the migration plan** despite three existing suites and two new scripts needing coverage.
+14. **`tests/` was never mentioned in the migration plan** despite four existing suites and two new scripts needing coverage.
 15. **`push-pr --stage finalize` does not validate `pr-review.md` today** — it only links it. §2.8 #8's mechanical refusal is genuinely new, and is now Step 1 rather than a clause inside Step 7.
 
 ---
@@ -813,7 +1036,7 @@ Corrections verified against the tree (not design changes — the spec asserted 
 1. Every type runs end-to-end per its row; constraint violations (`against` array rules, `--plan` on non-build, locked `--pipeline`, unknown flags) error at parse time, before setup, with a plain-language ask — **enforced by `resolve-type.sh`, not by the router's good intentions** (§2.11 D3).
 2. `map` completes with zero git side effects and is materially faster than `analyze` on the same question.
 3. `med`/`high` produces claim-level evidence with majority thresholds; disputes and singletons show a re-verification trace against the source, not a second vote. Where the committee wraps a **gate**, that gate's own verdict round is written normally through `report-verdict.sh` and passes `validate-report.sh` — the committee writes no verdict of its own.
-4. Context seams hold: a map run's context contains no build/publish skills; a `low` run never loads the `committee` agent, and its behaviour is **byte-for-byte identical to pre-migration** — spot-check transcripts and diff the artifacts.
+4. Context seams hold: a map run's context contains no build/publish skills; a `low` run never loads the `committee` agent, and it is **the same code path as pre-migration** — verified by 5.2's four structural checks (solo routing; exactly one map artifact at the requested path; required sections present; **no `committees/` directory at all**). *(Round 4: this criterion previously said "byte-for-byte identical" and directed a transcript spot-check plus artifact diff. Both were retired — see §2.1's round-4 marker.)*
 5. Handoff fast path reaches lane dispatch with no planner spawn and no plan gate; staleness guard forces amendment when base moved inside lane scope; adopted-plan `plan-wrong` cold-amends from paths only, then stays warm.
 6. §2.8 holds everywhere new code runs: envelope returns, script-enforced verdicts, plan→contract detail blocks survive adoption, `anchors:`/claims on disk, no state that exists only in context.
 7. The `existing implementation` oracle produces a tests-only diff, mechanically verified by the scope scripts.

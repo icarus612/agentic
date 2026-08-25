@@ -3,13 +3,29 @@
 Canonical guide: [`orchestrators/AGENTS.md`](../orchestrators/AGENTS.md). This
 page is the meta-summary; edit pipeline behavior in the payload files, not here.
 
-One entry orchestrator — **`dae`** (`/dae`) — routes every request to exactly
-one workflow and drives two **worker agents** (`planner`, `builder`) through
-**cold gates** to a PR. Nothing in the pipeline is bound to a technology except
-the record stage, when the docs target is Confluence.
+**"Pipeline" is used in two senses here — this page's own title is the
+first.** As the whole run arc (router → workers → gates → PR, or → chat for a
+report type), "pipeline" is what this page describes and titles itself after.
+As one of the five resolved axes, the **`pipeline` axis** names something
+narrower: which *middle file* a type executes. Below, "the `pipeline` axis"
+is named explicitly wherever that narrower sense applies; everywhere else
+"pipeline" means the whole run arc.
+
+One entry orchestrator — **`dae`** (`/dae`) — resolves every request to
+exactly one **type**, whose `pipeline` axis selects a middle file, then drives
+two **worker agents** (`planner`, `builder`) through **cold gates** to a PR —
+or, for a `pipeline: report` type (`map`/`analyze`), answers the question in
+chat instead. Nothing in the pipeline is bound to a technology except the
+record stage, when the docs target is Confluence.
 
 ```
-dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
+                    ┌─ pipeline: report, ship: chat (map │ analyze) ─▶ explore
+                    │  ─▶ fill report skeleton ─▶ answer in chat + scratch
+                    │  file (zero gates, zero git side effects, no worktree,
+                    │  no PR)
+dae (/dae) ─resolve type/pipeline─┤
+                    │
+                    └─ ship: publish ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
                         ▲ SendMessage revisions        │ approved
                         │                              ▼
               plan-wrong kickback        push-pr --stage open-draft (draft PR
@@ -35,19 +51,33 @@ dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (hu
                           push-pr --stage finalize (draft → ready)
 ```
 
-## Workflows (`--type`)
+## Types (`--type`)
 
-| `--type` | Workflow file | Middle stages |
-|---|---|---|
-| `feature` / `bugfix` / `rework` / `migration` / `hotfix` | `build.md` | planner (type module) → plan gate → builder lanes → code gate |
-| `diagnose` | `diagnose.md` | planner (`plan-diagnosis`: investigate, rank likelihood × ease) → pick-the-causes gate → fix lanes → code gate |
-| `document` | `document.md` | deep `explore` (map on disk) → map-driven record; no planner |
-| `sync` | `sync.md` | planner (`plan-reconcile`: classify done/partial/dropped/diverged vs the real diff) → confirm-the-diff gate → reconciliation-driven record |
+Ten types over four `pipeline`-axis values, resolving to five middle files
+(`pipeline: plan` resolves to `diagnose.md` or `sync.md` by planner module,
+never by type name).
 
-All share the router's **setup** (docs target, Confluence requirements capture,
-parent worktree `<type>/<name>`) and **ship** (`open-draft` at plan approval →
-per-lane/record `push-pr --stage update` pushes → PR gate → `finalize`)
-stages. `bugfix` vs `diagnose`: known cause → bugfix; unknown cause → diagnose.
+| `--type` | `pipeline` axis | Middle file | Middle stages |
+|---|---|---|---|
+| `feature` (default) / `bugfix` (alias `bug`) / `hotfix` / `migration` / `rework` | `build` | `build.md` | planner (type module) → plan gate → builder lanes → code gate |
+| `diagnose` (aliases `debug`, `triage`) | `plan` | `diagnose.md` | planner (`plan-diagnosis`: investigate, rank likelihood × ease) → pick-the-causes gate → fix lanes → code gate |
+| `sync` | `plan` | `sync.md` | planner (`plan-reconcile`: classify done/partial/dropped/diverged vs the real diff) → confirm-the-diff gate → reconciliation-driven record |
+| `map` | `report` | `report.md` | fast `explore` → fill the report skeleton → chat answer; no planner, no gates, no git side effects |
+| `analyze` | `report` | `report.md` | rigorous `explore` (deep, `rigor: med`) → fill the report skeleton → chat answer (`--ship publish` opts into the record/PR stages below, scoped to `docs/reports/`); no planner |
+| `document` (alias `doc`) | `docs` | `document.md` | deep `explore` (map on disk) → map-driven record; no planner |
+
+**Alias flips (breaking):** `debug`/`triage` now route to `diagnose` — they
+used to reach `bugfix`; the line is cause-known → `bugfix`, cause-unknown →
+`diagnose`. `map` is its own type with its own pipeline and ship profile, no
+longer an alias of `document`.
+
+All `ship: publish` types share the router's **setup** (docs target,
+Confluence requirements capture, parent worktree `<type>/<name>`) and
+**ship** (`open-draft` at plan approval → per-lane/record
+`push-pr --stage update` pushes → PR gate → `finalize`) stages. `map` and
+`analyze` default to `ship: chat` — the diagram's chat branch above, with zero
+gates and zero git side effects. `bugfix` vs `diagnose`: known cause →
+bugfix; unknown cause → diagnose.
 
 ## The three tiers
 
@@ -55,7 +85,7 @@ stages. `bugfix` vs `diagnose`: known cause → bugfix; unknown cause → diagno
 |---|---|---|
 | Orchestrator | `dae`, `orchestrate` | the conversation; holds every human gate |
 | Workers | `planner` (opus, warm — revisions via SendMessage), `builder` (sonnet, one per lane) + its `coder`/`contract-tester` sub-agents | own contexts |
-| Cold forks | `explore`, `review-plan`, `review-code`, `review-pr`, `init-workspace`, `document-local`/`document-confluence`, `push-pr`, `comment-pr`, `cleanup-merged` | isolated; envelope return |
+| Cold forks | `explore`, `review-plan`, `review-code`, `review-pr`, `init-workspace`, `document-local`/`document-confluence`, `push-pr`, `comment-pr`, `cleanup-merged` (+ `committee`, wrapping a gate at `rigor: med\|high`) | isolated; envelope return |
 
 Every worker and fork returns the **shared envelope** — `status`,
 `artifacts[]`, `next`, `blockers[]` (defined once in
@@ -101,7 +131,9 @@ goes to `proposals/<slug>-MM-DD-YY.plan-review.md` beside the proposal and
 moves in at promotion (per the `run-artifacts` rule — the verdict vocabulary
 `ready | tentative | rejected` is enforced by
 `report-verdict.sh`/`validate-report.sh`, and the loop history is readable
-from the file), and return envelope verdicts. The code and PR
+from the file), and return envelope verdicts. `review-code` runs once — after
+EVERY builder lane has merged, over the whole assembled implementation, never
+scoped to a single lane. The code and PR
 gates' `next` carries a kickback reason code: `impl-wrong` → redispatch the
 lane; `plan-wrong` → message the warm planner; `map-wrong` → re-run `explore`,
 then the planner — the redispatched worker gets the report PATH, never a
@@ -131,10 +163,13 @@ Bash, applying to a **consuming** project, not to `agentic` (except
 
 - Helpers (invoked, never wired): `workflow-setup.sh` (worktrees; types
   `feature|bug|hotfix|docs|sync`; `--parent` children; `--reuse` resume),
-  `resolve-config.sh` (CLAUDE_* chain), `mark-syllabus.sh`, `verify-scope.sh`,
+  `resolve-config.sh` (CLAUDE_* chain), `resolve-type.sh` (the only reader of
+  the type table `workflows.yaml`; prints resolved axes as `KEY=value`),
+  `resolve-anchor.sh` (per-item `--against` anchor resolution to typed
+  pointers; all-or-nothing), `mark-syllabus.sh`, `verify-scope.sh`,
   `plan-lifecycle.sh` (every plan move:
-  `promote | archive | supersede | reopen | locate | check`; `archive` refuses
-  a plan that didn't ship),
+  `promote | archive | supersede | reopen | locate | check | adopt`; `archive`
+  refuses a plan that didn't ship),
   `sync-install.sh` (this repo → `~/.claude`, deletions included).
 - Wired: `workflow-diff-check.sh` (`Stop` on `dae`), `scope-writes.sh`
   (`PreToolUse`; orchestrator write-scope config).

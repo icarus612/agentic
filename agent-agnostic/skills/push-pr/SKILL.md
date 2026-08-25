@@ -21,12 +21,12 @@ You are the sole publisher of a workflow run's branch, called repeatedly across 
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Always required: the worktree path, the branch name, the base branch, and the `--stage` value. Verify — don't trust: check the working tree is clean, or dirty only where this stage's args authorize a commit, and that the branch is the expected `<type>/<name>` (where `<type>` is `feature`, `bug`, or `hotfix`) — never main — before doing anything.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Always required: the worktree path, the branch name, the base branch, and the `--stage` value. Verify — don't trust: check the working tree is clean, or dirty only where this stage's args authorize a commit, and that the branch is the expected `<type>/<name>` (where `<type>` is `feature`, `bug`, `hotfix`, `docs`, or `sync` — the authoritative set `workflow-setup.sh` creates workflow branches from) — never main — before doing anything.
 
 Per-stage needs beyond the above:
 - `open-draft` — the plan path (to commit the promoted plan dir) and a plan-derived summary for the PR title/body.
 - `update` — which stragglers the caller authorizes; never commit files the caller didn't list.
-- `finalize` — the work summary, the `pr-review.md` path (linked in the PR body), and the keep-draft decision (whether to leave the PR as a draft instead of flipping it to ready).
+- `finalize` — the work summary, the `pr-review.md` path — **required**, and it is the stage's precondition (a passing PR gate is what authorizes the draft→ready flip), not only a PR-body link — and the keep-draft decision (whether to leave the PR as a draft instead of flipping it to ready).
 
 ## How it works
 
@@ -51,10 +51,20 @@ Every stage starts the same way: inside the worktree, confirm the working tree i
 
 ### `--stage finalize`
 
-1. **Commit last stragglers.** Commit any remaining authorized record stragglers.
-2. **Push.** `git push origin <branch>`, before any PR-state change. Never `--force`, never main or the base branch. Report which of the three push outcomes occurred — a successful push here is what clears any lane cleanups deferred earlier in the run.
-3. **Retry a missing PR, if needed.** If `open-draft` was declined or impossible and `update` never got the chance to retry either, open the draft PR now (same action as `open-draft` step 3) — this is the last retry point; no stage blocks on it.
-4. **Flip draft to ready.** Refresh the PR title/body with the final work summary and a pointer to `pr-review.md`, then flip the PR from draft to ready — `gh pr ready`, or the GitHub MCP `update_pull_request` with `draft: false` **only if `gh` is not installed**. A blocked or denied `gh pr ready` is never a reason to switch to MCP, `gh api`, or a GraphQL mutation (see **A denial is not unavailability** below). This is the second outward-facing PR-state change, so hold a conversational confirmation before it ("push and mark the PR ready?") — the push in step 2 already happened by this point, so the confirmation gates only the ready-flip. Unless the caller passes keep-draft, in which case leave the PR as a draft and report why.
+1. **Refuse without a passing PR gate.** Before any commit, push, or PR-state action, check the run's `pr-review.md` (the path from your args): it must exist, must pass `validate-report.sh` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy), and its **last** round must read `verdict: ready` / `next: proceed`. This holds unconditionally — including when the caller passes keep-draft, which governs only the ready-flip in step 5, never whether this gate runs.
+
+<!-- pr-gate-check -->
+```sh
+# exit 0     -> the PR gate passed; finalize may proceed
+# exit non-0 -> refuse: stop the stage, do NOT flip draft -> ready
+validate-report.sh "$PR_REVIEW" | grep -qE 'verdict ready, next proceed'
+```
+
+   If the predicate fails, **refuse**: stop the stage cold — nothing is committed, nothing is pushed, the PR is not flipped from draft to ready. This is a `failed` return, not a silent skip and not an error to route around. Report plainly which of the three conditions missed (missing file, failed `validate-report.sh`, or a last round that isn't ready/proceed), the `pr-review.md` path you checked, and the `validate-report.sh` output. A run whose gate has not passed pushes stragglers through `--stage update`, never through a bypassed `finalize`.
+2. **Commit last stragglers.** Commit any remaining authorized record stragglers.
+3. **Push.** `git push origin <branch>`, before any PR-state change. Never `--force`, never main or the base branch. Report which of the three push outcomes occurred — a successful push here is what clears any lane cleanups deferred earlier in the run.
+4. **Retry a missing PR, if needed.** If `open-draft` was declined or impossible and `update` never got the chance to retry either, open the draft PR now (same action as `open-draft` step 3) — this is the last retry point; no stage blocks on it.
+5. **Flip draft to ready.** Refresh the PR title/body with the final work summary and a pointer to `pr-review.md`, then flip the PR from draft to ready — `gh pr ready`, or the GitHub MCP `update_pull_request` with `draft: false` **only if `gh` is not installed**. A blocked or denied `gh pr ready` is never a reason to switch to MCP, `gh api`, or a GraphQL mutation (see **A denial is not unavailability** below). This is the second outward-facing PR-state change, so hold a conversational confirmation before it ("push and mark the PR ready?") — the push in step 3 already happened by this point, so the confirmation gates only the ready-flip. Unless the caller passes keep-draft, in which case leave the PR as a draft and report why.
    - If the confirmation is declined, leave the PR as a draft, record the exact command to flip it later, and report — a declined PR action is a valid outcome, not an error to route around.
    - If the repo has no remote hosting or no PR tooling is available, say so and report the branch as pushed-only.
 
@@ -101,7 +111,7 @@ Each stage returns its own contract. `open-draft` and `update` do not end the wo
 
 - `open-draft` returns: the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible (with the exact push command if failed-or-declined); the PR URL if opened as a draft (or the exact command to open it, if failed-or-declined or publishing impossible); the worktree path, still live.
 - `update` returns: the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible — stated explicitly so the caller can branch on it (amendment A1: `build-dispatch.md` decides whether to clean up the lane's child worktree and branch on exactly this distinction); the PR URL and state if a retried open succeeded; the worktree path, still live; the straggler commits made.
-- `finalize` returns: the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible (a successful push here is what clears any lane cleanups deferred earlier in the run); the PR URL and its final state (ready, or still draft with the reason); the worktree path, still live with its run dir intact for the PR gate and any kickback; any straggler commits made.
+- `finalize` returns one of four outcomes, distinct from each other: **refused — PR gate not passed** (the `pr-review.md` precondition failed; nothing committed, nothing pushed, the PR left as-is — report which of the three gate conditions missed, the `pr-review.md` path checked, and the `validate-report.sh` output), or, when the gate passed, the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible (a successful push here is what clears any lane cleanups deferred earlier in the run); the PR URL and its final state (ready, or still draft with the reason); the worktree path, still live with its run dir intact for the PR gate and any kickback; any straggler commits made.
 
 Only `finalize`'s return ends the workflow by default — nothing follows automatically. Follow-ups the caller may invoke, never you, once the PR exists (at any verdict, not only after `finalize`): `comment-pr` to post a review report on the PR, `review-pr` for a fresh pass on the published PR, and — once the PR merges — `cleanup-merged` to close out the branch, run dir, and plan archive.
 

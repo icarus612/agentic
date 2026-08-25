@@ -134,8 +134,11 @@ entry and removed with that worktree by post-merge cleanup — holding
 never committed), `contracts/<lane-id>.md`, `reports/<lane-id>-exit.md`
 (lane ids are always `l1`, `l2`, … — the plan's numbered lanes — naming each
 builder's branch `<type>/<name>-l<n>`, worktree, contract, and exit report;
-the parent branch is plain `<type>/<name>`), and the `explore` fork's map
-(`explore-map-<scope-slug>-<MM-DD-YY>.md` — never the plans dir).
+the parent branch is plain `<type>/<name>`), `committees/<skill>/` (the
+`committee` agent's member files and consolidated artifact at `rigor:
+med|high` — layout owned by the `run-artifacts` rule, not restated here), and
+the `explore` fork's map (`explore-map-<scope-slug>-<MM-DD-YY>.md` — never the
+plans dir).
 
 Review reports append one `## Round <n>` section per gate iteration. The
 verdict vocabulary is enforced by scripts, not prose: `report-verdict.sh` is
@@ -188,8 +191,8 @@ siblings moving in under bare kind names; at post-merge closeout ONLY
 removed, git history keeps the records. A superseded or abandoned plan never
 enters `completed/`: it is deleted, and the successor plan's Goal & scope
 names what it supersedes and why. Every move goes through `plan-lifecycle.sh`
-(`promote | archive | supersede | reopen | locate | check`), never by hand —
-`archive` refuses a plan whose syllabus says it didn't ship.
+(`promote | archive | supersede | reopen | locate | check | adopt`), never by
+hand — `archive` refuses a plan whose syllabus says it didn't ship.
 
 Structure: phase syllabus first — title-only, one nested checkbox per
 subphase under its phase header (every phase decomposes into
@@ -220,6 +223,10 @@ Consuming projects adopting Antigravity should create an `.agents/GEMINI.md` fil
   `rules:`.
 - Keep rules short and frontmatter-light — they're always-on context.
 - Never let a skill or rule name a directory in this repo.
+- A new `--type` row is judged against the four standing review rules in
+  [`orchestrators/AGENTS.md`](../orchestrators/AGENTS.md#review-rules-for-future-types)
+  — loops attach to axis values, never to type names; the seam rule; the
+  carried invariants; `pipeline` is not an array. Not repeated here.
 - Distribution is deliberately copy-paste, not symlinks or a setup script, so it
   behaves identically across platforms. (Hooks are the one automated path: Nix
   home-manager installs them to `~/.claude/hooks/`.)

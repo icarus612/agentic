@@ -3,7 +3,6 @@ name: explore
 description: Shared mapping fork — deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware; writes the full structured map (stack, patterns, conventions, dependency graph) to disk and returns an envelope pointing at it. Invoked by the planner worker as its deep-exploration escalation and by the dae document workflow; not for ad-hoc file searches.
 domain: universal
 context: fork
-agent: Explore
 rules: [verify-dont-assume, tech-agnostic, artifact-locations, doc-format]
 model: sonnet
 model-fallback: [gemini-pro]
@@ -24,7 +23,7 @@ You are NOT a mandatory pre-plan phase: the planner explores for itself and call
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), and optionally the output path for the map file. If no output path is given, write the map to the resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain per `artifact-locations`, default `.workflows/` — gitignored) as `explore-map-<scope-slug>-<MM-DD-YY>.md`. The map never goes in the plans dir — it is ephemeral like everything else on the workflows side of the split, and a map is not a plan record.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), the rigor tier (`low`/`med`/`high`; default `low`), and optionally the output path for the map file. If no output path is given, write the map to the resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain per `artifact-locations`, default `.workflows/` — gitignored) as `explore-map-<scope-slug>-<MM-DD-YY>.md`. The map never goes in the plans dir — it is ephemeral like everything else on the workflows side of the split, and a map is not a plan record. At `rigor: med|high` the output path you're handed may instead be a **member** path — write your claims there exactly as you would write the map anywhere else; see "Rigor — orthogonal to mode" below for what that does and doesn't change.
 
 ## Modes
 
@@ -51,6 +50,16 @@ Go SHALLOW otherwise:
 
 When genuinely on the fence, prefer DEEP — a wasted read is cheaper than a confidently wrong map.
 
+### Rigor — orthogonal to mode
+
+Rigor is a second, independent knob, never a fourth depth value: **depth (AUTO/SHALLOW/DEEP) and rigor (`low`/`med`/`high`) are orthogonal, and depth means exactly the same thing at every rigor tier.** One skill, no drift. Rigor is applied by the CALLER, not by you — you always run your own single pass at whatever depth you settled on; the caller decides whether one of you runs or several do.
+
+**At `rigor: low` — the default — you run exactly as this file describes: the existing solo path, unchanged.** The `committee` agent is not loaded and you do not route through it. This is an absolute, not a default that happens to look this way today: `low` is the existing solo path invoked directly, and nothing about rigor may turn it into a committee of one.
+
+**At `rigor: med|high` you may be running as one member of a committee.** You are handed a member output path; write your claims there and return that path, exactly as you always write your map. You never know about your siblings — not their ids, paths, findings, or existence — and you never consolidate; that is the committee's job, not yours. Member artifacts follow the `committee` agent's member-artifact convention.
+
+**No downstream consumer branches on rigor.** At every tier the artifact at your output path is a map in the structure defined below; at `med|high` the committee returns that same artifact type, consolidated, with claims as its evidence layer.
+
 ## Monorepo awareness
 
 Detect single project vs. monorepo (look for `apps/`, `packages/`, workspace manifests, multiple build files). For a monorepo, choose ONE scope:
@@ -68,27 +77,27 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env
 4. **Map structure and dependencies.** Walk the layout. For monorepos build the app/package dependency graph; for a single app list exactly which internal packages and external libraries it depends on.
 5. **Extract patterns and conventions** (deep, or as far as docs allow): how code is organized, named, tested, styled; what's idiomatic vs. forbidden (styling, preferred reuse, error handling, test layout, lint/format rules).
 6. **Note the doc/symlink topology** — where source-of-truth docs live and which paths are symlinks into them.
-7. **Write the structured map to disk** (sections below) at the output path from your args (or the default). Be concrete, cite real paths, and flag anything you couldn't verify. The map file is the deliverable; it must stand alone.
+7. **Write the structured map to disk** (sections below) at the output path from your args (or the default). Every load-bearing claim in the map is **one atomized assertion** — a single fact, not a paragraph bundling several — carrying its own **evidence anchor (`file:line`)**; a claim you cannot anchor is written as unverified rather than asserted. Be concrete, cite real paths. The map file is the deliverable; it must stand alone.
 
 ## The map file: structure
 
-- **Scope & mode** — what you explored and how.
-- **Tech stack** — languages, frameworks, libraries WITH major versions.
-- **Structure** — directory layout; apps/packages for monorepos.
-- **Dependency graph** — who depends on whom (internal and key external).
-- **Patterns** — idiomatic organization, naming, testing, styling.
-- **Conventions / rules** — enforced standards, preferred reuse, forbidden patterns, tooling (lint/format/build/test).
-- **Docs topology** — source-of-truth docs, which paths are symlinks, the plans location.
-- **Open questions / unverified** — anything uncertain; flag rather than assert.
+- **Scope & mode** — what you explored and how, plus the **rigor tier** you ran under and **whether you ran solo or as a committee member** (at `low` that reads as solo).
+- **Tech stack** — languages, frameworks, libraries WITH major versions. Each claim anchored to its `file:line`.
+- **Structure** — directory layout; apps/packages for monorepos. Each claim anchored to its `file:line`.
+- **Dependency graph** — who depends on whom (internal and key external). Each claim anchored to its `file:line`.
+- **Patterns** — idiomatic organization, naming, testing, styling. Each claim anchored to its `file:line`.
+- **Conventions / rules** — enforced standards, preferred reuse, forbidden patterns, tooling (lint/format/build/test). Each claim anchored to its `file:line`.
+- **Docs topology** — source-of-truth docs, which paths are symlinks, the plans location. Each claim anchored to its `file:line`.
+- **Open questions / unverified** — anything uncertain; flag rather than assert. A claim still unverified when you're done is included here, flagged, never silently dropped — see Notes below.
 
 ## Hand-off / next
 
-Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off, and it is the shared worker envelope (see the conventions doc "Worker return envelope"): `status`; `artifacts[]` = [the map file path]; `next` = whatever the caller said it plans from the map (or "consume the map" when unstated); `blockers[]`. Body: a SHORT abstract — mode run, scope covered, stack + majors in one line, the two or three findings that most constrain planning, and what you did NOT read. Never inline the full map; the caller reads the file if it needs more.
+Return contract: as a fork you cannot invoke the next phase yourself — your final report IS the hand-off, and it is the shared worker envelope (see the conventions doc "Worker return envelope"): `status`; `artifacts[]` = [the map file path]; `next` = whatever the caller said it plans from the map (or "consume the map" when unstated); `blockers[]`. Body: a SHORT abstract — mode and rigor tier run (and whether solo or committee member), scope covered, stack + majors in one line, the two or three findings that most constrain planning, and what you did NOT read. Never inline the full map; the caller reads the file if it needs more.
 
 ## Notes
 
 - Read-only: never edit, format, or run mutating commands.
 - Prefer real code and config over prose; descriptions drift, source doesn't.
-- Be honest about coverage — "I did not read X" beats a confident guess.
+- Be honest about coverage — "I did not read X" beats a confident guess. You are a collector, not a gate: a claim still unverified when you're done is included in the map, flagged unverified, never dropped silently.
 - Stay tech-agnostic: any technology named is only an example; report what the repo actually uses.
 - Respect scope boundaries in single-app mode to stay fast and keep your context clean for the orchestrator.

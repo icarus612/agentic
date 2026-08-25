@@ -277,6 +277,118 @@ EOF
 EOF
 }
 
+# build_adopt_fixture <dir> -- fixture tree for the `adopt` subcommand
+# (contract l5.md, Packet 1t), git-init'd and committed so `explored_at`
+# derivation (git log -1 -- <source>) has real history to read.
+build_adopt_fixture() {
+  local dir="$1" pd
+  pd="$dir/project-plans"
+  mkdir -p "$pd"
+
+  # gated-src: qualifying gate record -- last round is ready/proceed.
+  mkdir -p "$pd/gated-src-01-01-26"
+  cat >"$pd/gated-src-01-01-26/plan.md" <<'EOF'
+# Gated Src Plan
+
+## Phase syllabus
+- [ ] Phase 1: Do the thing
+  - [ ] 1.1: First subphase
+
+## Phase 1: Do the thing
+Detail text for subphase 1.1.
+EOF
+  cat >"$pd/gated-src-01-01-26/plan-review.md" <<'EOF'
+# Plan review for Gated Src
+
+## Round 1 — 08-01-26
+
+```
+verdict: tentative
+next: proceed
+blocking: 0
+non-blocking: 0
+```
+
+## Round 2 — 08-02-26
+
+```
+verdict: ready
+next: proceed
+blocking: 0
+non-blocking: 0
+```
+EOF
+
+  # ungated-src: same plan shape, no review record beside it at all.
+  mkdir -p "$pd/ungated-src-01-01-26"
+  cat >"$pd/ungated-src-01-01-26/plan.md" <<'EOF'
+# Ungated Src Plan
+
+## Phase syllabus
+- [ ] Phase 1: Do the thing
+  - [ ] 1.1: First subphase
+
+## Phase 1: Do the thing
+Detail text for subphase 1.1.
+EOF
+
+  # rejected-src: a valid (schema-passing) review record whose last round is
+  # a rejection -- must NOT count as a qualifying gate approval.
+  mkdir -p "$pd/rejected-src-01-01-26"
+  cat >"$pd/rejected-src-01-01-26/plan.md" <<'EOF'
+# Rejected Src Plan
+
+## Phase syllabus
+- [ ] Phase 1: Do the thing
+  - [ ] 1.1: First subphase
+
+## Phase 1: Do the thing
+Detail text for subphase 1.1.
+EOF
+  cat >"$pd/rejected-src-01-01-26/plan-review.md" <<'EOF'
+# Plan review for Rejected Src
+
+## Round 1 — 08-01-26
+
+```
+verdict: rejected
+next: impl-wrong
+blocking: 1
+non-blocking: 0
+```
+
+- [blocking] something is fundamentally broken
+EOF
+
+  # anchored-src: leading front-matter with an anchors: block (two items)
+  # plus one unrelated top-level key, above a plan-format body. No review
+  # record beside it -- callers exercising this fixture must pass
+  # --assume-gated to get past the gate guard.
+  mkdir -p "$pd/anchored-src-01-01-26"
+  cat >"$pd/anchored-src-01-01-26/plan.md" <<'EOF'
+---
+owner: someone-else
+anchors:
+  - anchor-one
+  - anchor-two
+---
+# Anchored Src Plan
+
+## Phase syllabus
+- [ ] Phase 1: Do the thing
+  - [ ] 1.1: First subphase
+
+## Phase 1: Do the thing
+Detail text for subphase 1.1.
+EOF
+
+  git -C "$dir" init -q
+  git -C "$dir" config user.email "plan-lifecycle-test@example.com"
+  git -C "$dir" config user.name "plan-lifecycle-test"
+  git -C "$dir" add -A
+  git -C "$dir" commit -q -m "adopt fixture"
+}
+
 # ---------------------------------------------------------------------------
 # Case 1: bash -n sanity precondition
 # ---------------------------------------------------------------------------
@@ -538,6 +650,267 @@ if [ "$CODE" -ne 0 ] \
 else
   fail "19: check flags the same plan-id in both proposals/ and completed/ (plan AC5)" \
     "code=$CODE out=[$OUT]"
+fi
+
+# ---------------------------------------------------------------------------
+# adopt fixtures: a dedicated scratch tree, git-init'd and committed, shared
+# across cases 20-30 (each mutation targets a fresh --as destination so the
+# shared state stays legible); cases 31-35 use their own isolated scratch
+# trees where the case needs a clean run-dir or a controlled git history.
+# ---------------------------------------------------------------------------
+adopt_scratch=$(new_scratch)
+adopt_plans_dir="$adopt_scratch/project-plans"
+adopt_run_dir="$adopt_scratch/.artifacts"
+build_adopt_fixture "$adopt_scratch"
+mkdir -p "$adopt_run_dir"
+adopt_common_flags=(--root "$adopt_scratch" --plans-dir "$adopt_plans_dir")
+
+# baseline md5s of every source plan.md, captured before case 20 runs (A5,
+# checked by case 27 after cases 20-26 have all run against this tree).
+gated_md5_before=$(md5sum "$adopt_plans_dir/gated-src-01-01-26/plan.md" | awk '{print $1}')
+ungated_md5_before=$(md5sum "$adopt_plans_dir/ungated-src-01-01-26/plan.md" | awk '{print $1}')
+rejected_md5_before=$(md5sum "$adopt_plans_dir/rejected-src-01-01-26/plan.md" | awk '{print $1}')
+anchored_md5_before=$(md5sum "$adopt_plans_dir/anchored-src-01-01-26/plan.md" | awk '{print $1}')
+
+# --- Case 20: adopt a gated source (A2) -------------------------------------
+run_script adopt "$adopt_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" "${adopt_common_flags[@]}"
+gated_dest_dir="$adopt_plans_dir/gated-src-$(date +%m-%d-%y)"
+gated_front=""
+[ -f "$gated_dest_dir/plan.md" ] && gated_front=$(sed -n '1,20p' "$gated_dest_dir/plan.md")
+if [ "$CODE" -eq 0 ] \
+   && [ "$OUT" = "$gated_dest_dir/plan.md" ] \
+   && [ -f "$gated_dest_dir/plan.md" ] \
+   && printf '%s' "$gated_front" | grep -q 'adopted: true' \
+   && printf '%s' "$gated_front" | grep -q 'source_run: gated-src-01-01-26' \
+   && printf '%s' "$gated_front" | grep -q 'explored_at:' \
+   && printf '%s' "$gated_front" | grep -q 'source_gate_verdict:.*ready' \
+   && printf '%s' "$gated_front" | grep -q 'source_gate_verdict:.*plan-review'; then
+  pass "20: adopt a gated source succeeds, stdout is exactly the dest path, front matter carries provenance (A2)"
+else
+  fail "20: adopt a gated source succeeds, stdout is exactly the dest path, front matter carries provenance (A2)" \
+    "code=$CODE out=[$OUT] err=[$ERR] expected=[$gated_dest_dir/plan.md] front=[$gated_front]"
+fi
+
+# --- Case 21: the adopted body survives (A2) --------------------------------
+first_heading=""
+[ -f "$gated_dest_dir/plan.md" ] && first_heading=$(grep -m1 -E '^## ' "$gated_dest_dir/plan.md")
+if [ "$first_heading" = "## Phase syllabus" ] \
+   && grep -qF '1.1: First subphase' "$gated_dest_dir/plan.md" \
+   && grep -qF 'Detail text for subphase 1.1.' "$gated_dest_dir/plan.md"; then
+  pass "21: adopted body keeps ## Phase syllabus as first heading, subphase detail block verbatim (A2)"
+else
+  fail "21: adopted body keeps ## Phase syllabus as first heading, subphase detail block verbatim (A2)" \
+    "first_heading=[$first_heading]"
+fi
+
+# --- Case 22: provenance reaches the progress log (A7) ----------------------
+progress_log="$adopt_run_dir/progress-log.md"
+if [ -f "$progress_log" ] \
+   && grep -q '^## Plan provenance (adopted)$' "$progress_log" \
+   && grep -q 'source run: gated-src-01-01-26' "$progress_log" \
+   && grep -q 'explored_at:' "$progress_log"; then
+  pass "22: progress log carries the plan provenance section naming the source run and explored_at (A7)"
+else
+  fail "22: progress log carries the plan provenance section naming the source run and explored_at (A7)" \
+    "exists=$([ -f "$progress_log" ] && echo yes || echo no) content=[$(cat "$progress_log" 2>/dev/null)]"
+fi
+
+# --- Case 23: ungated source refuses (A3) -----------------------------------
+ungated_dest_dir="$adopt_plans_dir/ungated-src-$(date +%m-%d-%y)"
+run_script adopt "$adopt_plans_dir/ungated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" "${adopt_common_flags[@]}"
+if [ "$CODE" -ne 0 ] \
+   && printf '%s' "$ERR" | grep -q 'no recorded gate approval' \
+   && printf '%s' "$ERR" | grep -q -- '--assume-gated' \
+   && [ ! -e "$ungated_dest_dir" ]; then
+  pass "23: adopt of an ungated source refuses, stderr names the confirm, no destination created (A3)"
+else
+  fail "23: adopt of an ungated source refuses, stderr names the confirm, no destination created (A3)" \
+    "code=$CODE err=[$ERR] dest_exists=$([ -e "$ungated_dest_dir" ] && echo yes || echo no)"
+fi
+
+# --- Case 24: a rejected record does not count as approval (A3) ------------
+rejected_dest_dir="$adopt_plans_dir/rejected-src-$(date +%m-%d-%y)"
+run_script adopt "$adopt_plans_dir/rejected-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" "${adopt_common_flags[@]}"
+if [ "$CODE" -ne 0 ] \
+   && printf '%s' "$ERR" | grep -q 'no recorded gate approval' \
+   && printf '%s' "$ERR" | grep -q -- '--assume-gated' \
+   && [ ! -e "$rejected_dest_dir" ]; then
+  pass "24: a rejected plan-review record does not qualify as approval, same refusal as an ungated source (A3)"
+else
+  fail "24: a rejected plan-review record does not qualify as approval, same refusal as an ungated source (A3)" \
+    "code=$CODE err=[$ERR] dest_exists=$([ -e "$rejected_dest_dir" ] && echo yes || echo no)"
+fi
+
+# --- Case 25: --assume-gated unblocks it (A4) -------------------------------
+assume_reason="ops approved this out of band"
+run_script adopt "$adopt_plans_dir/ungated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --assume-gated "$assume_reason" "${adopt_common_flags[@]}"
+ungated_front=""
+[ -f "$ungated_dest_dir/plan.md" ] && ungated_front=$(sed -n '1,20p' "$ungated_dest_dir/plan.md")
+if [ "$CODE" -eq 0 ] \
+   && [ -f "$ungated_dest_dir/plan.md" ] \
+   && printf '%s' "$ungated_front" | grep -q "source_gate_verdict:.*none-on-record" \
+   && printf '%s' "$ungated_front" | grep -qF "$assume_reason"; then
+  pass "25: --assume-gated <reason> unblocks adoption, destination records none-on-record and the reason verbatim (A4)"
+else
+  fail "25: --assume-gated <reason> unblocks adoption, destination records none-on-record and the reason verbatim (A4)" \
+    "code=$CODE err=[$ERR] front=[$ungated_front]"
+fi
+
+# --- Case 26: --assume-gated with an empty reason ---------------------------
+run_script adopt "$adopt_plans_dir/rejected-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --assume-gated "" "${adopt_common_flags[@]}"
+if [ "$CODE" -ne 0 ] \
+   && printf '%s' "$ERR" | grep -q 'non-empty reason' \
+   && [ ! -e "$rejected_dest_dir" ]; then
+  pass "26: --assume-gated with an empty reason is refused, nothing created"
+else
+  fail "26: --assume-gated with an empty reason is refused, nothing created" \
+    "code=$CODE err=[$ERR] dest_exists=$([ -e "$rejected_dest_dir" ] && echo yes || echo no)"
+fi
+
+# --- Case 27: source is never moved or mutated across cases 20-26 (A5) -----
+gated_md5_after=$(md5sum "$adopt_plans_dir/gated-src-01-01-26/plan.md" | awk '{print $1}')
+ungated_md5_after=$(md5sum "$adopt_plans_dir/ungated-src-01-01-26/plan.md" | awk '{print $1}')
+rejected_md5_after=$(md5sum "$adopt_plans_dir/rejected-src-01-01-26/plan.md" | awk '{print $1}')
+anchored_md5_after=$(md5sum "$adopt_plans_dir/anchored-src-01-01-26/plan.md" | awk '{print $1}')
+if [ "$gated_md5_before" = "$gated_md5_after" ] \
+   && [ "$ungated_md5_before" = "$ungated_md5_after" ] \
+   && [ "$rejected_md5_before" = "$rejected_md5_after" ] \
+   && [ "$anchored_md5_before" = "$anchored_md5_after" ] \
+   && [ -f "$adopt_plans_dir/gated-src-01-01-26/plan.md" ] \
+   && [ -f "$adopt_plans_dir/ungated-src-01-01-26/plan.md" ] \
+   && [ -f "$adopt_plans_dir/rejected-src-01-01-26/plan.md" ] \
+   && [ -f "$adopt_plans_dir/anchored-src-01-01-26/plan.md" ]; then
+  pass "27: source plan.md files are never moved or mutated across cases 20-26 (A5)"
+else
+  fail "27: source plan.md files are never moved or mutated across cases 20-26 (A5)" \
+    "gated=$gated_md5_before/$gated_md5_after ungated=$ungated_md5_before/$ungated_md5_after rejected=$rejected_md5_before/$rejected_md5_after anchored=$anchored_md5_before/$anchored_md5_after"
+fi
+
+# --- Case 28: anchors inherited in order (A6) -------------------------------
+run_script adopt "$adopt_plans_dir/anchored-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --assume-gated "no review record for this fixture" --as "anchored-dest-01-01-26" "${adopt_common_flags[@]}"
+anchored_dest="$adopt_plans_dir/anchored-dest-01-01-26/plan.md"
+anchored_front=""
+fence_count=0
+if [ -f "$anchored_dest" ]; then
+  anchored_front=$(awk 'BEGIN{c=0} /^---$/{c++; print; if (c==2) exit; next} {print}' "$anchored_dest")
+  fence_count=$(grep -cE '^---$' "$anchored_dest")
+fi
+anchor_one_line=$(printf '%s\n' "$anchored_front" | grep -n 'anchor-one' | head -1 | cut -d: -f1)
+anchor_two_line=$(printf '%s\n' "$anchored_front" | grep -n 'anchor-two' | head -1 | cut -d: -f1)
+if [ "$CODE" -eq 0 ] \
+   && [ -n "$anchor_one_line" ] && [ -n "$anchor_two_line" ] \
+   && [ "$anchor_one_line" -lt "$anchor_two_line" ] \
+   && printf '%s' "$anchored_front" | grep -q 'owner: someone-else' \
+   && [ "$fence_count" -eq 2 ]; then
+  pass "28: anchors inherited from source front matter in order, unrelated top-level key carried through, one fence pair (A6)"
+else
+  fail "28: anchors inherited from source front matter in order, unrelated top-level key carried through, one fence pair (A6)" \
+    "code=$CODE err=[$ERR] fence_count=$fence_count front=[$anchored_front]"
+fi
+
+# --- Case 29: --anchors overrides (A6) --------------------------------------
+run_script adopt "$adopt_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --anchors "a,b" --as "anchors-override-01-01-26" "${adopt_common_flags[@]}"
+override_dest="$adopt_plans_dir/anchors-override-01-01-26/plan.md"
+override_front=""
+[ -f "$override_dest" ] && override_front=$(awk 'BEGIN{c=0} /^---$/{c++; print; if (c==2) exit; next} {print}' "$override_dest")
+a_line=$(printf '%s\n' "$override_front" | grep -nE '^[[:space:]]*-[[:space:]]*a[[:space:]]*$' | head -1 | cut -d: -f1)
+b_line=$(printf '%s\n' "$override_front" | grep -nE '^[[:space:]]*-[[:space:]]*b[[:space:]]*$' | head -1 | cut -d: -f1)
+if [ "$CODE" -eq 0 ] && [ -n "$a_line" ] && [ -n "$b_line" ] && [ "$a_line" -lt "$b_line" ]; then
+  pass "29: --anchors a,b overrides a source with no anchors, both present in the order given (A6)"
+else
+  fail "29: --anchors a,b overrides a source with no anchors, both present in the order given (A6)" \
+    "code=$CODE err=[$ERR] front=[$override_front]"
+fi
+
+# --- Case 30: no anchors anywhere yields anchors: none (A6) ----------------
+run_script adopt "$adopt_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --as "no-anchors-01-01-26" "${adopt_common_flags[@]}"
+none_dest="$adopt_plans_dir/no-anchors-01-01-26/plan.md"
+if [ "$CODE" -eq 0 ] && [ -f "$none_dest" ] && grep -qE '^anchors: none$' "$none_dest"; then
+  pass "30: no anchors in the source and none passed via --anchors yields the explicit line 'anchors: none' (A6)"
+else
+  fail "30: no anchors in the source and none passed via --anchors yields the explicit line 'anchors: none' (A6)" \
+    "code=$CODE err=[$ERR]"
+fi
+
+# --- Case 31: --run-dir is required (usage) ---------------------------------
+run_script adopt "$adopt_plans_dir/gated-src-01-01-26/plan.md" --as "no-run-dir-01-01-26" "${adopt_common_flags[@]}"
+if [ "$CODE" -ne 0 ] && [ ! -e "$adopt_plans_dir/no-run-dir-01-01-26" ]; then
+  pass "31: adopt with no --run-dir exits non-zero and creates nothing"
+else
+  fail "31: adopt with no --run-dir exits non-zero and creates nothing" \
+    "code=$CODE err=[$ERR] dest_exists=$([ -e "$adopt_plans_dir/no-run-dir-01-01-26" ] && echo yes || echo no)"
+fi
+
+# --- Case 32: destination collision -----------------------------------------
+run_script adopt "$adopt_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --as "collide-target-01-01-26" "${adopt_common_flags[@]}"
+collide_first_code=$CODE
+collide_dest="$adopt_plans_dir/collide-target-01-01-26/plan.md"
+collide_first_md5=""
+[ -f "$collide_dest" ] && collide_first_md5=$(md5sum "$collide_dest" | awk '{print $1}')
+run_script adopt "$adopt_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$adopt_run_dir" --as "collide-target-01-01-26" "${adopt_common_flags[@]}"
+collide_second_md5=""
+[ -f "$collide_dest" ] && collide_second_md5=$(md5sum "$collide_dest" | awk '{print $1}')
+if [ "$collide_first_code" -eq 0 ] && [ "$CODE" -ne 0 ] \
+   && [ -n "$collide_first_md5" ] && [ "$collide_first_md5" = "$collide_second_md5" ]; then
+  pass "32: adopting the same source into an existing --as destination refuses on the second attempt, first destination unchanged"
+else
+  fail "32: adopting the same source into an existing --as destination refuses on the second attempt, first destination unchanged" \
+    "first_code=$collide_first_code code=$CODE first_md5=$collide_first_md5 second_md5=$collide_second_md5 err=[$ERR]"
+fi
+
+# --- Case 33: adopt --dry-run makes zero filesystem changes (A8) -----------
+dryrun_adopt_scratch=$(new_scratch)
+dryrun_adopt_plans_dir="$dryrun_adopt_scratch/project-plans"
+dryrun_adopt_run_dir="$dryrun_adopt_scratch/.artifacts"
+build_adopt_fixture "$dryrun_adopt_scratch"
+mkdir -p "$dryrun_adopt_run_dir"
+fp_before=$(tree_fingerprint "$dryrun_adopt_plans_dir")
+run_script adopt "$dryrun_adopt_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$dryrun_adopt_run_dir" --dry-run --root "$dryrun_adopt_scratch" --plans-dir "$dryrun_adopt_plans_dir"
+fp_after=$(tree_fingerprint "$dryrun_adopt_plans_dir")
+if [ "$CODE" -eq 0 ] && [ "$fp_before" = "$fp_after" ] && [ ! -f "$dryrun_adopt_run_dir/progress-log.md" ]; then
+  pass "33: adopt --dry-run makes zero filesystem changes, creates no progress log, exit 0 (A8)"
+else
+  fail "33: adopt --dry-run makes zero filesystem changes, creates no progress log, exit 0 (A8)" \
+    "code=$CODE fp_before=$fp_before fp_after=$fp_after out=[$OUT] err=[$ERR]"
+fi
+
+# --- Case 34: provenance section is replaced, not appended (A7) ------------
+replace_scratch=$(new_scratch)
+replace_plans_dir="$replace_scratch/project-plans"
+replace_run_dir="$replace_scratch/.artifacts"
+build_adopt_fixture "$replace_scratch"
+mkdir -p "$replace_run_dir"
+run_script adopt "$replace_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$replace_run_dir" --as "replace-first-01-01-26" --root "$replace_scratch" --plans-dir "$replace_plans_dir"
+replace_first_code=$CODE
+run_script adopt "$replace_plans_dir/ungated-src-01-01-26/plan.md" --run-dir "$replace_run_dir" --as "replace-second-01-01-26" --assume-gated "second adopt for replace test" --root "$replace_scratch" --plans-dir "$replace_plans_dir"
+replace_heading_count=0
+[ -f "$replace_run_dir/progress-log.md" ] && replace_heading_count=$(grep -cE '^## Plan provenance \(adopted\)$' "$replace_run_dir/progress-log.md" || true)
+if [ "$replace_first_code" -eq 0 ] && [ "$CODE" -eq 0 ] \
+   && [ "$replace_heading_count" -eq 1 ] \
+   && grep -q 'source run: ungated-src-01-01-26' "$replace_run_dir/progress-log.md"; then
+  pass "34: two successive adopts (different --as) against the same --run-dir leave exactly one provenance heading (A7)"
+else
+  fail "34: two successive adopts (different --as) against the same --run-dir leave exactly one provenance heading (A7)" \
+    "first_code=$replace_first_code code=$CODE heading_count=$replace_heading_count err=[$ERR]"
+fi
+
+# --- Case 35: changed-file recording ----------------------------------------
+changed_scratch=$(new_scratch)
+changed_plans_dir="$changed_scratch/project-plans"
+changed_run_dir="$changed_scratch/.artifacts"
+build_adopt_fixture "$changed_scratch"
+mkdir -p "$changed_run_dir"
+echo "post-adoption-source change" >"$changed_scratch/extra-tracked-file.txt"
+git -C "$changed_scratch" add -A
+git -C "$changed_scratch" commit -q -m "advance history past the source's own commit"
+run_script adopt "$changed_plans_dir/gated-src-01-01-26/plan.md" --run-dir "$changed_run_dir" --root "$changed_scratch" --plans-dir "$changed_plans_dir"
+changed_line=""
+[ -f "$changed_run_dir/progress-log.md" ] && changed_line=$(grep -E '^- changed since explored_at:' "$changed_run_dir/progress-log.md" || true)
+if [ "$CODE" -eq 0 ] && [ -n "$changed_line" ] && printf '%s' "$changed_line" | grep -qE '[0-9]|unknown'; then
+  pass "35: progress log records a 'changed since explored_at' line carrying a count or 'unknown'"
+else
+  fail "35: progress log records a 'changed since explored_at' line carrying a count or 'unknown'" \
+    "code=$CODE changed_line=[$changed_line] err=[$ERR]"
 fi
 
 # ---------------------------------------------------------------------------

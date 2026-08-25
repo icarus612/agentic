@@ -37,14 +37,16 @@ don't exist, so they refer to each other by name and to bindings by `domain:`.
 |---|---|
 | [`architecture.md`](architecture.md) | The organizing principle (`domain:` = what a thing is bound to = where it installs), directory structure, the skill/rule/hook separation, and the dependency graph. |
 | [`conventions.md`](conventions.md) | The authoritative spec: skill and rule file formats, the `domain:` classifier, model policy, artifact locations, plan format, contribution rules. |
-| [`pipeline.md`](pipeline.md) | The dae pipeline: one router, four workflows (build / diagnose / document / sync), two workers through cold gates to a PR, plus the hooks and scripts. |
+| [`pipeline.md`](pipeline.md) | The dae pipeline: one router, ten types over four `pipeline`-axis values (build / plan / report / docs) resolving to five middle files, two workers through cold gates to a PR — or, for a report type, straight to chat — plus the hooks and scripts. |
 | [`tool-based.md`](tool-based.md) | The tech layers — status of each, naming, and how to add one. |
 
 ## At a glance
 
-- **Not a runtime project.** No manifest, lockfile, build, or test suite. The
+- **Not a runtime project.** No manifest, lockfile, or build system. The
   only executable code is the Bash under `agent-agnostic/hooks/` and
-  `orchestrators/hooks/`, which runs inside *consuming* projects.
+  `orchestrators/hooks/` (runs inside *consuming* projects), plus `tests/`
+  (8 contract-test suites exercising those hooks against this repo itself —
+  still no test framework or runner beyond that).
 - **Everything else is markdown.**
 - **No CI, license, `CONTRIBUTING.md`, or `CHANGELOG`.**
 - **This `/docs` tree was bootstrapped by a map-driven documentation run** (a deep

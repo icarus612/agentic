@@ -11,6 +11,10 @@
 #   supersede <plan-path> --by <successor> DELETE a plan that never shipped
 #   reopen <completed-file>                completed/<slug>.md -> <slug>/plan.md
 #   check [<path>]                         layout conformance of the plans dir (or one plan)
+#   adopt <source-plan-path> --run-dir <dir>
+#                                           import an externally-planned plan into this run's
+#                                           namespace, recording provenance in the plan
+#                                           front-matter and the run's progress log
 #
 # DESCRIPTION
 #   A "plan-id" is the full dated identifier <feature-slug>-MM-DD-YY (see
@@ -28,6 +32,14 @@
 #     --by <successor>    supersede only
 #     --force-incomplete <reason>
 #                         archive only; bypasses the completeness guard
+#     --run-dir <dir>     adopt only; REQUIRED; the run's gitignored run dir
+#     --as <plan-id>      adopt only; destination plan-id (default: derived)
+#     --gate-record <path>
+#                         adopt only; use exactly this file as the gate-approval record
+#     --assume-gated <reason>
+#                         adopt only; bypasses the gate-approval refusal (human confirmed)
+#     --explored-at <sha> adopt only; tree state the plan was written against
+#     --anchors <list>    adopt only; comma-separated and/or repeatable
 #
 #   Every destructive operation (git rm, plain rm, rmdir) refuses unless its
 #   target resolves to the plans dir itself or a path under it. Moves and
@@ -57,6 +69,13 @@ dry_run=0
 by=""
 force_incomplete_set=0
 force_incomplete_reason=""
+run_dir=""
+as_plan_id=""
+gate_record_path=""
+assume_gated_set=0
+assume_gated_reason=""
+explored_at_override=""
+anchors_flag_values=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -65,6 +84,12 @@ while [ $# -gt 0 ]; do
     --dry-run) dry_run=1; shift ;;
     --by) by="${2:-}"; shift 2 ;;
     --force-incomplete) force_incomplete_set=1; force_incomplete_reason="${2:-}"; shift 2 ;;
+    --run-dir) run_dir="${2:-}"; shift 2 ;;
+    --as) as_plan_id="${2:-}"; shift 2 ;;
+    --gate-record) gate_record_path="${2:-}"; shift 2 ;;
+    --assume-gated) assume_gated_set=1; assume_gated_reason="${2:-}"; shift 2 ;;
+    --explored-at) explored_at_override="${2:-}"; shift 2 ;;
+    --anchors) anchors_flag_values+=("${2:-}"); shift 2 ;;
     -*) err "unknown flag: $1" ;;
     *)
       if [ -z "$subcommand" ]; then subcommand="$1"; else positional+=("$1"); fi
@@ -364,6 +389,297 @@ cmd_reopen() {
   [ "$dry_run" = 1 ] || echo "$dest_dir/plan.md"
 }
 
+# --- adopt -------------------------------------------------------------
+adopt_qualify_candidate() { # <file> -> prints "verdict\nnext\nround"; returns 1 if it does not qualify
+  local file="$1"
+  [ -f "$file" ] || return 1
+  "$hookdir/validate-report.sh" "$file" >/dev/null 2>&1 || return 1
+  local last round hdr verdict next
+  last=$(grep -E '^## Round [0-9]+' "$file" | tail -1 | grep -oE 'Round [0-9]+' | awk '{print $2}')
+  [ -n "$last" ] || return 1
+  round=$(awk -v r="^## Round ${last} " '$0 ~ r {f=1} f' "$file")
+  hdr=$(printf '%s\n' "$round" | awk '/^```/{n++; next} n==1')
+  verdict=$(printf '%s\n' "$hdr" | grep -m1 -E '^verdict:' | sed -E 's/^verdict:[[:space:]]*//')
+  next=$(printf '%s\n' "$hdr" | grep -m1 -E '^next:' | sed -E 's/^next:[[:space:]]*//')
+  case "$verdict" in ready|tentative) : ;; *) return 1 ;; esac
+  [ "$next" = "proceed" ] || return 1
+  printf '%s\n%s\n%s\n' "$verdict" "$next" "$last"
+}
+
+adopt_front_matter_close_line() { # <file> -> prints closing '---' line number; returns 1 if no leading front matter
+  local file="$1" n
+  [ "$(sed -n '1p' -- "$file")" = "---" ] || return 1
+  n=$(awk 'NR>1 && /^---$/{print NR; exit}' "$file")
+  [ -n "$n" ] || return 1
+  printf '%s\n' "$n"
+}
+
+adopt_extract_other_keys() { # reads source front-matter content on stdin; drops reserved top-level keys + their continuation lines
+  awk '
+    /^[A-Za-z_][A-Za-z0-9_.-]*:/ {
+      key=$0; sub(/:.*$/, "", key)
+      if (key=="adopted" || key=="source_plan" || key=="source_run" || key=="source_gate_verdict" || key=="explored_at" || key=="adopted_at" || key=="anchors") {
+        cur_skip=1
+      } else {
+        cur_skip=0
+      }
+    }
+    { if (!cur_skip) print }
+  '
+}
+
+adopt_write_progress_log() { # <file> <section>
+  local file="$1" section="$2" tmp
+  if [ -f "$file" ] && grep -q '^## Plan provenance (adopted)$' "$file"; then
+    tmp=$(mktemp)
+    ADOPT_SECTION="$section" awk '
+      BEGIN { section = ENVIRON["ADOPT_SECTION"] }
+      /^## Plan provenance \(adopted\)$/ { print section; skipping=1; next }
+      skipping && /^## / { skipping=0 }
+      skipping { next }
+      { print }
+    ' "$file" > "$tmp" || { [ -e "$tmp" ] && rm -- "$tmp"; err "failed to update $file"; }
+    mv -- "$tmp" "$file" || err "failed to update $file"
+  elif [ -f "$file" ]; then
+    tmp=$(mktemp)
+    { cat -- "$file"; printf '\n%s\n' "$section"; } > "$tmp" || { [ -e "$tmp" ] && rm -- "$tmp"; err "failed to update $file"; }
+    mv -- "$tmp" "$file" || err "failed to update $file"
+  else
+    { echo "# Progress log"; printf '\n%s\n' "$section"; } > "$file" || err "failed to create $file"
+  fi
+}
+
+cmd_adopt() {
+  local source="${1:-}"
+
+  if [ -z "$source" ] || [ -z "$run_dir" ]; then
+    err "usage: plan-lifecycle.sh adopt <source-plan-path> --run-dir <dir> [--as <plan-id>] [--gate-record <path>] [--assume-gated <reason>] [--explored-at <sha>] [--anchors <list>]"
+  fi
+  if [ "$assume_gated_set" = 1 ] && [ -z "$assume_gated_reason" ]; then
+    err "usage: --assume-gated requires a non-empty reason"
+  fi
+
+  [ -f "$source" ] || err "source plan not found: $source"
+
+  # --- step 3: plan ids ---
+  local src_base source_plan_id
+  src_base=$(basename -- "$source")
+  if [ "$src_base" = "plan.md" ]; then
+    source_plan_id=$(basename -- "$(dirname -- "$source")")
+  else
+    source_plan_id="${src_base%.md}"
+  fi
+
+  if ! printf '%s' "$source_plan_id" | grep -qE "$PLAN_ID_RE"; then
+    [ -n "$as_plan_id" ] || err "cannot derive a plan-id from $source; pass --as <plan-id>"
+  fi
+
+  local today dest_plan_id
+  today=$(date +%m-%d-%y)
+  if [ -n "$as_plan_id" ]; then
+    dest_plan_id="$as_plan_id"
+  else
+    local stripped
+    stripped=$(printf '%s' "$source_plan_id" | sed -E 's/-[0-9]{2}-[0-9]{2}-[0-9]{2}$//')
+    dest_plan_id="${stripped}-${today}"
+  fi
+  printf '%s' "$dest_plan_id" | grep -qE "$PLAN_ID_RE" || err "not a valid plan-id: $dest_plan_id"
+
+  # --- step 4: destination ---
+  local dest_dir
+  dest_dir="$plans_dir/$dest_plan_id"
+  [ -e "$dest_dir" ] && err "destination already exists: $dest_dir"
+
+  # --- step 5: gate approval ---
+  local src_dirname src_dirname_abs proposals_abs
+  src_dirname=$(dirname -- "$source")
+  src_dirname_abs=$(realpath -m -- "$src_dirname" 2>/dev/null || printf '%s' "$src_dirname")
+  proposals_abs=$(realpath -m -- "$proposals_dir" 2>/dev/null || printf '%s' "$proposals_dir")
+
+  local candidates=()
+  if [ -n "$gate_record_path" ]; then
+    candidates=("$gate_record_path")
+  elif [ "$src_base" = "plan.md" ]; then
+    candidates=("$src_dirname/plan-review.md" "$src_dirname/pr-review.md")
+  elif [ "$src_dirname_abs" = "$proposals_abs" ]; then
+    candidates=("$proposals_dir/$source_plan_id.plan-review.md")
+  fi
+
+  local source_gate_verdict="" gate_qualified=0
+  local cand
+  for cand in "${candidates[@]}"; do
+    [ -n "$cand" ] || continue
+    local result
+    if result=$(adopt_qualify_candidate "$cand"); then
+      local verdict next round cand_base
+      verdict=$(printf '%s\n' "$result" | sed -n '1p')
+      next=$(printf '%s\n' "$result" | sed -n '2p')
+      round=$(printf '%s\n' "$result" | sed -n '3p')
+      cand_base=$(basename -- "$cand")
+      source_gate_verdict="$verdict/$next ($cand_base, round $round)"
+      gate_qualified=1
+      break
+    fi
+  done
+
+  if [ "$gate_qualified" != 1 ]; then
+    if [ "$assume_gated_set" != 1 ]; then
+      err "no recorded gate approval for $source_plan_id; a human must confirm \"treat as approved?\" — re-run with --assume-gated <reason>"
+    fi
+    source_gate_verdict="none-on-record (confirmed: $assume_gated_reason)"
+  fi
+
+  # --- step 6: explored_at ---
+  local explored_at
+  if [ -n "$explored_at_override" ]; then
+    explored_at="$explored_at_override"
+  else
+    explored_at=$(git -C "$root" log -1 --format=%H -- "$source" 2>/dev/null)
+    if [ -z "$explored_at" ]; then
+      explored_at="unknown"
+      echo "plan-lifecycle: explored_at unknown; the staleness guard must treat this adoption as stale" >&2
+    fi
+  fi
+
+  # --- source front matter, consumed once (used by steps 7 and 8) ---
+  local has_fm=0 fm_close="" fm_content="" body=""
+  if fm_close=$(adopt_front_matter_close_line "$source"); then
+    has_fm=1
+    fm_content=$(sed -n "2,$((fm_close-1))p" -- "$source")
+    body=$(sed -n "$((fm_close+1)),\$p" -- "$source")
+  else
+    body=$(cat -- "$source")
+  fi
+
+  # --- step 7: anchors ---
+  local anchors=()
+  if [ ${#anchors_flag_values[@]} -gt 0 ]; then
+    local av
+    for av in "${anchors_flag_values[@]}"; do
+      local adopt_parts=() part_raw trimmed
+      IFS=',' read -ra adopt_parts <<< "$av"
+      for part_raw in "${adopt_parts[@]}"; do
+        trimmed=$(printf '%s' "$part_raw" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+        [ -n "$trimmed" ] && anchors+=("$trimmed")
+      done
+    done
+  elif [ "$has_fm" = 1 ]; then
+    local anchor_lines
+    anchor_lines=$(printf '%s\n' "$fm_content" | awk '
+      /^anchors:[[:space:]]*$/ { f=1; next }
+      f && /^[[:space:]]+- / { print; next }
+      f { exit }
+    ')
+    if [ -n "$anchor_lines" ]; then
+      local aline aitem
+      while IFS= read -r aline; do
+        [ -n "$aline" ] || continue
+        aitem=$(printf '%s' "$aline" | sed -E 's/^[[:space:]]*-[[:space:]]*//')
+        anchors+=("$aitem")
+      done <<< "$anchor_lines"
+    fi
+  fi
+
+  # --- step 8a: destination plan ---
+  ensure_dir "$dest_dir"
+  if [ "$dry_run" = 1 ]; then
+    echo "DRY-RUN: adopt $source -> $dest_dir/plan.md"
+  else
+    {
+      echo "---"
+      echo "adopted: true"
+      echo "source_plan: $source"
+      echo "source_run: $source_plan_id"
+      echo "source_gate_verdict: $source_gate_verdict"
+      echo "explored_at: $explored_at"
+      echo "adopted_at: $today"
+      if [ ${#anchors[@]} -gt 0 ]; then
+        echo "anchors:"
+        local a
+        for a in "${anchors[@]}"; do
+          echo "  - $a"
+        done
+      else
+        echo "anchors: none"
+      fi
+      if [ "$has_fm" = 1 ] && [ -n "$fm_content" ]; then
+        printf '%s\n' "$fm_content" | adopt_extract_other_keys
+      fi
+      echo "---"
+      printf '%s\n' "$body"
+    } > "$dest_dir/plan.md" || err "failed to write $dest_dir/plan.md"
+  fi
+
+  # --- step 8b: progress log ---
+  local anchors_joined
+  if [ ${#anchors[@]} -gt 0 ]; then
+    anchors_joined=$(IFS=,; printf '%s' "${anchors[*]}")
+  else
+    anchors_joined="none"
+  fi
+
+  local changed_status="ok" changed_files="" changed_count=0
+  if [ "$explored_at" = "unknown" ]; then
+    changed_status="unknown"
+  else
+    if changed_files=$(git -C "$root" diff --name-only "$explored_at"..HEAD 2>/dev/null); then
+      changed_status="ok"
+    else
+      changed_status="unknown"
+    fi
+  fi
+
+  local changed_line changed_path_arr=()
+  if [ "$changed_status" = "unknown" ]; then
+    changed_line="- changed since explored_at: unknown (treat as stale)"
+  else
+    changed_count=$(printf '%s\n' "$changed_files" | grep -cE '.' || true)
+    changed_line="- changed since explored_at: ${changed_count} file(s)"
+    if [ "$changed_count" -gt 0 ]; then
+      local pf
+      if [ "$changed_count" -gt 50 ]; then
+        while IFS= read -r pf; do
+          changed_path_arr+=("  - $pf")
+        done < <(printf '%s\n' "$changed_files" | head -n 50)
+        local more=$((changed_count - 50))
+        changed_path_arr+=("  - … and ${more} more")
+      else
+        while IFS= read -r pf; do
+          changed_path_arr+=("  - $pf")
+        done <<< "$changed_files"
+      fi
+    fi
+  fi
+
+  local prov_lines=(
+    "## Plan provenance (adopted)"
+    ""
+    "- adopted plan: $dest_dir/plan.md"
+    "- source plan: $source"
+    "- source run: $source_plan_id"
+    "- source gate verdict: $source_gate_verdict"
+    "- explored_at: $explored_at"
+    "- anchors: $anchors_joined"
+    "$changed_line"
+  )
+  if [ ${#changed_path_arr[@]} -gt 0 ]; then
+    prov_lines+=("${changed_path_arr[@]}")
+  fi
+  local provenance_section
+  provenance_section=$(printf '%s\n' "${prov_lines[@]}")
+
+  local progress_log="$run_dir/progress-log.md"
+  if [ "$dry_run" = 1 ]; then
+    echo "DRY-RUN: record provenance in $progress_log"
+  else
+    ensure_dir "$run_dir"
+    adopt_write_progress_log "$progress_log" "$provenance_section"
+  fi
+
+  # --- step 9: output ---
+  [ "$dry_run" = 1 ] || echo "$dest_dir/plan.md"
+}
+
 # --- check -------------------------------------------------------------
 fail=0
 say_fail() { echo "FAIL: $*"; fail=1; }
@@ -557,5 +873,6 @@ case "$subcommand" in
   supersede) cmd_supersede "${positional[@]}" ;;
   reopen) cmd_reopen "${positional[@]}" ;;
   check) cmd_check "${positional[@]}" ;;
+  adopt) cmd_adopt "${positional[@]}" ;;
   *) err "unknown subcommand: $subcommand" ;;
 esac

@@ -45,16 +45,18 @@ agentic/
 ├── AGENTS.md                  # the index (payload)
 ├── orchestrators/             # entry points + workers          (domain: universal)
 │   ├── AGENTS.md
-│   ├── skills/                #   dae (router + workflow siblings + scripts), orchestrate
+│   ├── skills/                #   dae (router + workflows.yaml type table + middle
+│   │                          #   files + report-skeleton.md), orchestrate
 │   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
-│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
+│   │                          #   resolve-type.sh, resolve-anchor.sh, sync-install.sh,
+│   │                          #   scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
 │   │                          #   plan-lifecycle.sh, …
 │   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
-│                              #   contract-tester.md
+│                              #   contract-tester.md, committee.md
 ├── agent-agnostic/                   # the global layer                (domain: universal)
 │   ├── AGENTS.md
-│   ├── rules/                 #   the always-on set (8)
-│   ├── skills/                #   the 7 tech-agnostic forks/gates
+│   ├── rules/                 #   the always-on set (10)
+│   ├── skills/                #   the 9 tech-agnostic forks/gates
 │   ├── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired)
 │   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # the tech layers                 (domain: <tech>)
@@ -63,7 +65,7 @@ agentic/
 │       ├── AGENTS.md          #   + stubs: bash, git, go, react, python, fastapi
 │       ├── rules/
 │       └── skills/
-├── tests/                     # contract tests for the lifecycle + scope-verification scripts
+├── tests/                     # contract tests (8 suites) for the lifecycle + scope-verification scripts
 └── docs/                      # meta-docs about the repo (this tree)
 ```
 
@@ -83,7 +85,7 @@ See [`pipeline.md`](pipeline.md) for the dae pipeline and
 > descriptions say so — the guard that stops single-word skills (`explore`)
 > auto-firing on a stray keyword. Tech skills *are* meant to match by
 > description whenever their tech is in play. A skill may carry sibling detail
-> files and a `scripts/` dir next to its SKILL.md (the `dae` router's workflow
+> files and a `scripts/` dir next to its SKILL.md (the `dae` router's middle
 > files; `review-plan`'s `validate-plan.sh`).
 >
 > **Worker agents are neither.** `agents/*.md` definitions (`planner`,
@@ -106,20 +108,26 @@ A prompt dependency graph, not a code import graph — "depends on" means "hands
 off to" or "is composed with."
 
 - **`dae`** (`/dae`) resolves the docs target, captures the story when it names
-  Confluence, creates the parent worktree via `workflow-setup.sh`, classifies
-  the request into ONE workflow (`build.md` / `diagnose.md` / `document.md` /
-  `sync.md`), then drives: `planner` (‖ `init-workspace`) → `review-plan`
-  (gate; capped; revisions via SendMessage to the warm planner) → approval →
-  `push-pr --stage open-draft` (draft PR opens right after the gate) →
-  `builder` lanes (event-driven dispatch; each in its own child worktree,
-  running the packet model with `coder`/`contract-tester` sub-agents;
-  merge-back + `push-pr --stage update` + cleanup per lane) → `review-code`
-  (gate; capped; reason-code kickbacks) → `document-local` **or**
-  `document-confluence` → `push-pr --stage update` (commits + pushes the
-  record output) → `review-pr` — the mandatory PR gate, run before
-  `finalize` on EVERY run, never optional or independent — (`ready`/
-  `tentative` → `push-pr --stage finalize`; `rejected` → replan / rebuild /
-  leave the PR as a draft + `comment-pr`).
+  Confluence, and resolves the request to ONE **type**, whose **pipeline**
+  axis selects a middle file (`build.md` / `diagnose.md` / `sync.md` /
+  `report.md` / `document.md` — ten types across four pipeline values). A
+  `pipeline: report` type (`map`/`analyze`) defaults to `ship: chat`: explore,
+  fill the report skeleton, answer in chat — zero gates, zero git side
+  effects, no worktree. Every other type creates the parent worktree via
+  `workflow-setup.sh` and drives: `planner` (‖ `init-workspace`) →
+  `review-plan` (gate; capped; revisions via SendMessage to the warm planner)
+  → approval → `push-pr --stage open-draft` (draft PR opens right after the
+  gate) → `builder` lanes (event-driven dispatch; each in its own child
+  worktree, running the packet model with `coder`/`contract-tester`
+  sub-agents; merge-back + `push-pr --stage update` + cleanup per lane) →
+  `review-code` (gate, run once every builder lane has merged, over the whole
+  assembled implementation — never scoped to one lane; capped; reason-code
+  kickbacks) → `document-local` **or** `document-confluence` →
+  `push-pr --stage update` (commits + pushes the record output) →
+  `review-pr` — the mandatory PR gate, run before `finalize` on EVERY
+  `ship: publish` run, never optional or independent — (`ready`/`tentative` →
+  `push-pr --stage finalize`; `rejected` → replan / rebuild / leave the PR as
+  a draft + `comment-pr`).
 - **Documentation dispatch** (`artifact-locations`): a local docs path →
   `document-local` (universal); a Confluence location → `document-confluence`
   (`domain: confluence`), which also pulls in `external-storage-cap` and sends
@@ -137,4 +145,6 @@ off to" or "is composed with."
 - `model-fallback:` is declarative only — Claude Code reads the single `model:`.
 - The item-8 scripts re-sweep (further mechanical extractions) is deliberately
   deferred until after this redesign settled — sweep against the final tree.
-- No CI, build system, test suite, license, `CONTRIBUTING.md`, or `CHANGELOG`.
+- No CI, build system, license, `CONTRIBUTING.md`, or `CHANGELOG`. `tests/`
+  holds 8 contract-test suites for the lifecycle + scope-verification
+  scripts — still no test framework or runner beyond that.

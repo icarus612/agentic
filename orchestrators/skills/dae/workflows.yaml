@@ -1,0 +1,27 @@
+# workflows.yaml — the dae type table: every type is a preset over the five axes.
+#
+# Structurally boring on purpose: exact skill names, no prose in cells, executed
+# imperatively ("exactly the row for this type"), no interpretive gap.
+#
+# FORMAT IS LOAD-BEARING: every row is a ONE-LINE FLOW MAP. This repo has no jq and
+# no YAML parser (orchestrators/hooks/resolve-config.sh:21), so orchestrators/hooks/
+# resolve-type.sh parses these rows with awk/sed. Nesting beyond the inline `rigor:`
+# map and the inline `aliases:` list will not parse. Do not reformat into block
+# mappings, and do not wrap a row across lines.
+#
+# Reading the `rigor` cell: a bare scalar expands to all four phases (explore, plan,
+# code, pr); the map form names only the phases that diverge and every unnamed phase
+# is `low`. So `code: low` holds for every row here — addressable, never a default cost.
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low,                against: forbid,   ship: publish, planner: plan-feature,   branch: feature/}
+  bugfix:    {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-bugfix,    branch: bug/,     aliases: [bug]}
+  hotfix:    {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-bugfix+minimal-scope, branch: hotfix/}
+  migration: {pipeline: build,  explore: auto, rigor: low,                against: forbid,   ship: publish, planner: plan-migration, branch: feature/}
+  rework:    {pipeline: build,  explore: auto, rigor: low,                against: require,  ship: publish, planner: plan-rework,    branch: feature/}
+  diagnose:  {pipeline: plan,   explore: deep, rigor: low,                against: optional, ship: publish, planner: plan-diagnosis, branch: bug/,     aliases: [debug, triage]}
+  map:       {pipeline: report, explore: auto, rigor: low,                against: forbid,   ship: chat}
+  analyze:   {pipeline: report, explore: deep, rigor: {explore: med},     against: forbid,   ship: chat,    branch: docs/}   # --ship publish allowed: report committed under docs/reports/
+  document:  {pipeline: docs,   explore: deep, rigor: {explore: med},     against: forbid,   ship: publish, branch: docs/,   aliases: [doc]}
+  sync:      {pipeline: plan,   explore: deep, rigor: {explore: med},     against: require,  ship: publish, planner: plan-reconcile, branch: sync/}
+
+default_type: feature   # when nothing is inferable and the ask is purely additive

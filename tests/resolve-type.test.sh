@@ -1,0 +1,854 @@
+#!/usr/bin/env bash
+# resolve-type.test.sh
+#
+# SYNOPSIS
+#   bash tests/resolve-type.test.sh
+#
+# DESCRIPTION
+#   Blind contract test for orchestrators/hooks/resolve-type.sh — the dae type
+#   resolver that maps a type (or alias) plus axis flags onto the five axes in
+#   orchestrators/skills/dae/workflows.yaml and prints them as KEY=value lines.
+#
+#   Written from the contract text of contracts/l2.md ALONE (§2 the yaml table,
+#   §3.2 the CLI, §3.3 flag/prefix resolution, §3.4 the resolution algorithm,
+#   §3.5 the error set and its required stderr substrings, §3.6 the stdout
+#   KEY=value contract, §3.7 the phase-existence table, §3.8 the five-step
+#   rigor resolution and the D2 warning rule, §3.9 the override tiers, §3.10
+#   the explicit non-goals). This suite NEVER reads resolve-type.sh's source
+#   and never reads the real workflows.yaml — every expectation about that
+#   table comes from §2.1 of the contract, which quotes it verbatim. The only
+#   interaction with the script file itself is the case-00 `bash -n` sanity
+#   precondition, which invokes it without inspecting its logic.
+#
+#   Assertions on stderr use only the substrings the contract's required-
+#   substring columns (§3.5, §3.8) make contractual; the surrounding sentence
+#   wording belongs to the implementer. Assertions on stdout use exact-line
+#   matching, and absence of a line is asserted explicitly — an omitted rigor
+#   phase, and map's absent PLANNER=/BRANCH=, are contractually ABSENT rather
+#   than empty.
+#
+#   Fixture yamls are written into throwaway `mktemp -d` directories and passed
+#   via the contract's internal `--yaml <path>` flag. Nothing is written
+#   outside those scratch dirs; the repo's real workflows.yaml is never
+#   mutated.
+#
+# EXIT CODES
+#   0  every case passed
+#   1  at least one case failed (or the bash -n sanity precondition failed)
+#
+# Runnable with no arguments from any working directory.
+
+set -uo pipefail
+
+# ---------------------------------------------------------------------------
+# Locate the script under test relative to this file's own location.
+# ---------------------------------------------------------------------------
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT="$REPO_ROOT/orchestrators/hooks/resolve-type.sh"
+
+# ---------------------------------------------------------------------------
+# Bookkeeping
+# ---------------------------------------------------------------------------
+TOTAL_PASS=0
+TOTAL_FAIL=0
+SCRATCH_DIRS=()
+
+cleanup() {
+  local d
+  for d in "${SCRATCH_DIRS[@]:-}"; do
+    [ -n "$d" ] && [ -d "$d" ] && rm -rf "$d"
+  done
+}
+trap cleanup EXIT
+
+pass() {
+  echo "PASS: $1"
+  TOTAL_PASS=$((TOTAL_PASS + 1))
+}
+
+fail() {
+  echo "FAIL: $1 ($2)"
+  TOTAL_FAIL=$((TOTAL_FAIL + 1))
+}
+
+new_scratch() {
+  local d
+  d=$(mktemp -d)
+  SCRATCH_DIRS+=("$d")
+  printf '%s' "$d"
+}
+
+# ---------------------------------------------------------------------------
+# Invocation helpers. Both pin stdin to /dev/null and capture stdout, stderr
+# and the exit code into the OUT / ERR / CODE globals.
+# ---------------------------------------------------------------------------
+OUT=""
+ERR=""
+CODE=0
+
+run_in() {
+  local dir="$1"
+  shift
+  local out_f err_f
+  out_f=$(mktemp)
+  err_f=$(mktemp)
+  ( cd "$dir" && exec "$SCRIPT" "$@" ) </dev/null >"$out_f" 2>"$err_f"
+  CODE=$?
+  OUT=$(cat "$out_f")
+  ERR=$(cat "$err_f")
+  rm -f "$out_f" "$err_f"
+}
+
+run() {
+  run_in "$REPO_ROOT" "$@"
+}
+
+ctx() {
+  printf 'code=%s out=[%s] err=[%s]' "$CODE" "$OUT" "$ERR"
+}
+
+# ---------------------------------------------------------------------------
+# Assertion primitives
+# ---------------------------------------------------------------------------
+
+# line <exact KEY=value>  -- exact whole-line match on stdout
+line() { printf '%s\n' "$OUT" | grep -qxF -- "$1"; }
+
+# out_re <regex>  -- regex match on stdout
+out_re() { printf '%s\n' "$OUT" | grep -q -- "$1"; }
+
+# err_sub <substring>  -- fixed-string match on stderr
+err_sub() { printf '%s\n' "$ERR" | grep -qF -- "$1"; }
+
+# err_tok <token>  -- stderr contains the token delimited by non-token chars.
+# Used where a plain substring test would be satisfied by a LONGER token that
+# merely contains it (e.g. asserting '--r' must not be satisfied by '--rigor').
+err_tok() {
+  printf '%s\n' "$ERR" | grep -qE -- "(^|[^A-Za-z0-9_=-])$1([^A-Za-z0-9_=-]|\$)"
+}
+
+# ok_lines <desc> <exact line...>  -- exit 0 and every listed line present
+ok_lines() {
+  local desc="$1"
+  shift
+  local s bad=""
+  [ "$CODE" -eq 0 ] || bad="exit=$CODE"
+  for s in "$@"; do
+    line "$s" || bad="$bad missing-line:[$s]"
+  done
+  if [ -z "$bad" ]; then pass "$desc"; else fail "$desc" "$bad; $(ctx)"; fi
+}
+
+# no_lines <desc> <regex...>  -- exit 0 and every listed regex ABSENT on stdout
+no_lines() {
+  local desc="$1"
+  shift
+  local s bad=""
+  [ "$CODE" -eq 0 ] || bad="exit=$CODE"
+  for s in "$@"; do
+    if out_re "$s"; then bad="$bad unexpected:[$s]"; fi
+  done
+  if [ -z "$bad" ]; then pass "$desc"; else fail "$desc" "$bad; $(ctx)"; fi
+}
+
+# err_case <desc> <required stderr substring...>  -- exit 1 and every substring
+err_case() {
+  local desc="$1"
+  shift
+  local s bad=""
+  [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+  for s in "$@"; do
+    err_sub "$s" || bad="$bad missing-stderr:[$s]"
+  done
+  if [ -z "$bad" ]; then pass "$desc"; else fail "$desc" "$bad; $(ctx)"; fi
+}
+
+# no_key_block  -- stdout carries no KEY=value line at all
+no_key_block() { ! out_re '^[A-Z][A-Z0-9_]*='; }
+
+# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Case 00: bash -n sanity precondition (the script must at least parse)
+# ---------------------------------------------------------------------------
+if bash -n "$SCRIPT" 2>/tmp/resolve-type-syntax-err.$$; then
+  pass "00: bash -n resolve-type.sh exits 0"
+else
+  syntax_err=$(cat /tmp/resolve-type-syntax-err.$$ 2>/dev/null)
+  fail "00: bash -n resolve-type.sh exits 0" "syntax error: $syntax_err"
+  rm -f /tmp/resolve-type-syntax-err.$$
+  echo "sanity failed: nothing else can be trusted, stopping."
+  echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"
+  exit 1
+fi
+rm -f /tmp/resolve-type-syntax-err.$$
+
+# ===========================================================================
+# TABLE PARSING (§2.1, §2.3)
+# ===========================================================================
+
+# --- Case 01: all ten canonical types resolve ------------------------------
+# rework and sync are `against: require` rows (§2.1) and so are given one
+# anchor; every other row is forbid or optional and is given none.
+for t in feature bugfix hotfix migration rework diagnose map analyze document sync; do
+  case "$t" in
+    rework|sync) run "$t" --against REF ;;
+    *)           run "$t" ;;
+  esac
+  bad=""
+  [ "$CODE" -eq 0 ] || bad="exit=$CODE"
+  line "TYPE=$t" || bad="$bad missing-line:[TYPE=$t]"
+  for k in '^PIPELINE=' '^EXPLORE=' '^SHIP=' '^AGAINST_COUNT='; do
+    out_re "$k" || bad="$bad missing:[$k]"
+  done
+  if [ -z "$bad" ]; then
+    pass "01/$t: resolves, exit 0, TYPE/PIPELINE/EXPLORE/SHIP/AGAINST_COUNT all present"
+  else
+    fail "01/$t: resolves, exit 0, TYPE/PIPELINE/EXPLORE/SHIP/AGAINST_COUNT all present" \
+      "$bad; $(ctx)"
+  fi
+done
+
+# --- Case 02: row fidelity spot-checks against §2.1 ------------------------
+run feature
+ok_lines "02a: feature row fidelity (build/auto/publish/plan-feature/feature/)" \
+  'TYPE=feature' 'PIPELINE=build' 'EXPLORE=auto' 'SHIP=publish' \
+  'PLANNER=plan-feature' 'BRANCH=feature/'
+
+run sync --against REF
+ok_lines "02b: sync row fidelity (plan/plan-reconcile/sync/, anchor accepted)" \
+  'TYPE=sync' 'PIPELINE=plan' 'PLANNER=plan-reconcile' 'BRANCH=sync/' \
+  'AGAINST_COUNT=1' 'AGAINST_1=REF'
+
+run hotfix
+ok_lines "02c: hotfix row fidelity (PLANNER=plan-bugfix+minimal-scope)" \
+  'TYPE=hotfix' 'PLANNER=plan-bugfix+minimal-scope' 'BRANCH=hotfix/'
+
+# --- Case 03: map emits no PLANNER= and no BRANCH= -------------------------
+run map
+no_lines "03: map emits no PLANNER= and no BRANCH= line (omitted, not empty)" \
+  '^PLANNER=' '^BRANCH='
+
+# --- Case 04: analyze carries BRANCH=docs/ despite SHIP=chat ---------------
+run analyze
+ok_lines "04: analyze emits BRANCH=docs/ while defaulting to SHIP=chat" \
+  'TYPE=analyze' 'BRANCH=docs/' 'SHIP=chat'
+
+# --- Case 05: malformed rows -> E15, exit 1, no partial KEY=value block ----
+f05a=$(new_scratch)
+cat >"$f05a/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  broken:    not-a-flow-map
+default_type: feature
+YAML
+run --yaml "$f05a/workflows.yaml" broken
+err_case "05a: malformed row (not a flow map) -> exit 1, 'malformed' + type name" \
+  'malformed' 'broken'
+if no_key_block; then
+  pass "05a2: malformed row (not a flow map) prints no partial KEY=value block"
+else
+  fail "05a2: malformed row (not a flow map) prints no partial KEY=value block" "$(ctx)"
+fi
+
+f05b=$(new_scratch)
+cat >"$f05b/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  broken:    {pipeline: build, explore: auto, rigor: low, ship: publish}
+default_type: feature
+YAML
+run --yaml "$f05b/workflows.yaml" broken
+err_case "05b: malformed row (missing required key 'against') -> exit 1, 'malformed' + type name" \
+  'malformed' 'broken'
+if no_key_block; then
+  pass "05b2: malformed row (missing required key) prints no partial KEY=value block"
+else
+  fail "05b2: malformed row (missing required key) prints no partial KEY=value block" "$(ctx)"
+fi
+
+f05c=$(new_scratch)
+cat >"$f05c/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  broken:    {pipeline: bogus, explore: auto, rigor: low, against: forbid, ship: publish}
+default_type: feature
+YAML
+run --yaml "$f05c/workflows.yaml" broken
+err_case "05c: malformed row (out-of-vocabulary cell) -> exit 1, 'malformed' + type name" \
+  'malformed' 'broken'
+if no_key_block; then
+  pass "05c2: malformed row (out-of-vocabulary cell) prints no partial KEY=value block"
+else
+  fail "05c2: malformed row (out-of-vocabulary cell) prints no partial KEY=value block" "$(ctx)"
+fi
+
+# --- Case 06: missing / unreadable --yaml path -> E14 ----------------------
+f06=$(new_scratch)
+run --yaml "$f06/does-not-exist.yaml" feature
+err_case "06: missing --yaml path -> exit 1, 'cannot read' + the given path" \
+  'cannot read' "$f06/does-not-exist.yaml"
+
+# ===========================================================================
+# TYPE ALIASES (§2.2)
+# ===========================================================================
+
+# --- Case 07: alias -> canonical TYPE= -------------------------------------
+run bug
+ok_lines "07a: alias 'bug' resolves to canonical TYPE=bugfix" 'TYPE=bugfix'
+run debug
+ok_lines "07b: alias 'debug' resolves to canonical TYPE=diagnose" 'TYPE=diagnose'
+run triage
+ok_lines "07c: alias 'triage' resolves to canonical TYPE=diagnose" 'TYPE=diagnose'
+run doc
+ok_lines "07d: alias 'doc' resolves to canonical TYPE=document" 'TYPE=document'
+
+# --- Case 08: map is its own type, not an alias of document ----------------
+run map
+ok_lines "08a: map resolves to TYPE=map, PIPELINE=report (no longer aliases document)" \
+  'TYPE=map' 'PIPELINE=report'
+no_lines "08b: map does not resolve to document" '^TYPE=document'
+
+# --- Case 09: unknown type -> E2 -------------------------------------------
+run notatype
+err_case "09: unknown type -> exit 1, 'unknown type' + the offending name" \
+  'unknown type' 'notatype'
+
+# --- Case 10: no type given -> default_type, exit 0, no warning ------------
+run
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE"
+line 'TYPE=feature' || bad="$bad missing-line:[TYPE=feature]"
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "10: no type given -> TYPE=feature (default_type), exit 0, no warning on stderr"
+else
+  fail "10: no type given -> TYPE=feature (default_type), exit 0, no warning on stderr" \
+    "$bad; $(ctx)"
+fi
+
+# ===========================================================================
+# FLAG ALIASES AND BRACKETED PREFIXES (§3.3)
+# ===========================================================================
+
+# --- Case 11: -r / --rig / --rigo / --rigor all resolve to the rigor axis --
+run feature -r med;      r11a="$OUT"; c11a="$CODE"
+run feature --rig med;   r11b="$OUT"; c11b="$CODE"
+run feature --rigo med;  r11c="$OUT"; c11c="$CODE"
+run feature --rigor med; r11d="$OUT"; c11d="$CODE"
+if [ "$c11a" -eq 0 ] && [ "$c11b" -eq 0 ] && [ "$c11c" -eq 0 ] && [ "$c11d" -eq 0 ] \
+   && [ "$r11a" = "$r11d" ] && [ "$r11b" = "$r11d" ] && [ "$r11c" = "$r11d" ] \
+   && printf '%s\n' "$r11d" | grep -qxF 'RIGOR_EXPLORE=med'; then
+  pass "11: -r / --rig / --rigo / --rigor med all resolve to rigor with identical stdout"
+else
+  fail "11: -r / --rig / --rigo / --rigor med all resolve to rigor with identical stdout" \
+    "codes=$c11a/$c11b/$c11c/$c11d a=[$r11a] b=[$r11b] c=[$r11c] d=[$r11d]"
+fi
+
+# --- Case 12: --r is REJECTED as an unknown flag (below --rig minimum) -----
+run feature --r med
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+if ! err_tok '--r'; then bad="$bad missing-token:[--r]"; fi
+if out_re '^RIGOR_'; then bad="$bad resolved-to-rigor"; fi
+if [ -z "$bad" ]; then
+  pass "12: '--r med' rejected as unknown flag (E1), exit 1, not resolved to rigor"
+else
+  fail "12: '--r med' rejected as unknown flag (E1), exit 1, not resolved to rigor" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 13: -a and --against both populate AGAINST_* ---------------------
+run bugfix -a SHORT
+ok_lines "13a: -a populates AGAINST_COUNT/AGAINST_1" 'AGAINST_COUNT=1' 'AGAINST_1=SHORT'
+run bugfix --against LONG
+ok_lines "13b: --against populates AGAINST_COUNT/AGAINST_1" 'AGAINST_COUNT=1' 'AGAINST_1=LONG'
+
+# --- Case 14: --p rejected; --pl -> --plan; --pi -> --pipeline -------------
+run feature --p somevalue
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+if ! err_tok '--p'; then bad="$bad missing-token:[--p]"; fi
+if [ -z "$bad" ]; then
+  pass "14a: '--p' rejected as unknown flag (ambiguous and below both minimums)"
+else
+  fail "14a: '--p' rejected as unknown flag (ambiguous and below both minimums)" "$bad; $(ctx)"
+fi
+
+run feature --pl /no/such/plan.md
+ok_lines "14b: '--pl' resolves to --plan (PLAN= emitted on a build pipeline)" \
+  'PLAN=/no/such/plan.md'
+
+run map --pi build
+err_case "14c: '--pi' resolves to --pipeline and is refused as locked (E3)" \
+  '--pipeline' 'locked' 'map'
+
+# --- Case 15: stale anchor-style '-r origin/main' fails on rigor vocabulary -
+run feature -r origin/main
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in 'rigor' 'origin/main' 'low' 'med' 'high'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if out_re '^AGAINST_'; then bad="$bad leaked-AGAINST"; fi
+if [ -z "$bad" ]; then
+  pass "15: stale '-r origin/main' fails on the rigor value vocabulary (E7), never accepted as an anchor"
+else
+  fail "15: stale '-r origin/main' fails on the rigor value vocabulary (E7), never accepted as an anchor" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 16: '--rigor=med' and '-rmed' are unknown flags ------------------
+run feature --rigor=med
+err_case "16a: '--rigor=med' (attached-value form) rejected as unknown flag" \
+  'unknown flag' '--rigor=med'
+run feature -rmed
+err_case "16b: '-rmed' (bundled short form) rejected as unknown flag" \
+  'unknown flag' '-rmed'
+
+# ===========================================================================
+# RIGOR RESOLUTION (§3.8 steps 1-3)
+# ===========================================================================
+
+# --- Case 17: scalar expansion over a build pipeline -----------------------
+run feature --rigor med
+ok_lines "17: 'feature --rigor med' sets all four phases to med" \
+  'RIGOR_EXPLORE=med' 'RIGOR_PLAN=med' 'RIGOR_CODE=med' 'RIGOR_PR=med'
+
+# --- Case 18: per-phase patch preserves the row default --------------------
+run document --rigor pr:high
+ok_lines "18: 'document --rigor pr:high' keeps the row's RIGOR_EXPLORE=med and sets RIGOR_PR=high" \
+  'RIGOR_EXPLORE=med' 'RIGOR_PR=high'
+
+# --- Case 19: an unmentioned phase never falls to low by fiat --------------
+run feature --rigor explore:high
+ok_lines "19a: 'feature --rigor explore:high' patches explore, leaves plan/code/pr at row defaults" \
+  'RIGOR_EXPLORE=high' 'RIGOR_PLAN=low' 'RIGOR_CODE=low' 'RIGOR_PR=low'
+run sync --against REF --rigor pr:high
+ok_lines "19b: 'sync --rigor pr:high' leaves RIGOR_EXPLORE=med (row map-form default preserved)" \
+  'RIGOR_EXPLORE=med' 'RIGOR_PR=high'
+
+# --- Case 20: mixed form, scalar plus patch --------------------------------
+run feature --rigor med,explore:high
+ok_lines "20: 'feature --rigor med,explore:high' -> explore high, plan/code/pr med" \
+  'RIGOR_EXPLORE=high' 'RIGOR_PLAN=med' 'RIGOR_CODE=med' 'RIGOR_PR=med'
+
+# --- Case 21: scalar-then-patch is ALGORITHM-step order, not argv order ----
+# §3.8 step 2 (scalar expansion) always runs before step 3 (per-phase patch),
+# regardless of where the scalar sits in the spec string. Putting the patch
+# BEFORE the scalar in argv (as here) must NOT wipe the patch: step 2 still
+# expands the scalar 'med' to all four phases first, then step 3 still patches
+# explore to 'high' on top of it. The normative worked example (§3.8 step 2)
+# and case 21 itself both give this exact spec resolving to explore=high with
+# plan/code/pr all med -- identical to case 20's 'med,explore:high', which
+# proves position-independence: whichever order the scalar and the patch
+# appear in argv, the resolved profile must be the same.
+run feature --rigor explore:high,med
+ok_lines "21: 'feature --rigor explore:high,med' -> explore high, plan/code/pr med (algorithm-step order; must not wipe the patch)" \
+  'RIGOR_EXPLORE=high' 'RIGOR_PLAN=med' 'RIGOR_CODE=med' 'RIGOR_PR=med'
+
+# --- Case 22: row forms with no --rigor ------------------------------------
+run analyze
+ok_lines "22a: 'analyze' with no --rigor -> RIGOR_EXPLORE=med (row map form)" 'RIGOR_EXPLORE=med'
+run feature
+ok_lines "22b: 'feature' with no --rigor -> all four low (row scalar form)" \
+  'RIGOR_EXPLORE=low' 'RIGOR_PLAN=low' 'RIGOR_CODE=low' 'RIGOR_PR=low'
+
+# --- Case 23: code is low on every shipped row that HAS a code phase -------
+for t in feature bugfix hotfix migration rework diagnose sync; do
+  case "$t" in
+    rework|sync) run "$t" --against REF ;;
+    *)           run "$t" ;;
+  esac
+  ok_lines "23/$t: RIGOR_CODE=low with no override" 'RIGOR_CODE=low'
+done
+for t in map analyze document; do
+  run "$t"
+  no_lines "23/$t: no RIGOR_CODE= line (the pipeline has no code phase)" '^RIGOR_CODE='
+done
+
+# --- Case 24: invalid rigor value (E7) and invalid rigor phase (E8) --------
+run feature --rigor bogus
+err_case "24a: invalid rigor value -> E7 (rigor, the value, low, med, high)" \
+  'rigor' 'bogus' 'low' 'med' 'high'
+run feature --rigor bogusphase:high
+err_case "24b: invalid rigor phase -> E8 (rigor, the phase, explore, plan, code, pr)" \
+  'rigor' 'bogusphase' 'explore' 'plan' 'code' 'pr'
+
+# ===========================================================================
+# ABSENT-PHASE DROPPING AND THE D2 WARNING (§3.7, §3.8)
+# ===========================================================================
+
+# --- Case 25: f(pipeline, ship) dropping, silent path ----------------------
+run map
+ok_lines "25a: map (report+chat) emits RIGOR_EXPLORE=" 'RIGOR_EXPLORE=low'
+no_lines "25b: map emits no RIGOR_PLAN=/RIGOR_CODE=/RIGOR_PR= lines" \
+  '^RIGOR_PLAN=' '^RIGOR_CODE=' '^RIGOR_PR='
+run document
+ok_lines "25c: document (docs) emits RIGOR_EXPLORE= and RIGOR_PR=" \
+  'RIGOR_EXPLORE=med' 'RIGOR_PR=low'
+no_lines "25d: document emits no RIGOR_PLAN=/RIGOR_CODE= lines" \
+  '^RIGOR_PLAN=' '^RIGOR_CODE='
+
+# --- Case 26: scalar expansion is SILENT (no warning flood on map) ---------
+run map --rigor med
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'RIGOR_EXPLORE=med' || bad="$bad missing-line:[RIGOR_EXPLORE=med]"
+for k in '^RIGOR_PLAN=' '^RIGOR_CODE=' '^RIGOR_PR='; do
+  if out_re "$k"; then bad="$bad unexpected:[$k]"; fi
+done
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "26: 'map --rigor med' -> exit 0, RIGOR_EXPLORE=med only, and NO warning on stderr"
+else
+  fail "26: 'map --rigor med' -> exit 0, RIGOR_EXPLORE=med only, and NO warning on stderr" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 27: D2, user-typed. Warning AND exit 0, asserted as a pair -------
+run map --rigor pr:high
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0 - a non-zero exit for D2 is forbidden)"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_tok 'pr' || bad="$bad warning-does-not-name-phase:[pr]"
+err_tok 'map' || bad="$bad warning-does-not-name-type:[map]"
+if [ -z "$bad" ]; then
+  pass "27a: 'map --rigor pr:high' -> warning naming both 'pr' and 'map' AND exit status 0 (the pair)"
+else
+  fail "27a: 'map --rigor pr:high' -> warning naming both 'pr' and 'map' AND exit status 0 (the pair)" \
+    "$bad; $(ctx)"
+fi
+ok_lines "27b: 'map --rigor pr:high' still prints the remaining axes" \
+  'TYPE=map' 'PIPELINE=report' 'EXPLORE=auto' 'RIGOR_EXPLORE=low' 'SHIP=chat' 'AGAINST_COUNT=0'
+no_lines "27c: 'map --rigor pr:high' drops the named absent phase (no RIGOR_PR= line)" '^RIGOR_PR='
+
+# --- Case 28: D2, row map-form cell. Same pair, via a fixture --------------
+f28=$(new_scratch)
+cat >"$f28/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  probe:     {pipeline: report, explore: auto, rigor: {explore: med, pr: high}, against: forbid, ship: chat}
+default_type: feature
+YAML
+run --yaml "$f28/workflows.yaml" probe
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0 - a non-zero exit for D2 is forbidden)"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_tok 'pr' || bad="$bad warning-does-not-name-phase:[pr]"
+err_tok 'probe' || bad="$bad warning-does-not-name-type:[probe]"
+if [ -z "$bad" ]; then
+  pass "28a: row map-form cell naming an absent phase -> warning naming 'pr' and 'probe' AND exit 0"
+else
+  fail "28a: row map-form cell naming an absent phase -> warning naming 'pr' and 'probe' AND exit 0" \
+    "$bad; $(ctx)"
+fi
+ok_lines "28b: row map-form D2 still prints the remaining axes" \
+  'TYPE=probe' 'PIPELINE=report' 'RIGOR_EXPLORE=med' 'SHIP=chat'
+no_lines "28c: row map-form D2 drops the absent phase (no RIGOR_PR= line)" '^RIGOR_PR='
+
+# --- Case 29: analyze --ship publish GAINS a pr phase ----------------------
+run analyze
+no_lines "29a: 'analyze' alone (report+chat) has no RIGOR_PR= line" '^RIGOR_PR='
+run analyze --ship publish
+ok_lines "29b: 'analyze --ship publish' gains the pr phase (RIGOR_PR= present)" \
+  'SHIP=publish' 'RIGOR_PR=low'
+run analyze --ship publish --rigor pr:high
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE"
+line 'RIGOR_PR=high' || bad="$bad missing-line:[RIGOR_PR=high]"
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "29c: 'analyze --ship publish --rigor pr:high' -> RIGOR_PR=high with NO warning"
+else
+  fail "29c: 'analyze --ship publish --rigor pr:high' -> RIGOR_PR=high with NO warning" \
+    "$bad; $(ctx)"
+fi
+
+# ===========================================================================
+# CONSTRAINT VIOLATIONS (§3.5, §3.9)
+# ===========================================================================
+
+# --- Case 30: against: forbid + anchors -> E4 ------------------------------
+run feature -a abc123
+err_case "30: 'feature -a abc123' (against: forbid) -> E4 (type name, --against, did you mean)" \
+  'feature' '--against' 'did you mean'
+
+# --- Case 31: against: require + no anchors -> E5 --------------------------
+run rework
+err_case "31a: 'rework' with no anchors -> E5 (type name, requires at least one anchor, --against)" \
+  'rework' 'requires at least one anchor' '--against'
+run sync
+err_case "31b: 'sync' with no anchors -> E5 (type name, requires at least one anchor, --against)" \
+  'sync' 'requires at least one anchor' '--against'
+
+# --- Case 32: against: optional, with and without ---------------------------
+run bugfix
+ok_lines "32a: 'bugfix' (optional) with no anchors -> exit 0, AGAINST_COUNT=0" 'AGAINST_COUNT=0'
+run bugfix -a REF
+ok_lines "32b: 'bugfix' (optional) with an anchor -> exit 0, AGAINST_COUNT=1" 'AGAINST_COUNT=1'
+run diagnose
+ok_lines "32c: 'diagnose' (optional) with no anchors -> exit 0, AGAINST_COUNT=0" 'AGAINST_COUNT=0'
+run diagnose --against REF
+ok_lines "32d: 'diagnose' (optional) with an anchor -> exit 0, AGAINST_COUNT=1" 'AGAINST_COUNT=1'
+
+# --- Case 33: --pipeline is locked -> E3 -----------------------------------
+run map --pipeline build
+err_case "33: 'map --pipeline build' -> E3 (--pipeline, locked, resolved type name)" \
+  '--pipeline' 'locked' 'map'
+
+# --- Case 34: --plan placement ---------------------------------------------
+# E6 on every non-build pipeline. sync is `against: require`, so it is given an
+# anchor to isolate E6 from E5.
+run map --plan /no/such/plan.md
+err_case "34a: '--plan' on map -> E6 (--plan, type name, pipeline: build)" \
+  '--plan' 'map' 'pipeline: build'
+run analyze --plan /no/such/plan.md
+err_case "34b: '--plan' on analyze -> E6" '--plan' 'analyze' 'pipeline: build'
+run document --plan /no/such/plan.md
+err_case "34c: '--plan' on document -> E6" '--plan' 'document' 'pipeline: build'
+run diagnose --plan /no/such/plan.md
+err_case "34d: '--plan' on diagnose -> E6" '--plan' 'diagnose' 'pipeline: build'
+run sync --against REF --plan /no/such/plan.md
+err_case "34e: '--plan' on sync -> E6" '--plan' 'sync' 'pipeline: build'
+
+# Accepted on every build pipeline, path emitted AS GIVEN, no existence check.
+for t in feature bugfix hotfix migration rework; do
+  case "$t" in
+    rework) run "$t" --against REF --plan /deliberately/nonexistent/plan.md ;;
+    *)      run "$t" --plan /deliberately/nonexistent/plan.md ;;
+  esac
+  ok_lines "34/$t: '--plan' accepted on a build pipeline, PLAN= emitted as given, no existence check" \
+    "TYPE=$t" 'PLAN=/deliberately/nonexistent/plan.md'
+done
+
+# --- Case 35: unknown flags -> E1 ------------------------------------------
+run feature -x
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+err_tok '-x' || bad="$bad missing-token:[-x]"
+if [ -z "$bad" ]; then
+  pass "35a: '-x' -> E1 (unknown flag + the offending token)"
+else
+  fail "35a: '-x' -> E1 (unknown flag + the offending token)" "$bad; $(ctx)"
+fi
+run feature --nope
+err_case "35b: '--nope' -> E1 (unknown flag + the offending token)" 'unknown flag' '--nope'
+
+# --- Case 36: --explore / --ship value vocabularies ------------------------
+run feature --explore bogus
+err_case "36a: '--explore bogus' -> E9 (explore, the value, shallow, deep, auto)" \
+  'explore' 'bogus' 'shallow' 'deep' 'auto'
+run feature --ship bogus
+err_case "36b: '--ship bogus' -> E10 (ship, the value, chat, publish)" \
+  'ship' 'bogus' 'chat' 'publish'
+
+# --- Case 37: value-taking flag given no value -> E11 ----------------------
+run feature --rigor
+err_case "37a: '--rigor' at end of argv -> E11 (missing value + the flag)" \
+  'missing value' '--rigor'
+run feature --explore --ship publish
+err_case "37b: '--explore' followed by another flag -> E11 (missing value + the flag)" \
+  'missing value' '--explore'
+
+# --- Case 38: empty anchor item -> E12 -------------------------------------
+run bugfix --against 'a,,b'
+err_case "38a: '--against a,,b' -> E12 (empty anchor + --against)" 'empty anchor' '--against'
+run bugfix --against ','
+err_case "38b: '--against ,' (bare comma) -> E12" 'empty anchor' '--against'
+run bugfix --against ''
+err_case "38c: '--against \"\"' (empty string) -> E12" 'empty anchor' '--against'
+
+# --- Case 39: positional argument arity -> E13 -----------------------------
+run feature extra
+err_case "39a: two positional arguments -> E13 ('unexpected argument')" 'unexpected argument'
+run feature --type map
+err_case "39b: positional and --type disagree -> E13 ('conflicting')" 'conflicting'
+run feature --type feature
+ok_lines "39c: positional and --type agree -> accepted, exit 0" 'TYPE=feature'
+
+# ===========================================================================
+# ANCHOR PASS-THROUGH (§3.6)
+# ===========================================================================
+
+# --- Case 40: argv order preserved across repeats and comma splits ---------
+run sync -a A,B -a C
+ok_lines "40: 'sync -a A,B -a C' -> AGAINST_COUNT=3 with argv order preserved, values raw" \
+  'AGAINST_COUNT=3' 'AGAINST_1=A' 'AGAINST_2=B' 'AGAINST_3=C'
+
+# --- Case 41: no anchors -> AGAINST_COUNT=0 and no AGAINST_1= --------------
+run feature
+ok_lines "41a: 'feature' with no anchors -> AGAINST_COUNT=0" 'AGAINST_COUNT=0'
+no_lines "41b: 'feature' with no anchors -> no AGAINST_1= line" '^AGAINST_1='
+
+# ===========================================================================
+# PURITY (§3.10, B12)
+# ===========================================================================
+
+# --- Case 42: identical output from an unrelated working directory ---------
+run_in "$REPO_ROOT" feature
+r42_repo="$OUT"
+c42_repo="$CODE"
+d42=$(new_scratch)
+run_in "$d42" feature
+r42_else="$OUT"
+c42_else="$CODE"
+if [ "$c42_repo" -eq 0 ] && [ "$c42_else" -eq 0 ] && [ "$r42_repo" = "$r42_else" ]; then
+  pass "42a: identical output from an unrelated working directory (table found BASH_SOURCE-relative)"
+else
+  fail "42a: identical output from an unrelated working directory (table found BASH_SOURCE-relative)" \
+    "repo_code=$c42_repo else_code=$c42_else repo=[$r42_repo] else=[$r42_else]"
+fi
+if [ -z "$(ls -A "$d42")" ]; then
+  pass "42b: the script writes nothing into the working directory it is run from"
+else
+  fail "42b: the script writes nothing into the working directory it is run from" \
+    "leftovers=[$(ls -A "$d42")]"
+fi
+
+# ===========================================================================
+# STDOUT BLOCK SHAPE (§3.6 - exact contents and exact ORDER)
+# ===========================================================================
+
+# --- Case 43: the whole KEY=value block, verbatim and in order -------------
+run feature
+expected_feature='TYPE=feature
+PIPELINE=build
+EXPLORE=auto
+RIGOR_EXPLORE=low
+RIGOR_PLAN=low
+RIGOR_CODE=low
+RIGOR_PR=low
+AGAINST_COUNT=0
+SHIP=publish
+PLANNER=plan-feature
+BRANCH=feature/'
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_feature" ]; then
+  pass "43a: 'feature' stdout is exactly §3.6's block, in order, with nothing else"
+else
+  fail "43a: 'feature' stdout is exactly §3.6's block, in order, with nothing else" \
+    "code=$CODE out=[$OUT] want=[$expected_feature]"
+fi
+
+run map
+expected_map='TYPE=map
+PIPELINE=report
+EXPLORE=auto
+RIGOR_EXPLORE=low
+AGAINST_COUNT=0
+SHIP=chat'
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_map" ]; then
+  pass "43b: 'map' stdout is exactly §3.6's block - dropped phases, PLANNER and BRANCH all absent"
+else
+  fail "43b: 'map' stdout is exactly §3.6's block - dropped phases, PLANNER and BRANCH all absent" \
+    "code=$CODE out=[$OUT] want=[$expected_map]"
+fi
+
+# ===========================================================================
+# PARSE ROBUSTNESS - NO SILENT WRONG ANSWERS (§4.2 cases 43-45)
+# ===========================================================================
+
+# --- Case R43: the E2 type list is DERIVED from the table, not hardcoded ---
+# Fixture has exactly one row, 'solo'. An unknown-type error must mention
+# 'solo' (the only row the table actually has) and must NOT mention any of
+# the ten shipped type names - those would only appear via a hardcoded list.
+fR43=$(new_scratch)
+cat >"$fR43/workflows.yaml" <<'YAML'
+types:
+  solo: {pipeline: build, explore: auto, rigor: low, against: forbid, ship: publish}
+default_type: solo
+YAML
+run --yaml "$fR43/workflows.yaml" nosuch
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown type' || bad="$bad missing-stderr:[unknown type]"
+err_sub 'nosuch' || bad="$bad missing-stderr:[nosuch]"
+err_sub 'solo' || bad="$bad missing-stderr:[solo]"
+for other in feature bugfix hotfix migration rework diagnose map analyze document sync; do
+  if err_sub "$other"; then bad="$bad unexpected-hardcoded-type-name:[$other]"; fi
+done
+if [ -z "$bad" ]; then
+  pass "R43: E2's type list is derived from the parsed table (mentions 'solo', not any shipped type name)"
+else
+  fail "R43: E2's type list is derived from the parsed table (mentions 'solo', not any shipped type name)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case R44: no silent empty axes - empty table and garbage table --------
+# Status-only would pass a silently broken parser (mawk rejects '--'); assert
+# stdout is explicitly EMPTY, not just that the exit code is 1.
+fR44a=$(new_scratch)
+: >"$fR44a/workflows.yaml"
+run --yaml "$fR44a/workflows.yaml" feature
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+[ -n "$ERR" ] || bad="$bad empty-stderr(want a loud message)"
+[ -z "$OUT" ] || bad="$bad nonempty-stdout:[$OUT]"
+if [ -z "$bad" ]; then
+  pass "R44a: empty table file -> exit 1, loud stderr, NOTHING on stdout"
+else
+  fail "R44a: empty table file -> exit 1, loud stderr, NOTHING on stdout" "$bad; $(ctx)"
+fi
+
+fR44b=$(new_scratch)
+cat >"$fR44b/workflows.yaml" <<'GARBAGE'
+this is not yaml at all {{{ ]][[ ::: %%% ---
+GARBAGE
+run --yaml "$fR44b/workflows.yaml" feature
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+[ -n "$ERR" ] || bad="$bad empty-stderr(want a loud message)"
+[ -z "$OUT" ] || bad="$bad nonempty-stdout:[$OUT]"
+if [ -z "$bad" ]; then
+  pass "R44b: garbage (non-yaml) table file -> exit 1, loud stderr, NOTHING on stdout"
+else
+  fail "R44b: garbage (non-yaml) table file -> exit 1, loud stderr, NOTHING on stdout" "$bad; $(ctx)"
+fi
+
+# --- Case R45: absent type (E2) vs unparseable row (E15) are distinguishable
+# One fixture: a valid 'feature' row plus an unparseable 'broken' row. A type
+# name absent from the table (E2) and a row present-but-unparseable (E15)
+# must produce messages that are NOT interchangeable.
+fR45=$(new_scratch)
+cat >"$fR45/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build, explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  broken:    not-a-flow-map
+default_type: feature
+YAML
+
+run --yaml "$fR45/workflows.yaml" ghost
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown type' || bad="$bad missing-stderr:[unknown type]"
+err_sub 'ghost' || bad="$bad missing-stderr:[ghost]"
+if err_sub 'malformed'; then bad="$bad E2-message-must-not-say-malformed"; fi
+if [ -z "$bad" ]; then
+  pass "R45a: absent type name -> E2 substrings ('unknown type' + name), never 'malformed'"
+else
+  fail "R45a: absent type name -> E2 substrings ('unknown type' + name), never 'malformed'" "$bad; $(ctx)"
+fi
+
+run --yaml "$fR45/workflows.yaml" broken
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'malformed' || bad="$bad missing-stderr:[malformed]"
+err_sub 'broken' || bad="$bad missing-stderr:[broken]"
+if err_sub 'unknown type'; then bad="$bad E15-message-must-not-say-unknown-type"; fi
+if [ -z "$bad" ]; then
+  pass "R45b: unparseable row -> E15 substrings ('malformed' + type name), never 'unknown type'"
+else
+  fail "R45b: unparseable row -> E15 substrings ('malformed' + type name), never 'unknown type'" "$bad; $(ctx)"
+fi
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"
+if [ "$TOTAL_FAIL" -eq 0 ]; then
+  exit 0
+else
+  exit 1
+fi

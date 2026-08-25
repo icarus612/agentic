@@ -28,15 +28,22 @@
 #   dir always resolves against the MAIN checkout, so children created from
 #   inside the parent worktree land as its siblings, never nested in it.
 #   With --reuse, an existing <type>/<name> branch is not an error: the
-#   worktree is created on that branch and the start-point branch is merged
-#   into it so the run starts up to date (merge conflicts abort the setup
-#   cleanly).
+#   worktree is created on that branch — or, if the worktree path itself also
+#   survives (e.g. a crashed lane left both branch and worktree standing),
+#   adopted in place, but only when `git worktree list --porcelain` confirms
+#   it is a registered worktree of this repo checked out on that exact
+#   branch; anything else found at that path is still an error — and the
+#   start-point branch is merged into it so the run starts up to date (merge
+#   conflicts abort the setup cleanly; an adopted worktree is never removed
+#   on conflict, since it predates this invocation and may hold uncommitted
+#   work).
 #   Prints machine-readable WORKTREE/BRANCH/BASE/REUSED lines, plus RUNDIR
 #   when a run dir was created (parent worktrees only).
 #
 # EXIT CODES
-#   0 - worktree created
-#   1 - precondition failed (not a repo, base unresolvable, path exists,
+#   0 - worktree created or adopted
+#   1 - precondition failed (not a repo, base unresolvable, path exists and
+#       is not a reusable worktree of this repo on the expected branch,
 #       branch exists without --reuse, merge conflict on --reuse)
 set -uo pipefail
 
@@ -139,11 +146,49 @@ fi
 # --- create the worktree ----------------------------------------------------
 path="$wfdir/$name"
 branch="$type/$name"
-[ -e "$path" ] && err "worktree path already exists: $path (pick another --name)"
+
+# An existing $path is only ever adopted, never silently reused: --reuse must
+# be passed AND git itself (via `worktree list --porcelain`, never a bare
+# `.git` file's presence) must confirm $path is a registered worktree of this
+# repo checked out on exactly $branch. Anything else at that path is an error.
+adopt_path=0
+if [ -e "$path" ]; then
+  [ "$reuse" = 1 ] || err "worktree path already exists: $path (pick another --name)"
+  path_phys=$(cd "$path" 2>/dev/null && pwd -P) || path_phys=""
+  wt_found=0
+  wt_branch=""
+  while IFS=$'\t' read -r wt_path wt_ref; do
+    [ -n "$wt_path" ] || continue
+    wt_phys=$(cd "$wt_path" 2>/dev/null && pwd -P) || continue
+    if [ -n "$path_phys" ] && [ "$wt_phys" = "$path_phys" ]; then
+      wt_found=1
+      wt_branch="$wt_ref"
+      break
+    fi
+  done < <(git worktree list --porcelain | awk '
+    /^worktree /{ if (p != "") print p "\t" b; p=substr($0,10); b="" }
+    /^branch /{ b=substr($0,8) }
+    /^detached/{ b="detached" }
+    END{ if (p != "") print p "\t" b }
+  ')
+  [ "$wt_found" = 1 ] || err "worktree path already exists: $path — is not a registered worktree of this repo"
+  if [ "$wt_branch" = "detached" ]; then
+    err "worktree path already exists: $path — is on branch (detached HEAD), expected $branch"
+  fi
+  wt_branch_short="${wt_branch#refs/heads/}"
+  [ "$wt_branch_short" = "$branch" ] || err "worktree path already exists: $path — is on branch $wt_branch_short, expected $branch"
+  adopt_path=1
+fi
 
 reused=no
 mkdir -p "$wfdir"
-if git rev-parse --verify -q "$branch" >/dev/null; then
+if [ "$adopt_path" = 1 ]; then
+  if ! git -C "$path" merge --no-edit "$base" >/dev/null 2>&1; then
+    git -C "$path" merge --abort >/dev/null 2>&1
+    err "merging '$base' into '$branch' hit conflicts — resolve them manually, then re-run"
+  fi
+  reused=yes
+elif git rev-parse --verify -q "$branch" >/dev/null; then
   [ "$reuse" = 1 ] || err "branch already exists: $branch (pick another --name, or pass --reuse to update it from the base branch)"
   git worktree add "$path" "$branch" >/dev/null || err "git worktree add failed (is '$branch' checked out elsewhere?)"
   if ! git -C "$path" merge --no-edit "$base" >/dev/null 2>&1; then

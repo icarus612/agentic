@@ -36,13 +36,19 @@ runs*:
 
 | Skill | Invoke | What it drives |
 |---|---|---|
-| **`dae`** | `/dae [--type\|-t <t>]` | The router: classifies the request into ONE workflow — build (`feature\|bugfix\|rework\|migration\|hotfix`), `diagnose`, `document`, `sync` — and follows that workflow's sibling file. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
+| **`dae`** | `/dae [--type\|-t <t>]` | The router: resolves the request to ONE of ten types — build (`feature\|bugfix\|rework\|migration\|hotfix`), `diagnose` (aliases `debug`, `triage` — breaking: these used to reach `bugfix`), `sync`, `map`, `analyze` (`map`'s own type, no longer a `document` alias), `document` (alias `doc`) — whose `pipeline` axis selects the middle file it follows. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
 | **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents, verify and synthesize. Not tied to the dae pipeline. |
 
-## The dae pipeline (build workflow)
+## The dae pipeline (build type)
 
 ```
-dae (/dae) ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
+                    ┌─ pipeline: report, ship: chat (map │ analyze) ─▶ explore
+                    │  ─▶ fill report skeleton ─▶ answer in chat + scratch
+                    │  file (zero gates, zero git side effects, no worktree,
+                    │  no PR)
+dae (/dae) ─resolve type/pipeline─┤
+                    │
+                    └─ ship: publish ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
                         ▲ SendMessage revisions        │ approved
                         │                              ▼
               plan-wrong kickback        push-pr --stage open-draft (draft PR
@@ -77,16 +83,20 @@ re-dispatch carrying contract + diagnosis, never the opposing artifact) → the
 builder's own e2e tail, the sole loop exit — verified against the PLAN, which
 catches a wrong contract that propagated into both code and tests.
 
-The other workflows swap the middle: `diagnose` (planner ranks causes →
-pick gate → fix lanes), `document` (deep explore → record), `sync` (planner
-reconciles → confirm gate → record). All share setup/ship and the same files
-in `skills/dae/`.
+The other types swap the middle file: `diagnose` (planner ranks causes → pick
+gate → fix lanes), `sync` (planner reconciles → confirm gate → record),
+`document` (deep explore → record), `map`/`analyze` (the chat branch above:
+explore → report skeleton → chat answer, no planner, no gates). All share
+setup/ship (`ship: publish` types) and the same files in `skills/dae/`.
 
 ## Hooks (`hooks/`)
 
 Helpers, invoked explicitly (never wired): `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
 `--reuse` for crash-resume), `resolve-config.sh` (CLAUDE_* settings chain),
+`resolve-type.sh` (the only reader of the type table `workflows.yaml`; prints
+resolved axes as `KEY=value`), `resolve-anchor.sh` (per-item `--against`
+anchor resolution to typed pointers; all-or-nothing),
 `mark-syllabus.sh` (scripted syllabus ticks), `verify-scope.sh` (reported
 files vs real lane diff), `verify-run-scope.sh` (whole-run diff vs the union
 of exit reports at the PR gate — unclaimed product changes are blocking),
@@ -113,6 +123,7 @@ everything else).
 | **`builder`** | sonnet | Per-lane mini-orchestrator of the packet model. Owns its child worktree, the contract, dispatch, debug mediation, and the e2e exit. Writes no implementation and no contract tests. |
 | **`coder`** | sonnet | One packet (≤~5 coupled files) against its contract slice. Never reads or writes tests. |
 | **`contract-tester`** | sonnet | Tests for one contract slice from the contract alone. Never reads the implementation — the blindness is its identity. |
+| **`committee`** | opus | Generic fan-out wrapper: runs N cold copies of a wrapped skill and consolidates their claims into one artifact, at `rigor: med\|high` only — never loaded at `rigor: low`. Owns structure (fan-out, matching, consolidation) only; the wrapped skill supplies substance. |
 
 **Considered and rejected:** a standalone `investigate` skill (single consumer —
 folded into `plan-diagnosis`); a branch-management agent (git is the external
@@ -120,3 +131,28 @@ state store; worktree/branch state needs no context of its own); a builder-lane
 `scope-writes` config (physical worktree isolation made it redundant);
 wave-barrier dispatch (event-driven `(after:)` scheduling replaced it — a
 dependent lane launches the moment its edge ticks).
+
+## Review rules for future types
+
+Four standing rules any new `--type` row — and any reviewer judging one — is
+held to:
+
+- **Loops attach to axis VALUES, never to types.** No loop or gate branches
+  on a type name; that discipline is what keeps adding a type cheap.
+- **The seam rule.** Nothing loads "just in case." If a new type needs a
+  skill outside the seams its row's axes name (Seam loading, in `dae`'s
+  `SKILL.md`), the type's design is wrong or a seam is misplaced — fix the
+  seam, never special-case the skill.
+- **The carried invariants.** A new component adopts these rather than
+  reinventing them: the shared worker envelope; kickbacks pass the report
+  PATH, never a paraphrase; verdicts are script-written
+  (`report-verdict.sh`); the plan→contract flow and its structural
+  blindness; state lives in files, not context; ownership is
+  machine-audited by the scope scripts; cold forks cannot ask mid-run;
+  nothing publishes without passing the PR gate.
+- **`pipeline` is not an array.** A run's artifact footprint (everything it
+  writes) is not the same thing as its `pipeline` axis (the execution
+  shape) — footprint is a planner-module constraint audited by the scope
+  scripts after the fact, never a declared row field. A genuinely new,
+  coherent stage combination is a new middle file and a new `pipeline`
+  value, not a footprint flag bolted onto an existing one.
