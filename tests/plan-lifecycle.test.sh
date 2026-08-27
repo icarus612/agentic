@@ -389,6 +389,77 @@ EOF
   git -C "$dir" commit -q -m "adopt fixture"
 }
 
+# build_f2_fixture <dir> -- fixture for the F2 regression (contract l3.md,
+# Packet 2): archive on a plan dir where git mv/git rm removes the dir's
+# LAST entry before remove_empty_dir runs against it. Two plan dirs, same
+# shape (plan.md, all-checked syllabus, plus plan-review.md and
+# code-review.md so removal of the last entry is exercised):
+#   - f2-tracked-01-01-26   -- created and populated BEFORE the commit, so
+#                              all three files are git-tracked and
+#                              archive's git mv/git rm path runs for real.
+#   - f2-untracked-01-01-26 -- created AFTER the commit, so nothing in it
+#                              is tracked and archive falls back to plain
+#                              mv/rm instead.
+build_f2_fixture() {
+  local dir="$1" pd
+  pd="$dir/project-plans"
+  mkdir -p "$pd/proposals" "$pd/completed"
+
+  # f2-tracked: plan.md + two records, populated before the commit below.
+  mkdir -p "$pd/f2-tracked-01-01-26"
+  cat >"$pd/f2-tracked-01-01-26/plan.md" <<'EOF'
+# F2 Tracked Plan
+
+## Phase syllabus
+- [x] Phase 1: Something
+  - [x] 1.1: First subphase
+  - [done] 1.2: Second subphase
+
+## Phase 1: Something
+Detail text.
+EOF
+  cat >"$pd/f2-tracked-01-01-26/plan-review.md" <<'EOF'
+# Plan review for F2 Tracked
+
+Some review text.
+EOF
+  cat >"$pd/f2-tracked-01-01-26/code-review.md" <<'EOF'
+# Code review for F2 Tracked
+
+Some review text.
+EOF
+
+  git -C "$dir" init -q
+  git -C "$dir" config user.email "plan-lifecycle-test@example.com"
+  git -C "$dir" config user.name "plan-lifecycle-test"
+  git -C "$dir" add -A
+  git -C "$dir" commit -q -m fixture
+
+  # f2-untracked: same shape, populated AFTER the commit -- untracked.
+  mkdir -p "$pd/f2-untracked-01-01-26"
+  cat >"$pd/f2-untracked-01-01-26/plan.md" <<'EOF'
+# F2 Untracked Plan
+
+## Phase syllabus
+- [x] Phase 1: Something
+  - [x] 1.1: First subphase
+  - [done] 1.2: Second subphase
+
+## Phase 1: Something
+Detail text.
+EOF
+  cat >"$pd/f2-untracked-01-01-26/plan-review.md" <<'EOF'
+# Plan review for F2 Untracked
+
+Some review text.
+EOF
+  cat >"$pd/f2-untracked-01-01-26/code-review.md" <<'EOF'
+# Code review for F2 Untracked
+
+Some review text.
+EOF
+}
+
 # ---------------------------------------------------------------------------
 # Case 1: bash -n sanity precondition
 # ---------------------------------------------------------------------------
@@ -911,6 +982,73 @@ if [ "$CODE" -eq 0 ] && [ -n "$changed_line" ] && printf '%s' "$changed_line" | 
 else
   fail "35: progress log records a 'changed since explored_at' line carrying a count or 'unknown'" \
     "code=$CODE changed_line=[$changed_line] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# F2 fixtures: a dedicated scratch tree exercising the git-tracked vs
+# untracked removal paths that trigger the remove_empty_dir defect (F2) --
+# archive removing a plan dir's last entry before the rmdir step runs.
+# ---------------------------------------------------------------------------
+f2_scratch=$(new_scratch)
+f2_plans_dir="$f2_scratch/project-plans"
+build_f2_fixture "$f2_scratch"
+
+# ---------------------------------------------------------------------------
+# Case 36: archive on a fully git-tracked plan dir -- the F2 regression
+# ---------------------------------------------------------------------------
+run_script archive "$f2_plans_dir/f2-tracked-01-01-26" --root "$f2_scratch" --plans-dir "$f2_plans_dir"
+expected_archived="archived: $f2_plans_dir/f2-tracked-01-01-26/plan.md -> $f2_plans_dir/completed/f2-tracked-01-01-26.md"
+expected_removed_1="removed: $f2_plans_dir/f2-tracked-01-01-26/plan-review.md"
+expected_removed_2="removed: $f2_plans_dir/f2-tracked-01-01-26/code-review.md"
+archived_line_ok=0
+printf '%s\n' "$OUT" | grep -Fqx "$expected_archived" && archived_line_ok=1
+removed_1_ok=0
+printf '%s\n' "$OUT" | grep -Fqx "$expected_removed_1" && removed_1_ok=1
+removed_2_ok=0
+printf '%s\n' "$OUT" | grep -Fqx "$expected_removed_2" && removed_2_ok=1
+err_no_rmdir_failed=0
+printf '%s' "$ERR" | grep -q 'rmdir failed' || err_no_rmdir_failed=1
+if [ "$CODE" -eq 0 ] \
+   && [ "$archived_line_ok" -eq 1 ] \
+   && [ "$removed_1_ok" -eq 1 ] \
+   && [ "$removed_2_ok" -eq 1 ] \
+   && [ "$err_no_rmdir_failed" -eq 1 ] \
+   && [ -z "$ERR" ] \
+   && [ -f "$f2_plans_dir/completed/f2-tracked-01-01-26.md" ] \
+   && [ ! -e "$f2_plans_dir/f2-tracked-01-01-26" ]; then
+  pass "36: archive on a fully git-tracked plan dir exits 0, no rmdir-failed lie, stderr empty (F2)"
+else
+  fail "36: archive on a fully git-tracked plan dir exits 0, no rmdir-failed lie, stderr empty (F2)" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case 37: archive on an untracked plan dir -- the mv/rm fallback path
+# ---------------------------------------------------------------------------
+run_script archive "$f2_plans_dir/f2-untracked-01-01-26" --root "$f2_scratch" --plans-dir "$f2_plans_dir"
+expected_archived_u="archived: $f2_plans_dir/f2-untracked-01-01-26/plan.md -> $f2_plans_dir/completed/f2-untracked-01-01-26.md"
+expected_removed_u1="removed: $f2_plans_dir/f2-untracked-01-01-26/plan-review.md"
+expected_removed_u2="removed: $f2_plans_dir/f2-untracked-01-01-26/code-review.md"
+archived_line_u_ok=0
+printf '%s\n' "$OUT" | grep -Fqx "$expected_archived_u" && archived_line_u_ok=1
+removed_u1_ok=0
+printf '%s\n' "$OUT" | grep -Fqx "$expected_removed_u1" && removed_u1_ok=1
+removed_u2_ok=0
+printf '%s\n' "$OUT" | grep -Fqx "$expected_removed_u2" && removed_u2_ok=1
+err_no_rmdir_failed_u=0
+printf '%s' "$ERR" | grep -q 'rmdir failed' || err_no_rmdir_failed_u=1
+if [ "$CODE" -eq 0 ] \
+   && [ "$archived_line_u_ok" -eq 1 ] \
+   && [ "$removed_u1_ok" -eq 1 ] \
+   && [ "$removed_u2_ok" -eq 1 ] \
+   && [ "$err_no_rmdir_failed_u" -eq 1 ] \
+   && [ -z "$ERR" ] \
+   && [ -f "$f2_plans_dir/completed/f2-untracked-01-01-26.md" ] \
+   && [ ! -e "$f2_plans_dir/f2-untracked-01-01-26" ]; then
+  pass "37: archive on an untracked plan dir (mv/rm fallback) exits 0, no rmdir-failed lie, stderr empty (F2)"
+else
+  fail "37: archive on an untracked plan dir (mv/rm fallback) exits 0, no rmdir-failed lie, stderr empty (F2)" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
 fi
 
 # ---------------------------------------------------------------------------

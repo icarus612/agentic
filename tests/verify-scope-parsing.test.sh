@@ -468,6 +468,207 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Lane-4 additions (contracts/l4.md, Packet P2 / P2t) -- CLAUDE_DOCS_DIR is
+# always a local path, enforced by resolve-config.sh's --expect path and
+# surfaced (not silently swallowed) by verify-run-scope.sh. Written from the
+# P2 contract text alone; never reads verify-run-scope.sh's or
+# resolve-config.sh's source.
+# ---------------------------------------------------------------------------
+
+# new_fixture_hookdir -- prints a fresh scratch dir containing a COPY (cp,
+# not a read) of the real script under test plus a STUB resolve-config.sh.
+# verify-run-scope.sh locates its resolver as a sibling of itself
+# ($(dirname "${BASH_SOURCE[0]}")/resolve-config.sh per the contract), so
+# this puts a test at the CLAUDE_DOCS_DIR resolution seam without any
+# dependence on the real resolver's internals. The stub:
+#   - logs every invocation's argv (var name plus all flags) to argv.log
+#     beside itself, for the --expect-path-was-passed assertion (case 24);
+#   - always resolves CLAUDE_PROJECT_PLANS_DIR successfully (a stub that
+#     failed it would confound every case, per the contract);
+#   - resolves CLAUDE_DOCS_DIR according to $STUB_MODE: "normal" (default)
+#     succeeds with /docs; "unresolvable" and "rejecting" fail with the
+#     exact contract message shapes for those two failure modes.
+new_fixture_hookdir() {
+  local dir
+  dir=$(new_scratch)
+  cp "$SCRIPT_RUN" "$dir/verify-run-scope.sh"
+  chmod +x "$dir/verify-run-scope.sh"
+  cat >"$dir/resolve-config.sh" <<'STUB'
+#!/usr/bin/env bash
+self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+printf '%s\n' "$*" >>"$self_dir/argv.log"
+var="$1"
+case "$var" in
+  CLAUDE_PROJECT_PLANS_DIR)
+    printf '%s\n' "/project-plans/"
+    exit 0
+    ;;
+  CLAUDE_DOCS_DIR)
+    case "${STUB_MODE:-normal}" in
+      unresolvable)
+        echo "resolve-config: cannot resolve CLAUDE_DOCS_DIR (no settings.local.json/settings.json/global settings.json value, and no usable default)" >&2
+        exit 1
+        ;;
+      rejecting)
+        echo "resolve-config: CLAUDE_DOCS_DIR must be a local path; a Confluence location belongs in CLAUDE_DOCS_PUBLISH (got: 'confluence:ENG')" >&2
+        exit 1
+        ;;
+      *)
+        printf '%s\n' "/docs"
+        exit 0
+        ;;
+    esac
+    ;;
+  *)
+    echo "stub resolve-config.sh: unexpected var $var" >&2
+    exit 1
+    ;;
+esac
+STUB
+  chmod +x "$dir/resolve-config.sh"
+  printf '%s' "$dir"
+}
+
+# ---------------------------------------------------------------------------
+# Case set 6: docs/ and project-plans/ prefixes still allowed after the dead
+# branch's removal, against the REAL resolver (P2 AC1 -- byte-identical
+# allowed-prefix list; pure dead-code removal plus a declaration).
+# ---------------------------------------------------------------------------
+
+# --- 6a: both prefixes present, zero claiming reports, must still pass -----
+c6a_wt=$(new_git_worktree)
+c6a_base=$(git -C "$c6a_wt" rev-parse HEAD)
+mkdir -p "$c6a_wt/docs" "$c6a_wt/project-plans"
+printf 'x\n' >"$c6a_wt/docs/x.md"
+printf 'y\n' >"$c6a_wt/project-plans/y.md"
+commit_all "$c6a_wt" "add docs and project-plans files"
+
+c6a_rundir=$(new_scratch)
+mkdir -p "$c6a_rundir/reports"
+
+run_script "$SCRIPT_RUN" "$c6a_wt" "$c6a_base" "$c6a_rundir"
+if [ "$CODE" -eq 0 ] \
+   && ! printf '%s\n' "$OUT" | grep -qF "UNCLAIMED: docs/x.md" \
+   && ! printf '%s\n' "$OUT" | grep -qF "UNCLAIMED: project-plans/y.md" \
+   && printf '%s\n' "$OUT" | grep -q '^OK:'; then
+  pass "21: docs/ and project-plans/ prefixes both still allowed with zero claiming reports, exit 0 with an OK: line (P2 AC1)"
+else
+  fail "21: docs/ and project-plans/ prefixes both still allowed with zero claiming reports, exit 0 with an OK: line (P2 AC1)" \
+    "code=$CODE out=[$OUT]"
+fi
+
+# --- 6b: negative control -- neither-prefix file, unclaimed, still fails ---
+c6b_wt=$(new_git_worktree)
+c6b_base=$(git -C "$c6b_wt" rev-parse HEAD)
+mkdir -p "$c6b_wt/elsewhere"
+printf 'z\n' >"$c6b_wt/elsewhere/z.md"
+commit_all "$c6b_wt" "add file under neither prefix"
+
+c6b_rundir=$(new_scratch)
+mkdir -p "$c6b_rundir/reports"
+
+run_script "$SCRIPT_RUN" "$c6b_wt" "$c6b_base" "$c6b_rundir"
+if [ "$CODE" -ne 0 ] && printf '%s\n' "$OUT" | grep -qF "UNCLAIMED: elsewhere/z.md"; then
+  pass "22: a file under neither the docs/ nor project-plans/ prefix, unclaimed, still fails loudly -- proves 21 cannot pass by allowing everything (P2 AC1)"
+else
+  fail "22: a file under neither the docs/ nor project-plans/ prefix, unclaimed, still fails loudly -- proves 21 cannot pass by allowing everything (P2 AC1)" \
+    "code=$CODE out=[$OUT]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case E: the dead http*/confluence: case is gone (P2 AC2). Source-text
+# assertion about a deletion, stated verbatim by the plan as a criterion.
+# ---------------------------------------------------------------------------
+ce_grep_out=$(grep -n 'http\*\|confluence:' "$SCRIPT_RUN")
+if [ -z "$ce_grep_out" ]; then
+  pass "23: grep -n 'http\\*\\|confluence:' over verify-run-scope.sh returns nothing (P2 AC2)"
+else
+  fail "23: grep -n 'http\\*\\|confluence:' over verify-run-scope.sh returns nothing (P2 AC2)" \
+    "matched: $ce_grep_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 7: the resolve-config.sh call for CLAUDE_DOCS_DIR passes
+# --expect path (P2 AC3). Fixture hook dir + recording stub.
+# ---------------------------------------------------------------------------
+c7_hookdir=$(new_fixture_hookdir)
+c7_wt=$(new_git_worktree)
+c7_base=$(git -C "$c7_wt" rev-parse HEAD)
+mkdir -p "$c7_wt/docs"
+printf 'note\n' >"$c7_wt/docs/b-note.md"
+commit_all "$c7_wt" "add docs note"
+
+c7_rundir=$(new_scratch)
+mkdir -p "$c7_rundir/reports"
+
+run_script "$c7_hookdir/verify-run-scope.sh" "$c7_wt" "$c7_base" "$c7_rundir"
+
+c7_docs_line=$(grep '^CLAUDE_DOCS_DIR' "$c7_hookdir/argv.log" 2>/dev/null | head -n1)
+if printf '%s' "$c7_docs_line" | grep -qF -- '--expect path'; then
+  pass "24: the resolve-config.sh call for CLAUDE_DOCS_DIR passes --expect path (P2 AC3)"
+else
+  fail "24: the resolve-config.sh call for CLAUDE_DOCS_DIR passes --expect path (P2 AC3)" \
+    "argv.log=[$(cat "$c7_hookdir/argv.log" 2>/dev/null)]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 8: an unresolvable CLAUDE_DOCS_DIR still falls back to /docs and
+# the run continues (P2 AC4). Fixture hook dir + unresolvable stub.
+# ---------------------------------------------------------------------------
+c8_hookdir=$(new_fixture_hookdir)
+c8_wt=$(new_git_worktree)
+c8_base=$(git -C "$c8_wt" rev-parse HEAD)
+mkdir -p "$c8_wt/docs"
+printf 'note\n' >"$c8_wt/docs/c-note.md"
+commit_all "$c8_wt" "add docs note"
+
+c8_rundir=$(new_scratch)
+mkdir -p "$c8_rundir/reports"
+
+export STUB_MODE=unresolvable
+run_script "$c8_hookdir/verify-run-scope.sh" "$c8_wt" "$c8_base" "$c8_rundir"
+unset STUB_MODE
+
+if [ "$CODE" -eq 0 ] && ! printf '%s\n' "$OUT" | grep -qF "UNCLAIMED: docs/c-note.md"; then
+  pass "25: an unresolvable CLAUDE_DOCS_DIR still falls back to /docs and the run continues (P2 AC4)"
+else
+  fail "25: an unresolvable CLAUDE_DOCS_DIR still falls back to /docs and the run continues (P2 AC4)" \
+    "code=$CODE out=[$OUT]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 9: THE REGRESSION THAT PROTECTS THE MIGRATION PATH. A rejected
+# CLAUDE_DOCS_DIR (old Confluence config) surfaces the resolver's error
+# rather than silently falling back and fabricating a docs root (P2 AC5).
+# Fixture hook dir + rejecting stub. Asserts all three of: exit 1, the
+# resolver's message on stderr, and the ABSENCE of an OK: line -- a case
+# that only checked the exit code would pass against a buggy script that
+# fell back and then failed for an unrelated reason.
+# ---------------------------------------------------------------------------
+c9_hookdir=$(new_fixture_hookdir)
+c9_wt=$(new_git_worktree)
+c9_base=$(git -C "$c9_wt" rev-parse HEAD)
+mkdir -p "$c9_wt/docs"
+printf 'note\n' >"$c9_wt/docs/d-note.md"
+commit_all "$c9_wt" "add docs note"
+
+c9_rundir=$(new_scratch)
+mkdir -p "$c9_rundir/reports"
+
+export STUB_MODE=rejecting
+run_script "$c9_hookdir/verify-run-scope.sh" "$c9_wt" "$c9_base" "$c9_rundir"
+unset STUB_MODE
+
+if [ "$CODE" -ne 0 ] \
+   && printf '%s\n' "$ERR" | grep -qF 'must be a local path' \
+   && ! printf '%s\n' "$OUT" | grep -q '^OK:'; then
+  pass "26: a rejected CLAUDE_DOCS_DIR surfaces the resolver's error and does not fall back -- exit nonzero, 'must be a local path' on stderr, no OK: line on stdout (P2 AC5)"
+else
+  fail "26: a rejected CLAUDE_DOCS_DIR surfaces the resolver's error and does not fall back -- exit nonzero, 'must be a local path' on stderr, no OK: line on stdout (P2 AC5)" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"

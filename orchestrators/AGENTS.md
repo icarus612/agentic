@@ -8,7 +8,7 @@ runs*:
 |---|---|---|---|
 | **Main-session orchestrator** | the user | the conversation | `dae`, `orchestrate` |
 | **Worker agent** | its orchestrator (messages) | own, **warm** — survives revision loops | `planner`, `builder` (+ its `coder`/`contract-tester` sub-agents) |
-| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `review-pr`, `document-*`, `init-workspace`, `push-pr`, `comment-pr`, `cleanup-merged` |
+| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `review-pr`, `document-local`, `init-workspace`, `push-pr`, `comment-pr`, `cleanup-merged` |
 
 **Principles** (each with its enforcement point):
 
@@ -42,10 +42,10 @@ runs*:
 ## The dae pipeline (build type)
 
 ```
-                    ┌─ pipeline: report, ship: chat (map │ analyze) ─▶ explore
-                    │  ─▶ fill report skeleton ─▶ answer in chat + scratch
-                    │  file (zero gates, zero git side effects, no worktree,
-                    │  no PR)
+                    ┌─ pipeline: report, ship: chat (map) ─▶ explore ─▶ fill
+                    │  report skeleton ─▶ answer in chat + scratch file (zero
+                    │  gates, no branch/commit/staged — no worktree either at
+                    │  rigor: low — see report.md; no PR)
 dae (/dae) ─resolve type/pipeline─┤
                     │
                     └─ ship: publish ─setup─▶ planner ‖ init-workspace ─▶ review-plan gate (human, capped)
@@ -63,7 +63,7 @@ dae (/dae) ─resolve type/pipeline─┤
                               impl-wrong │ plan-wrong │ map-wrong) ◀── integration
                                                │ clean
                                                ▼
-                          document-local | document-confluence
+                                        document-local
                                                │
                                                ▼
                        push-pr --stage update (commit+push record output)
@@ -85,9 +85,11 @@ catches a wrong contract that propagated into both code and tests.
 
 The other types swap the middle file: `diagnose` (planner ranks causes → pick
 gate → fix lanes), `sync` (planner reconciles → confirm gate → record),
-`document` (deep explore → record), `map`/`analyze` (the chat branch above:
-explore → report skeleton → chat answer, no planner, no gates). All share
-setup/ship (`ship: publish` types) and the same files in `skills/dae/`.
+`document` (deep explore → record), `map` (the chat branch above: explore →
+report skeleton → chat answer, no planner, no gates), `analyze` (the same
+middle on the publish arc: explore → report skeleton → record under the
+resolved docs root's `reports/`, no planner). All share setup/ship
+(`ship: publish` types) and the same files in `skills/dae/`.
 
 ## Hooks (`hooks/`)
 
@@ -103,7 +105,11 @@ of exit reports at the PR gate — unclaimed product changes are blocking),
 `report-verdict.sh` (the ONLY writer of a verdict
 round — enforces `ready|tentative|rejected` + kickback codes at write time),
 `validate-report.sh` (caller-side report schema check, `--kind exit` for
-builder exit reports), `sync-install.sh` (repo→`~/.claude` install sync,
+builder exit reports), `plan-lifecycle.sh` (every plan move:
+`promote|archive|supersede|reopen|locate|check|adopt` — `archive` refuses a
+plan that didn't ship), `resolve-scratch.sh` (the `ship: chat` scratch-dir
+resolver; delegates the configured rung to `resolve-config.sh`),
+`sync-install.sh` (repo→`~/.claude` install sync,
 deletions included — this repo's `push-main` runs it).
 Wired hooks: `workflow-diff-check.sh` (`Stop`, on `dae` only — builders check
 per lane instead), `scope-writes.sh` (`PreToolUse` deny-outside-allowlist;
@@ -118,6 +124,10 @@ leaves no merge ancestry and `push-policy` makes squash universal — so
 on a landed branch the real delete is `git branch -D`, which is NOT
 auto-allowed and prompts; that prompt is the safety check, and the
 content diff against the base is what establishes the branch landed.
+`branch-squash-guard.sh` (`PreToolUse` on `Bash` and the write tools —
+enforces this user's two-mode dev/main squash-only branch policy per
+`push-policy`; mode is detected per invocation from the target repo, never
+a static toggle).
 
 ## Agents (`agents/`)
 

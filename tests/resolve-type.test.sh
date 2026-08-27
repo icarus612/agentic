@@ -32,6 +32,10 @@
 #   outside those scratch dirs; the repo's real workflows.yaml is never
 #   mutated.
 #
+#   The locked-`--ship` cases (04, 29, 36b, and 44-50) were added later, from
+#   the contract text of contracts/l1.md ALONE, under the same no-source-read
+#   discipline.
+#
 # EXIT CODES
 #   0  every case passed
 #   1  at least one case failed (or the bash -n sanity precondition failed)
@@ -228,10 +232,10 @@ run map
 no_lines "03: map emits no PLANNER= and no BRANCH= line (omitted, not empty)" \
   '^PLANNER=' '^BRANCH='
 
-# --- Case 04: analyze carries BRANCH=docs/ despite SHIP=chat ---------------
+# --- Case 04: analyze carries BRANCH=docs/ with SHIP=publish ---------------
 run analyze
-ok_lines "04: analyze emits BRANCH=docs/ while defaulting to SHIP=chat" \
-  'TYPE=analyze' 'BRANCH=docs/' 'SHIP=chat'
+ok_lines "04: analyze emits BRANCH=docs/ alongside SHIP=publish (RIGOR_PR=low)" \
+  'TYPE=analyze' 'BRANCH=docs/' 'SHIP=publish' 'RIGOR_PR=low'
 
 # --- Case 05: malformed rows -> E15, exit 1, no partial KEY=value block ----
 f05a=$(new_scratch)
@@ -548,21 +552,31 @@ ok_lines "28b: row map-form D2 still prints the remaining axes" \
   'TYPE=probe' 'PIPELINE=report' 'RIGOR_EXPLORE=med' 'SHIP=chat'
 no_lines "28c: row map-form D2 drops the absent phase (no RIGOR_PR= line)" '^RIGOR_PR='
 
-# --- Case 29: analyze --ship publish GAINS a pr phase ----------------------
+# --- Case 29: analyze's ship is now locked to publish (RIGOR_PR=low) -------
 run analyze
-no_lines "29a: 'analyze' alone (report+chat) has no RIGOR_PR= line" '^RIGOR_PR='
-run analyze --ship publish
-ok_lines "29b: 'analyze --ship publish' gains the pr phase (RIGOR_PR= present)" \
+ok_lines "29a: bare 'analyze' (report+publish) carries RIGOR_PR=low" \
   'SHIP=publish' 'RIGOR_PR=low'
-run analyze --ship publish --rigor pr:high
+run analyze --rigor pr:high
 bad=""
 [ "$CODE" -eq 0 ] || bad="exit=$CODE"
 line 'RIGOR_PR=high' || bad="$bad missing-line:[RIGOR_PR=high]"
 if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
 if [ -z "$bad" ]; then
-  pass "29c: 'analyze --ship publish --rigor pr:high' -> RIGOR_PR=high with NO warning"
+  pass "29b: 'analyze --rigor pr:high' -> RIGOR_PR=high with NO warning"
 else
-  fail "29c: 'analyze --ship publish --rigor pr:high' -> RIGOR_PR=high with NO warning" \
+  fail "29b: 'analyze --rigor pr:high' -> RIGOR_PR=high with NO warning" \
+    "$bad; $(ctx)"
+fi
+run map --rigor pr:high
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0 - a non-zero exit for D2 is forbidden)"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_tok 'pr' || bad="$bad warning-does-not-name-phase:[pr]"
+err_tok 'map' || bad="$bad warning-does-not-name-type:[map]"
+if [ -z "$bad" ]; then
+  pass "29c: 'map --rigor pr:high' still warns on stderr and still exits 0 (D2 precedent survives)"
+else
+  fail "29c: 'map --rigor pr:high' still warns on stderr and still exits 0 (D2 precedent survives)" \
     "$bad; $(ctx)"
 fi
 
@@ -637,13 +651,13 @@ fi
 run feature --nope
 err_case "35b: '--nope' -> E1 (unknown flag + the offending token)" 'unknown flag' '--nope'
 
-# --- Case 36: --explore / --ship value vocabularies ------------------------
+# --- Case 36: --explore value vocabulary; --ship is now locked (E3) --------
 run feature --explore bogus
 err_case "36a: '--explore bogus' -> E9 (explore, the value, shallow, deep, auto)" \
   'explore' 'bogus' 'shallow' 'deep' 'auto'
 run feature --ship bogus
-err_case "36b: '--ship bogus' -> E10 (ship, the value, chat, publish)" \
-  'ship' 'bogus' 'chat' 'publish'
+err_case "36b: '--ship bogus' -> locked (E3), never reaches the ship value vocabulary" \
+  '--ship' 'locked' 'feature' 'publish'
 
 # --- Case 37: value-taking flag given no value -> E11 ----------------------
 run feature --rigor
@@ -746,6 +760,22 @@ else
     "code=$CODE out=[$OUT] want=[$expected_map]"
 fi
 
+run analyze
+expected_analyze='TYPE=analyze
+PIPELINE=report
+EXPLORE=deep
+RIGOR_EXPLORE=med
+RIGOR_PR=low
+AGAINST_COUNT=0
+SHIP=publish
+BRANCH=docs/'
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_analyze" ]; then
+  pass "43c: 'analyze' stdout is exactly contracts/l1.md §4.3's block - SHIP=publish, RIGOR_PR=low, no RIGOR_PLAN/RIGOR_CODE/PLANNER"
+else
+  fail "43c: 'analyze' stdout is exactly contracts/l1.md §4.3's block - SHIP=publish, RIGOR_PR=low, no RIGOR_PLAN/RIGOR_CODE/PLANNER" \
+    "code=$CODE out=[$OUT] want=[$expected_analyze]"
+fi
+
 # ===========================================================================
 # PARSE ROBUSTNESS - NO SILENT WRONG ANSWERS (§4.2 cases 43-45)
 # ===========================================================================
@@ -841,6 +871,95 @@ if [ -z "$bad" ]; then
   pass "R45b: unparseable row -> E15 substrings ('malformed' + type name), never 'unknown type'"
 else
   fail "R45b: unparseable row -> E15 substrings ('malformed' + type name), never 'unknown type'" "$bad; $(ctx)"
+fi
+
+# ===========================================================================
+# LOCKED --SHIP AXIS (contracts/l1.md §3.3, crits 6-12)
+# ===========================================================================
+
+# --- Case 44: feature --ship chat -> locked (§A1 regression) ---------------
+run feature --ship chat
+err_case "44: 'feature --ship chat' -> locked (E3) naming 'feature' and 'publish' (the §A1 regression: a build no longer ships chat)" \
+  '--ship' 'locked' 'feature' 'publish'
+
+# --- Case 45: analyze --ship publish -> locked even though it agrees -------
+run analyze --ship publish
+err_case "45: 'analyze --ship publish' -> locked (E3) even though the value agrees with the row's own ship" \
+  '--ship' 'locked' 'analyze' 'publish'
+
+# --- Case 46: map --sh chat -> locked, not unknown flag --------------------
+run map --sh chat
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'locked' || bad="$bad missing-stderr:[locked]"
+err_sub 'map' || bad="$bad missing-stderr:[map]"
+if err_sub 'unknown flag'; then bad="$bad unexpected:[unknown flag]"; fi
+if [ -z "$bad" ]; then
+  pass "46: 'map --sh chat' -> the short form resolves and is refused as locked (E3), never 'unknown flag'"
+else
+  fail "46: 'map --sh chat' -> the short form resolves and is refused as locked (E3), never 'unknown flag'" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 47: --ship with no value -> E11, unchanged -----------------------
+run feature --ship
+err_case "47: 'feature --ship' at end of argv -> E11 (missing value + --ship), unchanged by the lock" \
+  'missing value' '--ship'
+
+# --- Case 48: --shp is an unknown flag, not --ship/--sh --------------------
+run feature --shp publish
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+err_tok '--shp' || bad="$bad missing-token:[--shp]"
+if err_tok '--ship'; then bad="$bad unexpected-token:[--ship]"; fi
+if err_tok '--sh'; then bad="$bad unexpected-token:[--sh]"; fi
+if [ -z "$bad" ]; then
+  pass "48: 'feature --shp publish' -> E1 (unknown flag + --shp), stderr names neither --ship nor --sh"
+else
+  fail "48: 'feature --shp publish' -> E1 (unknown flag + --shp), stderr names neither --ship nor --sh" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 49: locked error's type lists are DERIVED, via fixture -----------
+f49=$(new_scratch)
+cat >"$f49/workflows.yaml" <<'YAML'
+types:
+  alpha: {pipeline: report, explore: auto, rigor: low, against: forbid, ship: chat}
+  beta:  {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish}
+default_type: beta
+YAML
+run --yaml "$f49/workflows.yaml" beta --ship chat
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'locked' || bad="$bad missing-stderr:[locked]"
+err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'beta' || bad="$bad missing-stderr:[beta]"
+err_sub 'alpha' || bad="$bad missing-stderr:[alpha]"
+for other in feature bugfix hotfix migration rework diagnose map analyze document sync; do
+  if err_sub "$other"; then bad="$bad unexpected-hardcoded-type-name:[$other]"; fi
+done
+if [ -z "$bad" ]; then
+  pass "49: the locked --ship error's type lists are derived from the parsed table (mentions 'alpha'/'beta', not any shipped type name)"
+else
+  fail "49: the locked --ship error's type lists are derived from the parsed table (mentions 'alpha'/'beta', not any shipped type name)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 50: --pipeline locked fires before --ship locked -----------------
+run feature --pipeline build --ship chat
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub '--pipeline' || bad="$bad missing-stderr:[--pipeline]"
+err_sub 'locked' || bad="$bad missing-stderr:[locked]"
+err_sub 'feature' || bad="$bad missing-stderr:[feature]"
+if err_sub '--ship'; then bad="$bad unexpected-stderr:[--ship]"; fi
+if [ -z "$bad" ]; then
+  pass "50: 'feature --pipeline build --ship chat' -> the --pipeline locked check fires first, never mentions --ship"
+else
+  fail "50: 'feature --pipeline build --ship chat' -> the --pipeline locked check fires first, never mentions --ship" \
+    "$bad; $(ctx)"
 fi
 
 # ---------------------------------------------------------------------------

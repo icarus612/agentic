@@ -61,11 +61,13 @@ agentic/
 │   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # the tech layers                 (domain: <tech>)
 │   ├── AGENTS.md
-│   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence
+│   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, medusa
 │       ├── AGENTS.md          #   + stubs: bash, git, go, react, python, fastapi
 │       ├── rules/
 │       └── skills/
-├── tests/                     # contract tests (8 suites) for the lifecycle + scope-verification scripts
+├── .github/                   # publish-docs.yml — canonical; post-merge docs→Confluence publish (no-op here)
+├── scripts/                   # publish-docs.yml — SYMLINK into .github/workflows/, not the reverse (see README.md)
+├── tests/                     # contract tests (10 suites) for the lifecycle + scope-verification scripts
 └── docs/                      # meta-docs about the repo (this tree)
 ```
 
@@ -107,31 +109,45 @@ See [`pipeline.md`](pipeline.md) for the dae pipeline and
 A prompt dependency graph, not a code import graph — "depends on" means "hands
 off to" or "is composed with."
 
-- **`dae`** (`/dae`) resolves the docs target, captures the story when it names
-  Confluence, and resolves the request to ONE **type**, whose **pipeline**
-  axis selects a middle file (`build.md` / `diagnose.md` / `sync.md` /
-  `report.md` / `document.md` — ten types across four pipeline values). A
-  `pipeline: report` type (`map`/`analyze`) defaults to `ship: chat`: explore,
-  fill the report skeleton, answer in chat — zero gates, zero git side
-  effects, no worktree. Every other type creates the parent worktree via
-  `workflow-setup.sh` and drives: `planner` (‖ `init-workspace`) →
-  `review-plan` (gate; capped; revisions via SendMessage to the warm planner)
-  → approval → `push-pr --stage open-draft` (draft PR opens right after the
-  gate) → `builder` lanes (event-driven dispatch; each in its own child
-  worktree, running the packet model with `coder`/`contract-tester`
-  sub-agents; merge-back + `push-pr --stage update` + cleanup per lane) →
-  `review-code` (gate, run once every builder lane has merged, over the whole
-  assembled implementation — never scoped to one lane; capped; reason-code
-  kickbacks) → `document-local` **or** `document-confluence` →
-  `push-pr --stage update` (commits + pushes the record output) →
-  `review-pr` — the mandatory PR gate, run before `finalize` on EVERY
-  `ship: publish` run, never optional or independent — (`ready`/`tentative` →
-  `push-pr --stage finalize`; `rejected` → replan / rebuild / leave the PR as
-  a draft + `comment-pr`).
-- **Documentation dispatch** (`artifact-locations`): a local docs path →
-  `document-local` (universal); a Confluence location → `document-confluence`
-  (`domain: confluence`), which also pulls in `external-storage-cap` and sends
-  large artifacts to Google Drive.
+- **`dae`** (`/dae`) resolves the docs target, captures the story when
+  `CLAUDE_DOCS_PUBLISH` is set (`confluence-mode.md`), and resolves the
+  request to ONE **type**, whose **pipeline** axis selects a middle file
+  (`build.md` / `diagnose.md` / `sync.md` / `report.md` / `document.md` — ten
+  types across four pipeline values). `map` (`pipeline: report`,
+  `ship: chat`) defaults to answering in chat: explore, fill the report
+  skeleton, answer in chat — zero gates, and (per `report.md`) no branch,
+  commit, or anything staged — no worktree either at `rigor: low`. Every
+  other type — every `ship: publish` type, `analyze` and `document`
+  included — creates the parent worktree via `workflow-setup.sh`. Types
+  carrying a `planner:` cell (every `pipeline: build` type, plus
+  `diagnose` and `sync`) drive:
+  `planner` (‖ `init-workspace`) → `review-plan` (gate; capped; takes the
+  run's ask of record as an input, an unrecorded divergence routing
+  `plan-wrong`; revisions via SendMessage to the warm planner) → approval →
+  `push-pr --stage open-draft` (draft PR opens right after the gate) →
+  `builder` lanes (event-driven dispatch; each in its own child worktree,
+  running the packet model with `coder`/`contract-tester` sub-agents;
+  merge-back + `push-pr --stage update` + cleanup per lane) → `review-code`
+  (gate, run once every builder lane has merged, over the whole assembled
+  implementation — never scoped to one lane; capped; reason-code kickbacks).
+  The planner-less publish types (`document`, `analyze`) skip straight to
+  a deep explore/report pass — no plan gate, no builder lanes, no
+  `review-code`: nothing is committable before the record stage, so the
+  draft PR opens at the **record commit** instead. Both arcs converge on
+  the shared record + ship tail:
+  → `document-local` → `push-pr --stage update` (commits + pushes the record
+  output) → `review-pr` — the mandatory PR gate, run before `finalize` on
+  EVERY `ship: publish` run, never optional or independent —
+  (`ready`/`tentative` → `push-pr --stage finalize`; `rejected` → replan /
+  rebuild / leave the PR as a draft + `comment-pr`).
+- **Documentation dispatch** (`artifact-locations`): `CLAUDE_DOCS_DIR` is
+  always a local path, and the record stage is always `document-local`
+  (universal). The optional `CLAUDE_DOCS_PUBLISH` names a separate publish
+  target — publishing is a CI job on merge, never a run stage — and when it
+  is set, `confluence-mode.md` (`domain: universal`) governs requirements
+  capture, pulling in `external-storage-cap` for large artifacts to Google
+  Drive. `document-confluence` is the manual/recovery sync that mirrors the
+  local docs tree to that target, never a run stage.
 - **Universal rules** are pulled in by nearly every skill via `rules:` —
   `verify-dont-assume` in almost all, `artifact-locations` in most.
 - **Model policy**: orchestration/planning (`dae`, `orchestrate`, the
@@ -145,6 +161,9 @@ off to" or "is composed with."
 - `model-fallback:` is declarative only — Claude Code reads the single `model:`.
 - The item-8 scripts re-sweep (further mechanical extractions) is deliberately
   deferred until after this redesign settled — sweep against the final tree.
-- No CI, build system, license, `CONTRIBUTING.md`, or `CHANGELOG`. `tests/`
-  holds 8 contract-test suites for the lifecycle + scope-verification
+- One GitHub Actions workflow — a post-merge docs→Confluence publish job
+  that no-ops in this repo, since this repo configures no publish target;
+  it ships as a working, copyable reference for consuming projects. Still
+  no build system, license, `CONTRIBUTING.md`, or `CHANGELOG`. `tests/`
+  holds 10 contract-test suites for the lifecycle + scope-verification
   scripts — still no test framework or runner beyond that.

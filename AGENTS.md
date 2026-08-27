@@ -21,7 +21,9 @@ agentic/
 │   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
 │       └── skills/
-└── tests/                     ← plan-lifecycle.sh's fixture test (repo-root, D4)
+├── tests/                     ← plan-lifecycle.sh's fixture test (repo-root, D4)
+├── .github/                   ← workflows/publish-docs.yml — canonical; docs→Confluence CI (no-op here)
+└── scripts/                   ← publish-docs.yml symlinks → .github/workflows/ (CI templates for consumers)
 ```
 
 ## `domain:` — the only classifier

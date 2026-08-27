@@ -45,10 +45,13 @@ don't exist, so they refer to each other by name and to bindings by `domain:`.
 - **Not a runtime project.** No manifest, lockfile, or build system. The
   only executable code is the Bash under `agent-agnostic/hooks/` and
   `orchestrators/hooks/` (runs inside *consuming* projects), plus `tests/`
-  (8 contract-test suites exercising those hooks against this repo itself —
+  (10 contract-test suites exercising those hooks against this repo itself —
   still no test framework or runner beyond that).
 - **Everything else is markdown.**
-- **No CI, license, `CONTRIBUTING.md`, or `CHANGELOG`.**
+- **One GitHub Actions workflow** — a post-merge docs→Confluence publish job
+  that no-ops here because this repo configures no publish target, shipped as
+  a working, copyable reference for consuming projects — **still no build
+  system, license, `CONTRIBUTING.md`, or `CHANGELOG`.**
 - **This `/docs` tree was bootstrapped by a map-driven documentation run** (a deep
   explore + map-driven document run) on 2026-07-06, with no accompanying code
   change and no changelog entry recorded, per the run's instructions.

@@ -15,12 +15,13 @@ tool-based/<tech>/
 ├── AGENTS.md      # the tech's conventions, tooling, defaults
 ├── rules/         # always-on while this tech is in play  (domain: <tech>)
 ├── skills/        # on-demand procedures                  (domain: <tech>)
-└── hooks/         # tech-specific hooks, if any
+├── hooks/         # tech-specific hooks, if any
+└── ci/            # shipped CI templates/references for consuming projects
 ```
 
 ## Status
 
-Six layers have real content; six are placeholder stubs (an `AGENTS.md`
+Seven layers have real content; six are placeholder stubs (an `AGENTS.md`
 containing only a `_TODO` line):
 
 | Tech | Status | Rules | Skills |
@@ -30,6 +31,7 @@ containing only a `_TODO` line):
 | `typescript` | **real** | `typescript-strict`, `code-quality` | `type-safely` |
 | `django` | **real** | `django-conventions`, `security` | `create-django-resource` |
 | `godot` | **real** | `gdscript-standards` | `generate-hex-neighbors`, `run-godot-test` |
+| `medusa` | **real** | — | `medusa-api` |
 | `confluence` | **real** | `external-storage-cap` | `document-confluence` |
 | `bash` | stub | — | — |
 | `git` | stub | — | — |
@@ -39,9 +41,10 @@ containing only a `_TODO` line):
 | `fastapi` | stub | — | — |
 
 `confluence` is the one layer bound to a *service* rather than a language:
-`document-confluence` is the documentation phase when the docs target is a
-Confluence location, publishing the story + technical page and changelog,
-linking Jira bidirectionally, and offloading large artifacts to Google Drive
+`document-confluence` is a manual/recovery sync, run standalone by a human,
+that mirrors the local docs tree to Confluence when the CI publish job hasn't
+run, has failed, or a target is being backfilled — never a documentation
+phase, never a source of truth — offloading large artifacts to Google Drive
 via the Atlassian and Drive MCP servers.
 
 ## Naming

@@ -39,7 +39,9 @@ agentic/
 │       ├── rules/
 │       └── skills/
 ├── tests/                     # plan-lifecycle.sh's fixture test    (repo-root, D4)
-└── docs/                      # meta-docs about this repo itself
+├── docs/                      # meta-docs about this repo itself
+├── .github/                   # workflows/publish-docs.yml — canonical; docs→Confluence CI (no-op here)
+└── scripts/                   # publish-docs.yml symlinks → .github/workflows/ (CI templates for consumers)
 ```
 
 ## The dae pipeline
@@ -54,7 +56,7 @@ planner ‖ init-workspace → review-plan ⇄ (human gate, capped)
    → builder lanes (each: contract → coder ‖ contract-tester per packet
      → debug-mediated rework → builder's own e2e exit → push-pr --stage update)
    → review-code ⇄ (human gate; kickback codes impl-wrong|plan-wrong|map-wrong)
-   → document-local | document-confluence → push-pr --stage update
+   → document-local → push-pr --stage update
    → review-pr ⇄ (mandatory gate) → push-pr --stage finalize
 ```
 

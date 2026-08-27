@@ -266,6 +266,309 @@ do
 done
 
 # ---------------------------------------------------------------------------
+# Case set 06: P1 criterion 1 -- `--expect` is additive: omitting it must
+# leave behavior byte-identical to today. This is EXACT-EQUALITY (not a
+# substring check) on the full stdout and stderr strings, for all three
+# no-`--expect` outcomes named in the contract: resolution from a settings
+# file, resolution from --default, and unresolvable-with-no-default. This
+# is the case that must be capable of failing if default output changed by
+# even one byte.
+# ---------------------------------------------------------------------------
+
+# --- 06a: settings-file resolution, exact stdout + exact stderr -------------
+c6a_home=$(new_home)
+c6a_root=$(new_root)
+write_settings_json "$c6a_home/.claude/settings.json" "CLAUDE_DOCS_DIR=exact-value"
+
+run_resolve "$c6a_home" CLAUDE_DOCS_DIR --root "$c6a_root"
+c6a_expected_err="resolve-config: CLAUDE_DOCS_DIR resolved to 'exact-value' (source: $c6a_home/.claude/settings.json)"
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "exact-value" ] && [ "$ERR" = "$c6a_expected_err" ]; then
+  pass "06a: no --expect, settings-file resolution -- stdout and stderr exact-equal to contract text"
+else
+  fail "06a: no --expect, settings-file resolution -- stdout and stderr exact-equal to contract text" \
+    "code=$CODE out=[$OUT] err=[$ERR] expected_err=[$c6a_expected_err]"
+fi
+
+# --- 06b: --default resolution, exact stdout + exact stderr -----------------
+c6b_home=$(new_home)
+c6b_root=$(new_root)
+
+run_resolve "$c6b_home" CLAUDE_DOCS_DIR --root "$c6b_root" --default some-default
+c6b_expected_err="resolve-config: CLAUDE_DOCS_DIR resolved to 'some-default' (source: supplied default)"
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "some-default" ] && [ "$ERR" = "$c6b_expected_err" ]; then
+  pass "06b: no --expect, --default resolution -- stdout and stderr exact-equal to contract text"
+else
+  fail "06b: no --expect, --default resolution -- stdout and stderr exact-equal to contract text" \
+    "code=$CODE out=[$OUT] err=[$ERR] expected_err=[$c6b_expected_err]"
+fi
+
+# --- 06c: unresolvable, no default, exact stdout (empty) + exact stderr -----
+c6c_home=$(new_home)
+c6c_root=$(new_root)
+
+run_resolve "$c6c_home" CLAUDE_DOCS_DIR --root "$c6c_root"
+c6c_expected_err="resolve-config: cannot resolve CLAUDE_DOCS_DIR (no settings.local.json/settings.json/global settings.json value, and no usable default)"
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] && [ "$ERR" = "$c6c_expected_err" ]; then
+  pass "06c: no --expect, unresolvable with no default -- exit 1, empty stdout, exact-equal stderr"
+else
+  fail "06c: no --expect, unresolvable with no default -- exit 1, empty stdout, exact-equal stderr" \
+    "code=$CODE out=[$OUT] err=[$ERR] expected_err=[$c6c_expected_err]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 07: P1 criterion 2 -- `--expect path` accepts a plain local path,
+# a colon-mid-segment path, and a single-letter (Windows-drive) prefix; none
+# of these are scheme-prefixed per the contract's anchored ERE.
+# ---------------------------------------------------------------------------
+for c7_val in \
+  "/docs" \
+  "docs" \
+  "/srv/x/docs" \
+  "/srv/a:b/docs" \
+  'C:\Users\me\docs'
+do
+  c7_home=$(new_home)
+  c7_root=$(new_root)
+  run_resolve "$c7_home" CLAUDE_DOCS_DIR --root "$c7_root" --default "$c7_val" --expect path
+  if [ "$CODE" -eq 0 ] && [ "$OUT" = "$c7_val" ]; then
+    pass "07: --expect path accepts '$c7_val', exit 0, value on stdout"
+  else
+    fail "07: --expect path accepts '$c7_val', exit 0, value on stdout" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# Case set 08: P1 criterion 3 -- `--expect path` rejects a scheme-prefixed
+# value (an Atlassian wiki URL, and a confluence: scheme): exit 1, empty
+# stdout, stderr naming both the passed var and CLAUDE_DOCS_PUBLISH.
+# ---------------------------------------------------------------------------
+for c8_val in \
+  "https://acme.atlassian.net/wiki/spaces/ENG" \
+  "confluence:ENG"
+do
+  c8_home=$(new_home)
+  c8_root=$(new_root)
+  run_resolve "$c8_home" CLAUDE_DOCS_DIR --root "$c8_root" --default "$c8_val" --expect path
+  if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] \
+     && printf '%s\n' "$ERR" | grep -qF 'must be a local path' \
+     && printf '%s\n' "$ERR" | grep -qF 'CLAUDE_DOCS_PUBLISH'; then
+    pass "08: --expect path rejects '$c8_val', exit 1, empty stdout, stderr names CLAUDE_DOCS_PUBLISH"
+  else
+    fail "08: --expect path rejects '$c8_val', exit 1, empty stdout, stderr names CLAUDE_DOCS_PUBLISH" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# Case set 09: P1 criterion 4 -- the rejection message uses the var name the
+# CALLER passed, never a hardcoded CLAUDE_DOCS_DIR.
+# ---------------------------------------------------------------------------
+c9_home=$(new_home)
+c9_root=$(new_root)
+
+run_resolve "$c9_home" CLAUDE_SOMETHING_ELSE --root "$c9_root" --default confluence:ENG --expect path
+if [ "$CODE" -eq 1 ] \
+   && printf '%s\n' "$ERR" | grep -qF 'CLAUDE_SOMETHING_ELSE' \
+   && ! printf '%s\n' "$ERR" | grep -qF 'CLAUDE_DOCS_DIR'; then
+  pass "09: rejection message names the passed var CLAUDE_SOMETHING_ELSE, not a hardcoded CLAUDE_DOCS_DIR"
+else
+  fail "09: rejection message names the passed var CLAUDE_SOMETHING_ELSE, not a hardcoded CLAUDE_DOCS_DIR" \
+    "code=$CODE err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 10: P1 criterion 5 -- `--expect publish-target` accepts an
+# Atlassian wiki URL with and without a /pages/... tail, and confluence:ENG /
+# confluence:ENG/Handbook.
+# ---------------------------------------------------------------------------
+for c10_val in \
+  "https://acme.atlassian.net/wiki/spaces/ENG" \
+  "https://acme.atlassian.net/wiki/spaces/ENG/pages/12345/Home" \
+  "confluence:ENG" \
+  "confluence:ENG/Handbook"
+do
+  c10_home=$(new_home)
+  c10_root=$(new_root)
+  run_resolve "$c10_home" CLAUDE_DOCS_PUBLISH --root "$c10_root" --default "$c10_val" --expect publish-target
+  if [ "$CODE" -eq 0 ] && [ "$OUT" = "$c10_val" ]; then
+    pass "10: --expect publish-target accepts '$c10_val', exit 0, value on stdout"
+  else
+    fail "10: --expect publish-target accepts '$c10_val', exit 0, value on stdout" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+done
+
+# ---------------------------------------------------------------------------
+# Case set 11: P1 criterion 6 -- `--expect publish-target` rejects a bare
+# path and an unknown scheme (confluance:ENG, a typo of confluence:ENG); the
+# rejection message for the unknown scheme is DERIVED from PUBLISH_SCHEMES,
+# so it must name every scheme the flag accepts ("confluence").
+# ---------------------------------------------------------------------------
+
+# --- 11a: bare path rejected -------------------------------------------------
+c11a_home=$(new_home)
+c11a_root=$(new_root)
+run_resolve "$c11a_home" CLAUDE_DOCS_PUBLISH --root "$c11a_root" --default /docs --expect publish-target
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] \
+   && printf '%s\n' "$ERR" | grep -qF 'must name a known publish target'; then
+  pass "11a: --expect publish-target rejects a bare path '/docs', exit 1, empty stdout"
+else
+  fail "11a: --expect publish-target rejects a bare path '/docs', exit 1, empty stdout" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# --- 11b: unknown scheme rejected, message derives the known-schemes list ---
+c11b_home=$(new_home)
+c11b_root=$(new_root)
+run_resolve "$c11b_home" CLAUDE_DOCS_PUBLISH --root "$c11b_root" --default confluance:ENG --expect publish-target
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] \
+   && printf '%s\n' "$ERR" | grep -qF 'must name a known publish target' \
+   && printf '%s\n' "$ERR" | grep -qF 'confluence'; then
+  pass "11b: --expect publish-target rejects 'confluance:ENG', message lists known scheme 'confluence'"
+else
+  fail "11b: --expect publish-target rejects 'confluance:ENG', message lists known scheme 'confluence'" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 12: P1 criterion 7 -- `--expect` composes with --default and
+# --root, and validates a value whichever rung produced it: --default, or a
+# settings-file fixture.
+# ---------------------------------------------------------------------------
+
+# --- 12a: illegal value from --default is rejected ---------------------------
+c12a_home=$(new_home)
+c12a_root=$(new_root)
+run_resolve "$c12a_home" CLAUDE_DOCS_DIR --root "$c12a_root" --default confluence:ENG --expect path
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] && printf '%s\n' "$ERR" | grep -qF 'must be a local path'; then
+  pass "12a: --expect composes with --default -- an illegal default value is rejected"
+else
+  fail "12a: --expect composes with --default -- an illegal default value is rejected" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# --- 12b: legal value from --default resolves 0 -----------------------------
+c12b_home=$(new_home)
+c12b_root=$(new_root)
+run_resolve "$c12b_home" CLAUDE_DOCS_DIR --root "$c12b_root" --default /docs --expect path
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "/docs" ]; then
+  pass "12b: --expect composes with --default -- a legal default value resolves 0"
+else
+  fail "12b: --expect composes with --default -- a legal default value resolves 0" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# --- 12c: legal value from a settings-file fixture is validated (accepted) --
+c12c_home=$(new_home)
+c12c_root=$(new_root)
+write_settings_json "$c12c_home/.claude/settings.json" "CLAUDE_DOCS_DIR=/srv/settings-docs"
+run_resolve "$c12c_home" CLAUDE_DOCS_DIR --root "$c12c_root" --expect path
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "/srv/settings-docs" ]; then
+  pass "12c: --expect composes with a settings-file fixture -- a legal value resolves 0"
+else
+  fail "12c: --expect composes with a settings-file fixture -- a legal value resolves 0" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# --- 12d: illegal value from a settings-file fixture is rejected ------------
+c12d_home=$(new_home)
+c12d_root=$(new_root)
+write_settings_json "$c12d_home/.claude/settings.json" "CLAUDE_DOCS_DIR=confluence:ENG"
+run_resolve "$c12d_home" CLAUDE_DOCS_DIR --root "$c12d_root" --expect path
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] && printf '%s\n' "$ERR" | grep -qF 'must be a local path'; then
+  pass "12d: --expect composes with a settings-file fixture -- an illegal value is rejected"
+else
+  fail "12d: --expect composes with a settings-file fixture -- an illegal value is rejected" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 13: P1 criterion 8 -- an unresolvable var with --expect path and
+# no default still exits 1 with the UNRESOLVABLE message (not the rejection
+# message), and stdout is empty. --expect must not invent a value.
+# ---------------------------------------------------------------------------
+c13_home=$(new_home)
+c13_root=$(new_root)
+run_resolve "$c13_home" CLAUDE_DOCS_DIR --root "$c13_root" --expect path
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] \
+   && printf '%s\n' "$ERR" | grep -qF 'cannot resolve' \
+   && ! printf '%s\n' "$ERR" | grep -qF 'must be a local path'; then
+  pass "13: --expect path, unresolvable var, no default -- exit 1, empty stdout, unresolvable message (not rejection)"
+else
+  fail "13: --expect path, unresolvable var, no default -- exit 1, empty stdout, unresolvable message (not rejection)" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 14: P1 criterion 9 -- an invalid --expect argument is a usage
+# error, exit 1; --expect with no following value is also a usage error, not
+# a silent accept.
+# ---------------------------------------------------------------------------
+
+# --- 14a: unknown --expect value ---------------------------------------------
+c14a_home=$(new_home)
+c14a_root=$(new_root)
+run_resolve "$c14a_home" CLAUDE_DOCS_DIR --root "$c14a_root" --default /docs --expect bogus
+if [ "$CODE" -eq 1 ] && printf '%s\n' "$ERR" | grep -qF -- '--expect'; then
+  pass "14a: --expect bogus is a usage error, exit 1, stderr mentions --expect"
+else
+  fail "14a: --expect bogus is a usage error, exit 1, stderr mentions --expect" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# --- 14b: --expect with no following value -----------------------------------
+c14b_home=$(new_home)
+c14b_root=$(new_root)
+run_resolve "$c14b_home" CLAUDE_DOCS_DIR --root "$c14b_root" --default /docs --expect
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ]; then
+  pass "14b: --expect with no following value is a usage error, not a silent accept (stdout stays empty)"
+else
+  fail "14b: --expect with no following value is a usage error, not a silent accept (stdout stays empty)" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 15: P1 criterion 10 -- no jq. We cannot grep the script's source
+# for "jq" (that would be reading the implementation, forbidden for a blind
+# contract test), and we chose NOT to restrict PATH down to bash-only either
+# -- the script legitimately needs other external tools (grep/sed/etc. -
+# unknown to us, blind) beyond jq, so stripping PATH to bash-only would risk
+# a false FAIL for reasons unrelated to jq (the "fragile" case the contract
+# warns about). Instead we shadow ONLY `jq` with a fake executable ahead of
+# the real PATH, run a representative successful case through it, and assert
+# on the fake's invocation LOG CONTENT (never on exit status alone): the log
+# must stay empty, proving the script under test never shells out to jq,
+# while every other tool on PATH remains the real one so nothing else in the
+# script is disturbed. bash -n cleanliness (the other half of criterion 10)
+# is already Case 00 and needs nothing new here.
+# ---------------------------------------------------------------------------
+c15_binfake=$(new_scratch)
+c15_jqlog="$c15_binfake/jq.log"
+{
+  printf '#!/usr/bin/env bash\n'
+  printf 'echo "jq called with: $*" >> %q\n' "$c15_jqlog"
+  printf 'exit 1\n'
+} >"$c15_binfake/jq"
+chmod +x "$c15_binfake/jq"
+
+c15_home=$(new_home)
+c15_root=$(new_root)
+write_settings_json "$c15_home/.claude/settings.json" "CLAUDE_DOCS_DIR=jq-check-value"
+
+c15_old_path="$PATH"
+PATH="$c15_binfake:$PATH"
+run_resolve "$c15_home" CLAUDE_DOCS_DIR --root "$c15_root"
+PATH="$c15_old_path"
+
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "jq-check-value" ] && [ ! -s "$c15_jqlog" ]; then
+  pass "15: no jq -- a shadowed fake jq ahead of PATH is never invoked (log stays empty) during a successful resolution"
+else
+  fail "15: no jq -- a shadowed fake jq ahead of PATH is never invoked (log stays empty) during a successful resolution" \
+    "code=$CODE out=[$OUT] err=[$ERR] jqlog=[$([ -f "$c15_jqlog" ] && cat "$c15_jqlog")]"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"

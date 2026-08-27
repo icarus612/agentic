@@ -104,16 +104,32 @@ hookdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # --- harness-owned prefixes (repo-relative, no leading slash) ---------------
 plans=$("$hookdir/resolve-config.sh" CLAUDE_PROJECT_PLANS_DIR --default /project-plans/ --root "$wt" 2>/dev/null || echo /project-plans/)
-docs=$("$hookdir/resolve-config.sh" CLAUDE_DOCS_DIR --default /docs --root "$wt" 2>/dev/null || echo /docs)
+
+# CLAUDE_DOCS_DIR must resolve to a local path — a run scanning against a
+# Confluence-valued one would otherwise fabricate a docs root and silently
+# turn a broken config into a passing gate. resolve-config.sh can fail two
+# ways here, and they are NOT the same thing: "unresolvable" (nothing
+# configured) still falls back to /docs as always, while "rejected" (the
+# value exists but --expect path refused it, e.g. a leftover Confluence
+# config) must abort instead. The two are distinguished ONLY by the
+# resolver's stderr message, never by exit status — both failures exit 1.
+docs_err=$(mktemp)
+docs=$("$hookdir/resolve-config.sh" CLAUDE_DOCS_DIR --default /docs --root "$wt" --expect path 2>"$docs_err")
+if [ $? -ne 0 ]; then
+  if grep -qF 'must be a local path' "$docs_err"; then
+    cat "$docs_err" >&2
+    rm -f "$docs_err"
+    err "CLAUDE_DOCS_DIR was rejected by resolve-config.sh (see above) — refusing to scan against a fabricated docs root"
+  fi
+  docs=/docs
+fi
+rm -f "$docs_err"
 allowed=".gitignore"
 norm() { printf '%s' "$1" | sed -E 's/^\.?\///; s/\/+$//'; }
 allowed="$allowed
 $(norm "$plans")"
-case "$docs" in
-  http*|confluence:*) : ;;                # docs live off-repo — no local docs allowance
-  *) allowed="$allowed
-$(norm "$docs")" ;;
-esac
+allowed="$allowed
+$(norm "$docs")"
 if [ -n "$allow_extra" ]; then
   IFS=':' read -r -a extras <<< "$allow_extra"
   for e in "${extras[@]}"; do [ -n "$e" ] && allowed="$allowed

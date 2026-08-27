@@ -14,7 +14,7 @@ For issues whose cause is UNKNOWN: investigate, rank candidate causes, gate on t
 
 **5. Code gate (human).** `review-code` with the diagnosis report path (the spec of record) and the build summary; route its reason-code verdict per the router.
 
-**6–7. Record, Ship** (shared — router). Record refreshes docs/ticket state per mode; ship commits and pushes via `push-pr --stage update`, runs the PR gate against the **diagnosis report** (plus the Jira key when one sourced the issue) — the picked candidates are the acceptance criteria, and nothing outside their cited file scopes may have changed — then `push-pr --stage finalize`. On a no-fix (none-picked) run, this sequence still runs in full: record still commits and pushes the report, and the draft PR opened at the pick-the-causes gate — finalized here — is what makes the report visible and preserved; a declined push leaves the report path in your summary.
+**6–7. Record, Ship** (shared — router). Record refreshes the local docs tree through `document-local`, always — the ticket is not touched there: `cleanup-merged` transitions it at closeout. Ship commits and pushes via `push-pr --stage update`, runs the PR gate against the **diagnosis report** (plus the Jira key when one sourced the issue) — the picked candidates are the acceptance criteria, and nothing outside their cited file scopes may have changed — then `push-pr --stage finalize`. On a no-fix (none-picked) run, this sequence still runs in full: record still commits and pushes the report, and the draft PR opened at the pick-the-causes gate — finalized here — is what makes the report visible and preserved; a declined push leaves the report path in your summary.
 
 ## Notes
 

@@ -3,7 +3,7 @@
 #
 # SYNOPSIS
 #   resolve-type.sh [<type>] [--t[ype] <t>] [--exp[lore] <v>] [--rig[or] <spec>]
-#                   [--ag[ainst] <a>[,<a>...]]... [--sh[ip] <v>] [--pl[an] <path>]
+#                   [--ag[ainst] <a>[,<a>...]]... [--pl[an] <path>]
 #                   [--yaml <path>]
 #
 # DESCRIPTION
@@ -11,11 +11,11 @@
 #   against, ship). The presets live in the type table
 #   ../skills/dae/workflows.yaml, one flow-map row per type. This script is
 #   the ONLY reader of that table: it resolves a type name or alias to its
-#   row, applies the free-tier flag overrides (--explore, --rigor, --ship),
+#   row, applies the free-tier flag overrides (--explore, --rigor),
 #   validates the constrained and locked axes (--against arity, --plan
-#   placement, --pipeline is locked), and prints the resolved axes as
-#   KEY=value lines on stdout for the router to consume. The router never
-#   interprets the yaml itself.
+#   placement, --pipeline and --ship are locked), and prints the resolved
+#   axes as KEY=value lines on stdout for the router to consume. The router
+#   never interprets the yaml itself.
 #
 #   The table is parsed with bash builtins and awk only — no jq, no YAML
 #   library, matching this repo's other hooks (resolve-config.sh:21). That is
@@ -142,7 +142,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
     -r) CANON="rigor"; return 0 ;;
     -a) CANON="against"; return 0 ;;
     --*) ;;
-    *) err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --ship, --plan?" ;;
+    *) err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan?" ;;
   esac
   for entry in $FLAG_TABLE; do
     long="${entry%%:*}"; min="${entry##*:}"
@@ -150,7 +150,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
     [ "${#tok}" -ge "${#min}" ] || continue
     matches="$matches $long"; count=$((count+1))
   done
-  [ "$count" -ne 0 ] || err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --ship, --plan? (short forms need at least --t, --exp, --rig, --ag, --sh, --pl)"
+  [ "$count" -ne 0 ] || err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan? (short forms need at least --t, --exp, --rig, --ag, --pl)"
   [ "$count" -eq 1 ] || err "ambiguous flag: '$tok' matches$matches — which one did you mean?"
   trim "$matches"; long="$TRIM"
   CANON="${long#--}"
@@ -160,7 +160,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
 # --- argv ------------------------------------------------------------------
 type_name=""; positional_count=0
 explore_override=""; have_explore=0
-ship_override=""; have_ship=0
+ship_given=0
 plan_path=""; have_plan=0
 pipeline_given=0
 yaml_path=""
@@ -191,7 +191,7 @@ while [ $# -gt 0 ]; do
       case "$canon" in
         type)     set_type "$val" ;;
         explore)  explore_override="$val"; have_explore=1 ;;
-        ship)     ship_override="$val"; have_ship=1 ;;
+        ship)     ship_given=1 ;;
         plan)     plan_path="$val"; have_plan=1 ;;
         pipeline) pipeline_given=1 ;;
         yaml)     yaml_path="$val" ;;
@@ -251,6 +251,7 @@ rows=$(awk '
 # reported separately, on the row-parse path below, if it is the resolved
 # row).
 all_types=(); all_aliases=(); build_types=(); require_types=()
+chat_types=(); publish_types=()
 while IFS=$'\t' read -r key raw; do
   [ -n "$key" ] || continue
   all_types+=("$key")
@@ -260,6 +261,10 @@ while IFS=$'\t' read -r key raw; do
   fi
   if cell_value "$INNER" "against"; then
     [ "$CELLVAL" != "require" ] || require_types+=("$key")
+  fi
+  if cell_value "$INNER" "ship"; then
+    [ "$CELLVAL" != "chat" ]    || chat_types+=("$key")
+    [ "$CELLVAL" != "publish" ] || publish_types+=("$key")
   fi
   if cell_value "$INNER" "aliases"; then
     alias_list="$CELLVAL"
@@ -346,10 +351,6 @@ if row_cell "branch"; then branch="$CELLVAL"; have_branch=1; fi
 if [ "$have_explore" = 1 ]; then
   in_list "$explore_override" "$VOCAB_EXPLORE" || err "explore value '$explore_override' is not one of shallow, deep, auto — which did you mean?"
   explore="$explore_override"
-fi
-if [ "$have_ship" = 1 ]; then
-  in_list "$ship_override" "$VOCAB_SHIP" || err "ship value '$ship_override' is not one of chat, publish — which did you mean?"
-  ship="$ship_override"
 fi
 
 # --- f(pipeline, ship): which rigor phases this run HAS ---------------------
@@ -474,6 +475,23 @@ drop_phase() { # drop_phase <phase> <named?>
 # such even on a type that also wants an anchor — the flag that cannot belong
 # here at all is the more useful thing to say first.
 [ "$pipeline_given" = 0 ] || err "--pipeline is locked: a type IS its pipeline, and type '$resolved_type' is pipeline '$pipeline' — pick the type whose pipeline you want instead?"
+
+if [ "$ship_given" = 1 ]; then
+  ship_parts=()
+  if [ "${#chat_types[@]}" -gt 0 ]; then
+    join_comma ${chat_types[@]+"${chat_types[@]}"}; chat_str="$JOINED"
+    ship_parts+=("for a chat answer run $chat_str")
+  fi
+  if [ "${#publish_types[@]}" -gt 0 ]; then
+    join_comma ${publish_types[@]+"${publish_types[@]}"}; publish_str="$JOINED"
+    ship_parts+=("for a published report run $publish_str")
+  fi
+  if [ "${#ship_parts[@]}" -gt 0 ]; then
+    join_comma ${ship_parts[@]+"${ship_parts[@]}"}; ship_parts_str="$JOINED"
+    err "--ship is locked: a type IS its ship mode, and type '$resolved_type' ships '$ship' — $ship_parts_str?"
+  fi
+  err "--ship is locked: a type IS its ship mode, and type '$resolved_type' ships '$ship' — pick the type whose ship mode you want instead?"
+fi
 
 if [ "$have_plan" = 1 ] && [ "$pipeline" != "build" ]; then
   if [ "${#build_types[@]}" -eq 0 ]; then

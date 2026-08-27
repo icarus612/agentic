@@ -167,10 +167,11 @@ git_aware_rm_dir() { # <dir> — whole tree (supersede only)
   fi
 }
 
-remove_empty_dir() { # <dir> — plain rmdir, loudly fails if non-empty
+remove_empty_dir() { # <dir> — the dir must not survive; already-gone counts as done
   require_under_plans_dir "$1"
   if [ "$dry_run" = 1 ]; then echo "DRY-RUN: rmdir $1"; return 0; fi
-  rmdir -- "$1" || err "rmdir failed (not empty?): $1"
+  [ -d "$1" ] || return 0        # git mv / git rm already removed it
+  rmdir -- "$1" || err "rmdir failed, directory not empty: $1"
 }
 
 insert_incomplete_note() { # <file> <reason> — insert after line 1

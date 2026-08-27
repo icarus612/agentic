@@ -1,6 +1,6 @@
 ---
 name: document-local
-description: Write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit. Part of the dae workflow, invoked by the dae orchestrator when CLAUDE_DOCS_DIR is a local path (the default).
+description: Write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit. Part of the dae workflow — the record stage of every run, invoked by the dae orchestrator whether or not a publish target is configured; publishing the docs tree beyond the repo is a CI job on merge, never this skill.
 domain: universal
 context: fork
 rules: [verify-dont-assume, push-policy, artifact-locations, doc-format]

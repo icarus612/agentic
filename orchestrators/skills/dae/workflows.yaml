@@ -20,7 +20,7 @@ types:
   rework:    {pipeline: build,  explore: auto, rigor: low,                against: require,  ship: publish, planner: plan-rework,    branch: feature/}
   diagnose:  {pipeline: plan,   explore: deep, rigor: low,                against: optional, ship: publish, planner: plan-diagnosis, branch: bug/,     aliases: [debug, triage]}
   map:       {pipeline: report, explore: auto, rigor: low,                against: forbid,   ship: chat}
-  analyze:   {pipeline: report, explore: deep, rigor: {explore: med},     against: forbid,   ship: chat,    branch: docs/}   # --ship publish allowed: report committed under docs/reports/
+  analyze:   {pipeline: report, explore: deep, rigor: {explore: med},     against: forbid,   ship: publish, branch: docs/}
   document:  {pipeline: docs,   explore: deep, rigor: {explore: med},     against: forbid,   ship: publish, branch: docs/,   aliases: [doc]}
   sync:      {pipeline: plan,   explore: deep, rigor: {explore: med},     against: require,  ship: publish, planner: plan-reconcile, branch: sync/}
 

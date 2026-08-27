@@ -33,7 +33,18 @@ Three modes. If the caller explicitly named one, run it and state which. Otherwi
 
 **SHALLOW** — fast orientation. Read ONLY the root `/docs` (source of truth), agent guidance (`/agents`, `AGENTS.md`, any `CLAUDE.md`), and every `README.md`. Use it to confirm facts, refresh stale knowledge, or meet the minimum a plan requires (never plan without AT LEAST a shallow explore). Cheap; run it liberally.
 
-**DEEP** — full understanding. Read the entire target: source, config, tests, build files, docs. Trace real code paths, not descriptions. Use when the task touches non-trivial logic or you can't answer the structured-map questions from docs alone.
+**DEEP** — full understanding. Read the entire target: source, config, tests, build files, docs — scoped to the project's real boundary, not its raw filesystem footprint (see "DEEP's boundary" below). Trace real code paths, not descriptions. Where docs and source disagree, the source wins: docs may be read at DEEP, but their accuracy is never trusted over code. Use when the task touches non-trivial logic or you can't answer the structured-map questions from docs alone.
+
+### DEEP's boundary — what's excluded, and how you decide
+
+"The entire target" means the whole project, not everything sitting under its root — discover the boundary before you fall back to a guess:
+
+1. **Inside a git repo, the repo's own answer wins.** Tracked files are the project; untracked/ignored paths are dependencies, build output, or scratch. The project's own ignore rules are its statement of what is not source — this can't rot, and it's correct for ecosystems nobody listed.
+2. **Outside a repo — or wherever the discovery answer is unusable — fall back to a named baseline**.
+
+The baseline floor (named ecosystems are EXAMPLES per `tech-agnostic`, never a supported-stack list — report what the repo actually uses): VCS metadata (`.git`, `.hg`, `.svn`); node (`node_modules`, `.pnpm-store`); python (`.venv`, `venv`, `__pycache__`, `.tox`, `*.egg-info`); go (`vendor`); java (`target`, `build`, `.gradle`); c# (`bin`, `obj`, `packages`); rust (`target`); plus common build/cache output (`dist`, `build`, `.next`, `.svelte-kit`, `coverage`, `.cache`).
+
+**Tracked beats baseline, always.** A repo that genuinely commits `vendor/` has its vendored deps as project source, and DEEP reads them — that's what makes the ambiguous floor entries (`target` is both rust and java; `build`/`dist` are generic) safe to list. Report what you excluded and which rule you applied; never apply the exclusion silently.
 
 ### Choosing DEEP vs SHALLOW (the AUTO decision rule)
 
@@ -67,12 +78,12 @@ Detect single project vs. monorepo (look for `apps/`, `packages/`, workspace man
 1. **Whole monorepo** — every app and package. Use when the task is cross-cutting or scope is unknown.
 2. **Single app + its dependencies only** — explore in order and STOP at the edges: (1) root/global docs (`/docs`, `AGENTS.md`), (2) `apps/[project]/docs` and the app's source, (3) the docs and (if deep) source of EACH dependency it actually uses, e.g. `packages/[pkg]`. Don't wander into unrelated apps/packages.
 
-The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env var is set); in-project doc folders and READMEs are SYMLINKS into it — same content, don't double-count.
+The root `/docs` is the SINGLE SOURCE OF TRUTH — the docs root resolved via `~/.claude/hooks/resolve-config.sh CLAUDE_DOCS_DIR --default /docs` (or the project's `.claude/hooks/` copy); in-project doc folders and READMEs are SYMLINKS into it — same content, don't double-count.
 
 ## How it works
 
 1. **Settle scope and mode.** If the caller gave no mode, default to AUTO; resolve AUTO via the decision rule above. State the mode, and for monorepos whether it's whole-repo or single-app(+deps), naming the target app.
-2. **Read global guidance first.** `AGENTS.md`/`CLAUDE.md` and root `/docs` define the conventions to report; note any tooling override. (Docs/plans locations come only from `CLAUDE_DOCS_DIR`/`CLAUDE_PROJECT_PLANS_DIR` env vars or their defaults — never from these files.)
+2. **Read global guidance first.** `AGENTS.md`/`CLAUDE.md` and root `/docs` define the conventions to report; note any tooling override. (Docs/plans locations are resolved via `resolve-config.sh` — `~/.claude/hooks/resolve-config.sh CLAUDE_DOCS_DIR --default /docs` and `CLAUDE_PROJECT_PLANS_DIR --default /project-plans/` (or the project's `.claude/hooks/` copy) — never from these files.)
 3. **Identify the tech stack.** From manifests, lockfiles, config: languages, frameworks, libraries, and especially MAJOR VERSIONS — record them precisely, since they drive which idioms are legal later.
 4. **Map structure and dependencies.** Walk the layout. For monorepos build the app/package dependency graph; for a single app list exactly which internal packages and external libraries it depends on.
 5. **Extract patterns and conventions** (deep, or as far as docs allow): how code is organized, named, tested, styled; what's idiomatic vs. forbidden (styling, preferred reuse, error handling, test layout, lint/format rules).
@@ -81,7 +92,7 @@ The root `/docs` is the SINGLE SOURCE OF TRUTH (or `CLAUDE_DOCS_DIR` if that env
 
 ## The map file: structure
 
-- **Scope & mode** — what you explored and how, plus the **rigor tier** you ran under and **whether you ran solo or as a committee member** (at `low` that reads as solo).
+- **Scope & mode** — what you explored and how, plus the **rigor tier** you ran under and **whether you ran solo or as a committee member** (at `low` that reads as solo). At DEEP, state what was excluded from "the entire target" and under which rule — discovered from the repo's own tracked/ignored split, or the baseline floor — and confirm that source was trusted over docs on any conflict.
 - **Tech stack** — languages, frameworks, libraries WITH major versions. Each claim anchored to its `file:line`.
 - **Structure** — directory layout; apps/packages for monorepos. Each claim anchored to its `file:line`.
 - **Dependency graph** — who depends on whom (internal and key external). Each claim anchored to its `file:line`.
@@ -97,7 +108,7 @@ Return contract: as a fork you cannot invoke the next phase yourself — your fi
 ## Notes
 
 - Read-only: never edit, format, or run mutating commands.
-- Prefer real code and config over prose; descriptions drift, source doesn't.
+- Trust real code and config over prose: where docs and source disagree, the source wins — descriptions drift, source doesn't.
 - Be honest about coverage — "I did not read X" beats a confident guess. You are a collector, not a gate: a claim still unverified when you're done is included in the map, flagged unverified, never dropped silently.
 - Stay tech-agnostic: any technology named is only an example; report what the repo actually uses.
 - Respect scope boundaries in single-app mode to stay fast and keep your context clean for the orchestrator.

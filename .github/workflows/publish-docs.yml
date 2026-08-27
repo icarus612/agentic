@@ -1,0 +1,135 @@
+# publish-docs — mirrors the local docs tree to a configured Confluence
+# target, after a merge to the base branch.
+#
+# - This is the CANONICAL copy of this workflow. `scripts/publish-docs.yml`
+#   is a symlink to this file (readable surface only — see scripts/README.md
+#   for why the symlink points "backwards" into .github/; do not invert it).
+# - Runs POST-MERGE and is NON-GATING: it triggers on `push` to the base
+#   branch, after the merge has already happened. A failure here is
+#   reported loudly but never blocks or reverts the merge.
+# - An unset CLAUDE_DOCS_PUBLISH is a DELIBERATE no-op: this repo ships no
+#   Confluence target, so on every merge here the job resolves the var,
+#   finds it unset, prints an explanatory message, and exits 0. That is
+#   not a skip and not a warning — it is the expected outcome absent a
+#   configured target.
+# - The docs root (CLAUDE_DOCS_DIR) and publish target (CLAUDE_DOCS_PUBLISH)
+#   are resolved through resolve-config.sh only — never read as raw env
+#   vars, never parsed with jq.
+#
+# A project whose CLAUDE_DOCS_DIR is not /docs, or whose base branch is not
+# `main`, must edit the `branches:` and `paths:` filters below — GitHub
+# path filters are static YAML and cannot read a resolved variable.
+
+name: publish-docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - ".github/workflows/publish-docs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish docs to configured target
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve publish target and docs root
+        id: resolve
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Locate the resolver: project install, then this repo's own
+          # source location, then the user-global install.
+          resolver=""
+          for candidate in \
+            ".claude/hooks/resolve-config.sh" \
+            "orchestrators/hooks/resolve-config.sh" \
+            "$HOME/.claude/hooks/resolve-config.sh"; do
+            if [ -f "$candidate" ]; then
+              resolver="$candidate"
+              break
+            fi
+          done
+          if [ -z "$resolver" ]; then
+            echo "publish-docs: resolve-config.sh not found; tried .claude/hooks/resolve-config.sh, orchestrators/hooks/resolve-config.sh, \$HOME/.claude/hooks/resolve-config.sh" >&2
+            echo "publish-docs: install it from the agentic repo's orchestrators/hooks/resolve-config.sh" >&2
+            exit 1
+          fi
+          echo "publish-docs: using resolver at $resolver" >&2
+
+          # Call 1 — no --expect: distinguishes "unset" (non-zero here)
+          # from "set" (proceeds to call 2 for validation). --expect alone
+          # cannot tell these apart, since both an unset var and a set-but-
+          # invalid one exit non-zero under --expect.
+          if ! "$resolver" CLAUDE_DOCS_PUBLISH >/dev/null 2>&1; then
+            echo "publish-docs: no publish target configured (CLAUDE_DOCS_PUBLISH unset); nothing to do." >&2
+            echo "should-publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Call 2 — validate shape. Non-zero here means the var IS set
+          # but malformed (bare path, unrecognized scheme, typo'd scheme).
+          # That is a real failure, not a no-op.
+          publish_target=$("$resolver" CLAUDE_DOCS_PUBLISH --expect publish-target 2>/tmp/resolve-publish.err)
+          if [ $? -ne 0 ]; then
+            echo "publish-docs: CLAUDE_DOCS_PUBLISH is set but invalid:" >&2
+            cat /tmp/resolve-publish.err >&2
+            exit 1
+          fi
+
+          docs_root=$("$resolver" CLAUDE_DOCS_DIR --default /docs --expect path 2>/tmp/resolve-docs.err)
+          if [ $? -ne 0 ]; then
+            echo "publish-docs: failed to resolve CLAUDE_DOCS_DIR:" >&2
+            cat /tmp/resolve-docs.err >&2
+            exit 1
+          fi
+
+          echo "should-publish=true" >> "$GITHUB_OUTPUT"
+          echo "publish-target=$publish_target" >> "$GITHUB_OUTPUT"
+          echo "docs-root=$docs_root" >> "$GITHUB_OUTPUT"
+
+      - name: No publish target configured
+        if: steps.resolve.outputs.should-publish != 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "publish-docs: no publish target configured (CLAUDE_DOCS_PUBLISH unset); nothing to do."
+
+      # --- SEAM ---------------------------------------------------------
+      # This repo ships no Confluence publisher and writing one is out of
+      # scope for this workflow. A consuming project supplies its own
+      # publisher (script or action) and wires it in below in place of
+      # this placeholder step. If a target IS configured and no publisher
+      # is wired, fail loudly and say exactly what to supply — never
+      # pretend to publish, and never stub a silent success.
+      - name: Mirror docs to publish target (seam — no publisher wired)
+        if: steps.resolve.outputs.should-publish == 'true'
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "publish-docs: CLAUDE_DOCS_PUBLISH resolved to '${{ steps.resolve.outputs.publish-target }}'," >&2
+          echo "publish-docs: but no Confluence publisher is wired into this workflow." >&2
+          echo "publish-docs: supply a publisher command here that mirrors '${{ steps.resolve.outputs.docs-root }}'" >&2
+          echo "publish-docs: to the resolved target — one page per doc, structure preserved," >&2
+          echo "publish-docs: large/binary artifacts offloaded to Drive per external-storage-cap," >&2
+          echo "publish-docs: stale pages removed or flagged. See tool-based/confluence/ci/README.md" >&2
+          echo "publish-docs: for the platform-neutral contract and required secrets." >&2
+          exit 1
+        env:
+          # Referenced only via secrets — never committed, never defaulted.
+          # Site and space come from CLAUDE_DOCS_PUBLISH at run time, never
+          # hardcoded here. Consuming projects wire their publisher to
+          # consume these.
+          ATLASSIAN_USER_EMAIL: ${{ secrets.ATLASSIAN_USER_EMAIL }}
+          ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+          GOOGLE_DRIVE_CREDENTIALS: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}

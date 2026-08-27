@@ -17,7 +17,8 @@ tool-based/<tech>/
 ├── AGENTS.md      # the tech's conventions, tooling, defaults
 ├── rules/         # always-on while this tech is in play  (domain: <tech>)
 ├── skills/        # on-demand procedures                  (domain: <tech>)
-└── hooks/         # tech-specific hooks, if any
+├── hooks/         # tech-specific hooks, if any
+└── ci/            # shipped CI templates/references for consuming projects
 ```
 
 ## Layers with real content
@@ -30,7 +31,7 @@ tool-based/<tech>/
 | **`django`** | `django-conventions`, `security` | `create-django-resource` |
 | **`godot`** | `gdscript-standards` | `generate-hex-neighbors`, `run-godot-test` |
 | **`medusa`** | — | `medusa-api` — MedusaJS 2.x storefront integration (products, cart, checkout, auth) |
-| **`confluence`** | `external-storage-cap` | `document-confluence` — the documentation phase when the docs target is a Confluence location: publishes the story + technical page and the changelog, links Jira bidirectionally, offloads large artifacts to Google Drive. Drives the Atlassian + Google Drive MCP servers. |
+| **`confluence`** | `external-storage-cap` | `document-confluence` — a manual/recovery sync, run standalone by a human, that mirrors the local docs tree to Confluence when the CI publish job hasn't run, has failed, or a target is being backfilled; never a documentation phase, never a source of truth. Offloads large artifacts to Google Drive. Drives the Atlassian + Google Drive MCP servers. |
 
 ## Stubs (scaffolded, unwritten)
 

@@ -122,7 +122,7 @@ report shape instead of this envelope is a convention violation.
 
 ## Run artifacts & verdict reports
 
-Defined by the `run-artifacts` rule. Two homes: **committed plan records**
+Defined by the `run-artifacts` rule. Three homes: **committed plan records**
 inside the plan's own dir (`<plans-dir>/<slug>-MM-DD-YY/` — the spec of record
 `plan.md` plus records named for their kind alone: `story.md`,
 `plan-review.md`, `code-review.md`, `pr-review.md`, `sync-report.md`; there is
@@ -138,7 +138,10 @@ the parent branch is plain `<type>/<name>`), `committees/<skill>/` (the
 `committee` agent's member files and consolidated artifact at `rigor:
 med|high` — layout owned by the `run-artifacts` rule, not restated here), and
 the `explore` fork's map (`explore-map-<scope-slug>-<MM-DD-YY>.md` — never the
-plans dir).
+plans dir); and the **scratch dir** `CLAUDE_SCRATCH_DIR`, where a `ship: chat`
+report run's artifacts land in place of a run dir it has none of — layout and
+resolution owned by `run-artifacts` and `artifact-locations`, not restated
+here.
 
 Review reports append one `## Round <n>` section per gate iteration. The
 verdict vocabulary is enforced by scripts, not prose: `report-verdict.sh` is
@@ -172,9 +175,11 @@ phase behaves in any project that adopts this library:
 
 | Artifact | Default | Config var |
 |---|---|---|
-| Docs | root `/docs` | `CLAUDE_DOCS_DIR` — a path keeps docs local (`document-local`); an Atlassian wiki URL or `confluence:SPACE[/Parent]` makes Confluence the docs source of truth (`document-confluence`) |
+| Docs | root `/docs` | `CLAUDE_DOCS_DIR` — always a local path; `document-local` records here, always |
+| Docs publish target (optional) | unset | `CLAUDE_DOCS_PUBLISH` — an Atlassian wiki URL or `confluence:SPACE[/Parent]`; publishing is a CI job on merge, never a run stage |
 | Implementation plans + their committed records | root `/project-plans/` — `proposals/` → `<slug>-MM-DD-YY/` → `completed/`, per `plan-format` | `CLAUDE_PROJECT_PLANS_DIR` |
 | Workflow worktrees | root `.workflows/` (gitignored, branch `<type>/<name>`) | `CLAUDE_WORKFLOWS_DIR` |
+| Scratch dir (a `ship: chat` report run's artifacts — no worktree, no run dir) | see `run-artifacts` / `artifact-locations` | `CLAUDE_SCRATCH_DIR` |
 
 Config vars are set in a project's own `.claude/settings.json` `env` block. This
 repo has none, so this `/docs` tree uses the plain defaults.
@@ -183,12 +188,13 @@ repo has none, so this `/docs` tree uses the plain defaults.
 
 A plan is identified by `<feature-slug>-MM-DD-YY` and moves through a
 lifecycle: an unapproved proposal is `proposals/<slug>-MM-DD-YY.md`, its
-pre-approval records (`<slug>-MM-DD-YY.plan-review.md`, a Confluence-mode
-`<slug>-MM-DD-YY.story.md`) sitting beside it as dotted siblings; at approval
-it is promoted to its own dir `<slug>-MM-DD-YY/` as **`plan.md`**, the
-siblings moving in under bare kind names; at post-merge closeout ONLY
-`plan.md` archives to `completed/<slug>-MM-DD-YY.md` — the rest of the dir is
-removed, git history keeps the records. A superseded or abandoned plan never
+pre-approval records (`<slug>-MM-DD-YY.plan-review.md`, a
+`confluence-mode.md` run's `<slug>-MM-DD-YY.story.md`) sitting beside it as
+dotted siblings; at approval it is promoted to its own dir
+`<slug>-MM-DD-YY/` as **`plan.md`**, the siblings moving in under bare kind
+names; at post-merge closeout ONLY `plan.md` archives to
+`completed/<slug>-MM-DD-YY.md` — the rest of the dir is removed, git history
+keeps the records. A superseded or abandoned plan never
 enters `completed/`: it is deleted, and the successor plan's Goal & scope
 names what it supersedes and why. Every move goes through `plan-lifecycle.sh`
 (`promote | archive | supersede | reopen | locate | check | adopt`), never by
@@ -203,10 +209,10 @@ manifest each was verified from), conventions to enforce, subphase detail
 blocks (each naming its file scope; independent lanes' scopes must be
 disjoint), risks/open questions/decision points, skill mapping; a living
 document (syllabus checked off per subphase — `archive` reads those ticks);
-**never** time estimates. In Confluence mode the `dae` orchestrator also
-captures the story as `proposals/<slug>-MM-DD-YY.story.md` (verbatim ask,
-narrative, acceptance criteria, Jira keys), which becomes the plan dir's
-`story.md` at promotion.
+**never** time estimates. When `CLAUDE_DOCS_PUBLISH` is set, the `dae`
+orchestrator also captures the story as `proposals/<slug>-MM-DD-YY.story.md`
+(verbatim ask, narrative, acceptance criteria, Jira keys), which becomes the
+plan dir's `story.md` at promotion.
 
 ## Antigravity Adoption
 
