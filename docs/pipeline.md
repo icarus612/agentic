@@ -176,7 +176,7 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `feature|bug|hotfix|docs|sync`; `--parent` children; `--reuse` resume),
   `resolve-config.sh` (CLAUDE_* chain), `resolve-type.sh` (the only reader of
   the type table `workflows.yaml`; prints resolved axes as `KEY=value`,
-  including `REWORK` on runs with a `code` phase; a row's `ship` cell is a
+  including `PATIENCE` on runs with a `code` phase; a row's `ship` cell is a
   `|`-separated allowed-value list, first = default — `publish | chat` /
   `chat | publish` here, a bare value where the row is fixed),
   `resolve-anchor.sh` (per-item `--against` anchor resolution to typed

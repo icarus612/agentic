@@ -80,6 +80,6 @@ the build summary → Record (shared — router) → `push-pr --stage update` �
 - **The plan is the transcript.** It grows monotonically; earlier phases are annotated, never
   rewritten. `plan-live.md` owns that discipline — point at it by name.
 - Every branch in this file keys on a resolved AXIS value (`RIGOR_PLAN`, `RIGOR_CODE`, `SHIP`,
-  `REWORK`), never on the type name.
+  `PATIENCE`), never on the type name.
 - If an ask turns out to need a real up-front design pass, say so and recommend a `feature` run —
   the run has outgrown a conversational increment and needs a plan gate before any code moves.

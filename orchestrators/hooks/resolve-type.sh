@@ -4,14 +4,14 @@
 # SYNOPSIS
 #   resolve-type.sh [<type>] [--t[ype] <t>] [--exp[lore] <v>] [--rig[or] <spec>]
 #                   [--ag[ainst] <a>[,<a>...]]... [--sh[ip] <v>] [--pl[an] <path>]
-#                   [--rew[ork] <n>] [--yaml <path>]
+#                   [--pat[ience] <n>] [--yaml <path>]
 #
 # DESCRIPTION
 #   Every dae type is a preset over five axes (pipeline, explore, rigor,
 #   against, ship). The presets live in the type table
 #   ../skills/dae/workflows.yaml, one flow-map row per type. This script is
 #   the ONLY reader of that table: it resolves a type name or alias to its
-#   row, applies the free-tier flag overrides (--explore, --rigor, --rework),
+#   row, applies the free-tier flag overrides (--explore, --rigor, --patience),
 #   validates the constrained and locked axes (--against arity, --plan
 #   placement, --pipeline alone is locked, --ship is constrained per row
 #   against its allowed-value list), and prints the resolved axes as
@@ -142,7 +142,7 @@ VOCAB_PHASE="explore plan code pr"
 # bracket minimum it is at least as long as. Below-minimum tokens (`--r`, which
 # used to be `--ref`; `--p`, which is below both `--pl` and `--pi`) are unknown
 # flags — never guessed at. `--yaml` is internal and matches exactly.
-FLAG_TABLE="--type:--t --explore:--exp --rigor:--rig --against:--ag --ship:--sh --plan:--pl --pipeline:--pi --rework:--rew"
+FLAG_TABLE="--type:--t --explore:--exp --rigor:--rig --against:--ag --ship:--sh --plan:--pl --pipeline:--pi --patience:--pat"
 
 resolve_flag() { # resolve_flag <token> -> CANON
   local tok="$1" entry long min matches="" count=0
@@ -154,7 +154,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
     -r) CANON="rigor"; return 0 ;;
     -a) CANON="against"; return 0 ;;
     --*) ;;
-    *) err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan, --rework?" ;;
+    *) err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan, --patience?" ;;
   esac
   for entry in $FLAG_TABLE; do
     long="${entry%%:*}"; min="${entry##*:}"
@@ -162,7 +162,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
     [ "${#tok}" -ge "${#min}" ] || continue
     matches="$matches $long"; count=$((count+1))
   done
-  [ "$count" -ne 0 ] || err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan, --rework? (short forms need at least --t, --exp, --rig, --ag, --pl, --rew)"
+  [ "$count" -ne 0 ] || err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan, --patience? (short forms need at least --t, --exp, --rig, --ag, --pl, --pat)"
   [ "$count" -eq 1 ] || err "ambiguous flag: '$tok' matches$matches — which one did you mean?"
   trim "$matches"; long="$TRIM"
   CANON="${long#--}"
@@ -175,7 +175,7 @@ explore_override=""; have_explore=0
 ship_override=""; ship_given=0
 plan_path=""; have_plan=0
 pipeline_given=0
-rework_override=""; have_rework=0
+patience_override=""; have_patience=0
 yaml_path=""
 rigor_items=(); anchors=()
 
@@ -207,7 +207,7 @@ while [ $# -gt 0 ]; do
         ship)     ship_override="$val"; ship_given=1 ;;
         plan)     plan_path="$val"; have_plan=1 ;;
         pipeline) pipeline_given=1 ;;
-        rework)   rework_override="$val"; have_rework=1 ;;
+        patience) patience_override="$val"; have_patience=1 ;;
         yaml)     yaml_path="$val" ;;
         rigor)
           split_commas "$val"
@@ -364,8 +364,8 @@ planner=""; have_planner=0
 if row_cell "planner"; then planner="$CELLVAL"; have_planner=1; fi
 branch=""; have_branch=0
 if row_cell "branch"; then branch="$CELLVAL"; have_branch=1; fi
-rework_row=""; have_rework_row=0
-if row_cell "rework"; then rework_row="$CELLVAL"; have_rework_row=1; fi
+patience_row=""; have_patience_row=0
+if row_cell "patience"; then patience_row="$CELLVAL"; have_patience_row=1; fi
 
 # --- free-tier overrides ---------------------------------------------------
 if [ "$have_explore" = 1 ]; then
@@ -373,12 +373,12 @@ if [ "$have_explore" = 1 ]; then
   explore="$explore_override"
 fi
 
-if [ "$have_rework" = 1 ]; then
-  case "$rework_override" in
-    ''|*[!0-9]*) err "--rework value '$rework_override' is not an integer 1 or greater — what should the persistence budget be?" ;;
+if [ "$have_patience" = 1 ]; then
+  case "$patience_override" in
+    ''|*[!0-9]*) err "--patience value '$patience_override' is not an integer 1 or greater — what should the patience budget be?" ;;
   esac
-  [ "$rework_override" -ge 1 ] || err "--rework value '$rework_override' is not an integer 1 or greater — what should the persistence budget be?"
-  [ "$rework_override" -le 5 ] || warn "--rework value '$rework_override' is above the typical ceiling of 5 — the run continues with it."
+  [ "$patience_override" -ge 1 ] || err "--patience value '$patience_override' is not an integer 1 or greater — what should the patience budget be?"
+  [ "$patience_override" -le 5 ] || warn "--patience value '$patience_override' is above the typical ceiling of 5 — the run continues with it."
 fi
 
 # --- ship: locked pipeline, then per-row constrained ship -------------------
@@ -586,14 +586,14 @@ for anchor in ${anchors[@]+"${anchors[@]}"}; do
 done
 echo "SHIP=$ship"
 if [ "$has_code_phase" = 1 ]; then
-  if [ "$have_rework" = 1 ]; then
-    echo "REWORK=$rework_override"
-  elif [ "$have_rework_row" = 1 ] && [ -n "$rework_row" ]; then
-    echo "REWORK=$rework_row"
+  if [ "$have_patience" = 1 ]; then
+    echo "PATIENCE=$patience_override"
+  elif [ "$have_patience_row" = 1 ] && [ -n "$patience_row" ]; then
+    echo "PATIENCE=$patience_row"
   fi
 else
-  if [ "$have_rework" = 1 ]; then
-    warn "--rework does not apply to type '$resolved_type' (no code phase) — dropped; the run continues."
+  if [ "$have_patience" = 1 ]; then
+    warn "--patience does not apply to type '$resolved_type' (no code phase) — dropped; the run continues."
   fi
   # a row-sourced value on a code-phase-less run drops SILENTLY (no row carries one
   # today; a future row must not warn spuriously either)

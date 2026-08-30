@@ -230,9 +230,9 @@ ok_lines "02c: hotfix row fidelity (PLANNER=plan-bugfix+minimal-scope)" \
 
 # --- Case 02f: live row fidelity (contracts/l1.md §Round 3) -----------------
 run live
-ok_lines "02f: live row fidelity (live/auto/publish/plan-live/feature//REWORK=2)" \
+ok_lines "02f: live row fidelity (live/auto/publish/plan-live/feature//PATIENCE=2)" \
   'TYPE=live' 'PIPELINE=live' 'EXPLORE=auto' 'SHIP=publish' \
-  'PLANNER=plan-live' 'BRANCH=feature/' 'REWORK=2'
+  'PLANNER=plan-live' 'BRANCH=feature/' 'PATIENCE=2'
 
 # --- Case 03: map emits no PLANNER= and no BRANCH= -------------------------
 run map
@@ -766,7 +766,7 @@ RIGOR_CODE=low
 RIGOR_PR=low
 AGAINST_COUNT=0
 SHIP=publish
-REWORK=3
+PATIENCE=3
 PLANNER=plan-feature
 BRANCH=feature/'
 if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_feature" ]; then
@@ -789,7 +789,7 @@ else
   fail "43b: 'map' stdout is exactly §3.6's block - dropped phases, PLANNER and BRANCH all absent" \
     "code=$CODE out=[$OUT] want=[$expected_map]"
 fi
-no_lines "43b2: 'map' emits no REWORK= line (map's row carries no rework: cell)" '^REWORK='
+no_lines "43b2: 'map' emits no PATIENCE= line (map's row carries no patience: cell)" '^PATIENCE='
 
 run analyze
 expected_analyze='TYPE=analyze
@@ -806,7 +806,7 @@ else
   fail "43c: 'analyze' stdout is exactly contracts/l1.md §4.3's block - SHIP=publish, RIGOR_PR=low, no RIGOR_PLAN/RIGOR_CODE/PLANNER" \
     "code=$CODE out=[$OUT] want=[$expected_analyze]"
 fi
-no_lines "43c2: 'analyze' emits no REWORK= line (analyze's row carries no rework: cell)" '^REWORK='
+no_lines "43c2: 'analyze' emits no PATIENCE= line (analyze's row carries no patience: cell)" '^PATIENCE='
 
 run live
 expected_live='TYPE=live
@@ -818,7 +818,7 @@ RIGOR_CODE=low
 RIGOR_PR=low
 AGAINST_COUNT=0
 SHIP=publish
-REWORK=2
+PATIENCE=2
 PLANNER=plan-live
 BRANCH=feature/'
 if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_live" ]; then
@@ -1035,32 +1035,32 @@ else
 fi
 
 # ===========================================================================
-# REWORK DIAL (contracts/l1.md §Round 1)
+# PATIENCE DIAL (contracts/l1.md §Round 1)
 # ===========================================================================
 
-# --- Case 51: bracket minimums and rejections for --rework ------------------
-run feature --rew 4;     r51a="$OUT"; c51a="$CODE"
-run feature --rewo 4;    r51b="$OUT"; c51b="$CODE"
-run feature --rework 4;  r51c="$OUT"; c51c="$CODE"
+# --- Case 51: bracket minimums and rejections for --patience ------------------
+run feature --pat 4;     r51a="$OUT"; c51a="$CODE"
+run feature --pati 4;    r51b="$OUT"; c51b="$CODE"
+run feature --patience 4;  r51c="$OUT"; c51c="$CODE"
 if [ "$c51a" -eq 0 ] && [ "$c51b" -eq 0 ] && [ "$c51c" -eq 0 ] \
    && [ "$r51a" = "$r51c" ] && [ "$r51b" = "$r51c" ] \
-   && printf '%s\n' "$r51c" | grep -qxF 'REWORK=4'; then
-  pass "51a: '--rew'/'--rewo'/'--rework' 4 on feature all resolve identically to REWORK=4"
+   && printf '%s\n' "$r51c" | grep -qxF 'PATIENCE=4'; then
+  pass "51a: '--pat'/'--pati'/'--patience' 4 on feature all resolve identically to PATIENCE=4"
 else
-  fail "51a: '--rew'/'--rewo'/'--rework' 4 on feature all resolve identically to REWORK=4" \
+  fail "51a: '--pat'/'--pati'/'--patience' 4 on feature all resolve identically to PATIENCE=4" \
     "codes=$c51a/$c51b/$c51c a=[$r51a] b=[$r51b] c=[$r51c]"
 fi
 
-run feature --re 4
+run feature --pa 4
 bad=""
 [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
 err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
-if ! err_tok '--re'; then bad="$bad missing-token:[--re]"; fi
-if out_re '^REWORK='; then bad="$bad resolved-to-rework"; fi
+if ! err_tok '--pa'; then bad="$bad missing-token:[--pa]"; fi
+if out_re '^PATIENCE='; then bad="$bad resolved-to-patience"; fi
 if [ -z "$bad" ]; then
-  pass "51b: '--re 4' rejected as unknown flag (4 chars, below --rew's 5-char minimum)"
+  pass "51b: '--pa 4' rejected as unknown flag (4 chars, below --pat's 5-char minimum)"
 else
-  fail "51b: '--re 4' rejected as unknown flag (4 chars, below --rew's 5-char minimum)" "$bad; $(ctx)"
+  fail "51b: '--pa 4' rejected as unknown flag (4 chars, below --pat's 5-char minimum)" "$bad; $(ctx)"
 fi
 
 run feature --ri 4
@@ -1069,11 +1069,11 @@ bad=""
 err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
 if ! err_tok '--ri'; then bad="$bad missing-token:[--ri]"; fi
 if out_re '^RIGOR_'; then bad="$bad resolved-to-rigor"; fi
-if out_re '^REWORK='; then bad="$bad resolved-to-rework"; fi
+if out_re '^PATIENCE='; then bad="$bad resolved-to-patience"; fi
 if [ -z "$bad" ]; then
-  pass "51c: '--ri 4' rejected as unknown flag (4 chars, below both --rig's and --rew's 5-char minimums)"
+  pass "51c: '--ri 4' rejected as unknown flag (4 chars, below --rig's 5-char minimum)"
 else
-  fail "51c: '--ri 4' rejected as unknown flag (4 chars, below both --rig's and --rew's 5-char minimums)" \
+  fail "51c: '--ri 4' rejected as unknown flag (4 chars, below --rig's 5-char minimum)" \
     "$bad; $(ctx)"
 fi
 
@@ -1083,119 +1083,132 @@ bad=""
 for s in 'rigor' '4' 'low' 'med' 'high'; do
   err_sub "$s" || bad="$bad missing-stderr:[$s]"
 done
-if out_re '^REWORK='; then bad="$bad leaked-REWORK"; fi
+if out_re '^PATIENCE='; then bad="$bad leaked-PATIENCE"; fi
 if [ -z "$bad" ]; then
-  pass "51d: '-r 4' still resolves to --rigor (single-dash alias stays rigor's alone) and fails on the rigor value vocabulary, not treated as --rework"
+  pass "51d: '-r 4' still resolves to --rigor (single-dash alias stays rigor's alone) and fails on the rigor value vocabulary"
 else
-  fail "51d: '-r 4' still resolves to --rigor (single-dash alias stays rigor's alone) and fails on the rigor value vocabulary, not treated as --rework" \
+  fail "51d: '-r 4' still resolves to --rigor (single-dash alias stays rigor's alone) and fails on the rigor value vocabulary" \
     "$bad; $(ctx)"
 fi
 
-# --- Case 52: --rework value validation --------------------------------------
-run feature --rework 0
+run feature -p 4
 bad=""
 [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
-for s in '--rework' '0' 'an integer 1 or greater'; do
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+if ! err_tok '-p'; then bad="$bad missing-token:[-p]"; fi
+if out_re '^PATIENCE='; then bad="$bad resolved-to-patience"; fi
+if [ -z "$bad" ]; then
+  pass "51e: '-p 4' rejected as unknown flag (-p stays unassigned; --plan/--pipeline/--patience share p-space)"
+else
+  fail "51e: '-p 4' rejected as unknown flag (-p stays unassigned; --plan/--pipeline/--patience share p-space)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 52: --patience value validation --------------------------------------
+run feature --patience 0
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in '--patience' '0' 'an integer 1 or greater'; do
   err_sub "$s" || bad="$bad missing-stderr:[$s]"
 done
 if ! no_key_block; then bad="$bad unexpected-partial-stdout:[$OUT]"; fi
 if [ -z "$bad" ]; then
-  pass "52a: 'feature --rework 0' -> exit 1, stderr names --rework/0/'an integer 1 or greater', nothing on stdout"
+  pass "52a: 'feature --patience 0' -> exit 1, stderr names --patience/0/'an integer 1 or greater', nothing on stdout"
 else
-  fail "52a: 'feature --rework 0' -> exit 1, stderr names --rework/0/'an integer 1 or greater', nothing on stdout" \
+  fail "52a: 'feature --patience 0' -> exit 1, stderr names --patience/0/'an integer 1 or greater', nothing on stdout" \
     "$bad; $(ctx)"
 fi
 
-run feature --rework abc
+run feature --patience abc
 bad=""
 [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
-for s in '--rework' 'abc' 'an integer 1 or greater'; do
+for s in '--patience' 'abc' 'an integer 1 or greater'; do
   err_sub "$s" || bad="$bad missing-stderr:[$s]"
 done
 if ! no_key_block; then bad="$bad unexpected-partial-stdout:[$OUT]"; fi
 if [ -z "$bad" ]; then
-  pass "52b: 'feature --rework abc' -> exit 1, stderr names --rework/abc/'an integer 1 or greater', nothing on stdout"
+  pass "52b: 'feature --patience abc' -> exit 1, stderr names --patience/abc/'an integer 1 or greater', nothing on stdout"
 else
-  fail "52b: 'feature --rework abc' -> exit 1, stderr names --rework/abc/'an integer 1 or greater', nothing on stdout" \
+  fail "52b: 'feature --patience abc' -> exit 1, stderr names --patience/abc/'an integer 1 or greater', nothing on stdout" \
     "$bad; $(ctx)"
 fi
 
-run feature --rework 7
+run feature --patience 7
 bad=""
-[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0 - above-ceiling --rework warns but does not fail)"
-line 'REWORK=7' || bad="$bad missing-line:[REWORK=7]"
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0 - above-ceiling --patience warns but does not fail)"
+line 'PATIENCE=7' || bad="$bad missing-line:[PATIENCE=7]"
 err_sub 'warning' || bad="$bad missing-stderr:[warning]"
 if [ -z "$bad" ]; then
-  pass "52c: 'feature --rework 7' -> exit 0 AND REWORK=7 on stdout AND a warning on stderr (the triple)"
+  pass "52c: 'feature --patience 7' -> exit 0 AND PATIENCE=7 on stdout AND a warning on stderr (the triple)"
 else
-  fail "52c: 'feature --rework 7' -> exit 0 AND REWORK=7 on stdout AND a warning on stderr (the triple)" \
+  fail "52c: 'feature --patience 7' -> exit 0 AND PATIENCE=7 on stdout AND a warning on stderr (the triple)" \
     "$bad; $(ctx)"
 fi
 
-run feature --rework 1
+run feature --patience 1
 bad=""
 [ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
-line 'REWORK=1' || bad="$bad missing-line:[REWORK=1]"
+line 'PATIENCE=1' || bad="$bad missing-line:[PATIENCE=1]"
 if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
 if [ -z "$bad" ]; then
-  pass "52c2: 'feature --rework 1' -> exit 0, REWORK=1, no warning (1 is within the typical ceiling)"
+  pass "52c2: 'feature --patience 1' -> exit 0, PATIENCE=1, no warning (1 is within the typical ceiling)"
 else
-  fail "52c2: 'feature --rework 1' -> exit 0, REWORK=1, no warning (1 is within the typical ceiling)" \
+  fail "52c2: 'feature --patience 1' -> exit 0, PATIENCE=1, no warning (1 is within the typical ceiling)" \
     "$bad; $(ctx)"
 fi
 
-# --- Case 53: --rework dropped with a warning on a no-code-phase type -------
-run map --rework 3
+# --- Case 53: --patience dropped with a warning on a no-code-phase type -------
+run map --patience 3
 bad=""
 [ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
 err_sub 'warning' || bad="$bad missing-stderr:[warning]"
-err_tok '--rework' || bad="$bad warning-does-not-name-flag:[--rework]"
+err_tok '--patience' || bad="$bad warning-does-not-name-flag:[--patience]"
 err_tok 'map' || bad="$bad warning-does-not-name-type:[map]"
 if [ -z "$bad" ]; then
-  pass "53a: 'map --rework 3' -> exit 0, warning naming --rework and map, REWORK= dropped"
+  pass "53a: 'map --patience 3' -> exit 0, warning naming --patience and map, PATIENCE= dropped"
 else
-  fail "53a: 'map --rework 3' -> exit 0, warning naming --rework and map, REWORK= dropped" \
+  fail "53a: 'map --patience 3' -> exit 0, warning naming --patience and map, PATIENCE= dropped" \
     "$bad; $(ctx)"
 fi
-no_lines "53a2: 'map --rework 3' emits no REWORK= line (map has no code phase)" '^REWORK='
+no_lines "53a2: 'map --patience 3' emits no PATIENCE= line (map has no code phase)" '^PATIENCE='
 
-run document --rework 3
+run document --patience 3
 bad=""
 [ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
 err_sub 'warning' || bad="$bad missing-stderr:[warning]"
-err_tok '--rework' || bad="$bad warning-does-not-name-flag:[--rework]"
+err_tok '--patience' || bad="$bad warning-does-not-name-flag:[--patience]"
 err_tok 'document' || bad="$bad warning-does-not-name-type:[document]"
 if [ -z "$bad" ]; then
-  pass "53b: 'document --rework 3' -> exit 0, warning naming --rework and document, REWORK= dropped"
+  pass "53b: 'document --patience 3' -> exit 0, warning naming --patience and document, PATIENCE= dropped"
 else
-  fail "53b: 'document --rework 3' -> exit 0, warning naming --rework and document, REWORK= dropped" \
+  fail "53b: 'document --patience 3' -> exit 0, warning naming --patience and document, PATIENCE= dropped" \
     "$bad; $(ctx)"
 fi
-no_lines "53b2: 'document --rework 3' emits no REWORK= line (document has no code phase)" '^REWORK='
+no_lines "53b2: 'document --patience 3' emits no PATIENCE= line (document has no code phase)" '^PATIENCE='
 
 run map
 bad=""
 [ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
 if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
 if [ -z "$bad" ]; then
-  pass "53c: bare 'map' (no --rework flag) -> no warning at all (nothing to drop)"
+  pass "53c: bare 'map' (no --patience flag) -> no warning at all (nothing to drop)"
 else
-  fail "53c: bare 'map' (no --rework flag) -> no warning at all (nothing to drop)" "$bad; $(ctx)"
+  fail "53c: bare 'map' (no --patience flag) -> no warning at all (nothing to drop)" "$bad; $(ctx)"
 fi
 
 # --- Case 54: row default vs. flag override ----------------------------------
 run feature
-ok_lines "54a: bare 'feature' -> REWORK=3 (row default)" 'REWORK=3'
+ok_lines "54a: bare 'feature' -> PATIENCE=3 (row default)" 'PATIENCE=3'
 
-run feature --rework 5
+run feature --patience 5
 bad=""
 [ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
-line 'REWORK=5' || bad="$bad missing-line:[REWORK=5]"
+line 'PATIENCE=5' || bad="$bad missing-line:[PATIENCE=5]"
 if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
 if [ -z "$bad" ]; then
-  pass "54b: 'feature --rework 5' -> REWORK=5 (flag wins over row default), no warning (5 is within the ceiling)"
+  pass "54b: 'feature --patience 5' -> PATIENCE=5 (flag wins over row default), no warning (5 is within the ceiling)"
 else
-  fail "54b: 'feature --rework 5' -> REWORK=5 (flag wins over row default), no warning (5 is within the ceiling)" \
+  fail "54b: 'feature --patience 5' -> PATIENCE=5 (flag wins over row default), no warning (5 is within the ceiling)" \
     "$bad; $(ctx)"
 fi
 
@@ -1416,9 +1429,9 @@ else
     "$bad; $(ctx)"
 fi
 
-# --- Case 63d: live --rework 4 -> flag overrides the row's rework: 2 -------
-run live --rework 4
-ok_lines "63d: 'live --rework 4' -> REWORK=4 (flag overrides the row's rework: 2)" 'REWORK=4'
+# --- Case 63d: live --patience 4 -> flag overrides the row's patience: 2 -------
+run live --patience 4
+ok_lines "63d: 'live --patience 4' -> PATIENCE=4 (flag overrides the row's patience: 2)" 'PATIENCE=4'
 
 # --- Case 63e: live -a PROJ-123 -> against: optional accepts one anchor ----
 run live -a PROJ-123

@@ -98,7 +98,7 @@ Helpers, invoked explicitly (never wired): `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
 `--reuse` for crash-resume), `resolve-config.sh` (CLAUDE_* settings chain),
 `resolve-type.sh` (the only reader of the type table `workflows.yaml`; prints
-resolved axes as `KEY=value`, including `REWORK` on runs with a `code` phase;
+resolved axes as `KEY=value`, including `PATIENCE` on runs with a `code` phase;
 a row's `ship` cell is a `|`-separated allowed-value list, first = default),
 `resolve-anchor.sh` (per-item `--against`
 anchor resolution to typed pointers; all-or-nothing),
