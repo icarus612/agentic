@@ -46,9 +46,9 @@ agentic/
 
 ## The dae pipeline
 
-`/dae` routes every request to exactly one workflow — build
-(`feature|bugfix|rework|migration|hotfix`), `diagnose`, `document`, `sync` —
-and drives two workers through cold gates:
+`/dae` routes every request to exactly one workflow — the full type list
+lives in [`orchestrators/AGENTS.md`](orchestrators/AGENTS.md) — and drives
+two workers through cold gates:
 
 ```
 planner ‖ init-workspace → review-plan ⇄ (human gate, capped)

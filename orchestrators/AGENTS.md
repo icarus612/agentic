@@ -36,7 +36,7 @@ runs*:
 
 | Skill | Invoke | What it drives |
 |---|---|---|
-| **`dae`** | `/dae [--type\|-t <t>]` | The router: resolves the request to ONE of ten types — build (`feature\|bugfix\|rework\|migration\|hotfix`), `diagnose` (aliases `debug`, `triage` — breaking: these used to reach `bugfix`), `sync`, `map`, `analyze` (`map`'s own type, no longer a `document` alias), `document` (alias `doc`) — whose `pipeline` axis selects the middle file it follows. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
+| **`dae`** | `/dae [--type\|-t <t>]` | The router: resolves the request to ONE of eleven types — build (`feature\|bugfix\|rework\|migration\|hotfix`), `live` (alias `adhoc` — an ad-hoc conversational build), `diagnose` (aliases `debug`, `triage` — breaking: these used to reach `bugfix`), `sync`, `map`, `analyze` (`map`'s own type, no longer a `document` alias), `document` (alias `doc`) — whose `pipeline` axis selects the middle file it follows. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
 | **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents, verify and synthesize. Not tied to the dae pipeline. |
 
 ## The dae pipeline (build type)
@@ -83,7 +83,8 @@ re-dispatch carrying contract + diagnosis, never the opposing artifact) → the
 builder's own e2e tail, the sole loop exit — verified against the PLAN, which
 catches a wrong contract that propagated into both code and tests.
 
-The other types swap the middle file: `diagnose` (planner ranks causes → pick
+The other types swap the middle file: `live` (conversational build, one phase
+per user ask, ships on request), `diagnose` (planner ranks causes → pick
 gate → fix lanes), `sync` (planner reconciles → confirm gate → record),
 `document` (deep explore → record), `map` (the chat branch above: explore →
 report skeleton → chat answer, no planner, no gates), `analyze` (the same
@@ -97,7 +98,9 @@ Helpers, invoked explicitly (never wired): `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
 `--reuse` for crash-resume), `resolve-config.sh` (CLAUDE_* settings chain),
 `resolve-type.sh` (the only reader of the type table `workflows.yaml`; prints
-resolved axes as `KEY=value`), `resolve-anchor.sh` (per-item `--against`
+resolved axes as `KEY=value`, including `REWORK` on runs with a `code` phase;
+a row's `ship` cell is a `|`-separated allowed-value list, first = default),
+`resolve-anchor.sh` (per-item `--against`
 anchor resolution to typed pointers; all-or-nothing),
 `mark-syllabus.sh` (scripted syllabus ticks), `verify-scope.sh` (reported
 files vs real lane diff), `verify-run-scope.sh` (whole-run diff vs the union
@@ -112,9 +115,14 @@ resolver; delegates the configured rung to `resolve-config.sh`),
 `sync-install.sh` (repo→`~/.claude` install sync,
 deletions included — this repo's `push-main` runs it).
 Wired hooks: `workflow-diff-check.sh` (`Stop`, on `dae` only — builders check
-per lane instead), `scope-writes.sh` (`PreToolUse` deny-outside-allowlist;
-live config = orchestrator scope; the builder-lane config was retired —
-worktree isolation replaced it), `allow-workflow-cleanup.sh`
+per lane instead), `scope-writes.sh` (`PreToolUse` on
+`Write|Edit|MultiEdit|NotebookEdit`, denying orchestrator writes outside the
+run's `.artifacts/`, the resolved plans dir, and the resolved docs dir,
+self-configured from a parent-worktree marker — `.artifacts/progress-log.md`
+— with no env var), `parent-tree-guard.sh` (`PostToolUse` on `Bash` and on
+`Stop` — the Bash-side backstop, checking the worktree's actual git state via
+`git status --porcelain` since a `PreToolUse` hook can't see inside a Bash
+command), `allow-workflow-cleanup.sh`
 (`PreToolUse` on `Bash(git branch:*)` and `Bash(git worktree remove:*)` —
 auto-allows `-d` deletes of workflow-namespace branches tied to the
 project's workflows dir and plain removals of lane-child worktrees
@@ -133,7 +141,7 @@ a static toggle).
 
 | Agent | Model | Role |
 |---|---|---|
-| **`planner`** | opus | Explores for itself (ladder: docs-as-claims → fan-out → own reads → `explore` fork), writes the plan/report to `proposals/` per `plan-format`, stays warm for revisions. Type modules in `agents/planner/`: `plan-{feature,bugfix,rework,migration,diagnosis,reconcile}.md`. |
+| **`planner`** | opus | Explores for itself (ladder: docs-as-claims → fan-out → own reads → `explore` fork), writes the plan/report to `proposals/` per `plan-format`, stays warm for revisions. Type modules in `agents/planner/`: `plan-{feature,bugfix,rework,migration,live,diagnosis,reconcile}.md`. |
 | **`builder`** | sonnet | Per-lane mini-orchestrator of the packet model. Owns its child worktree, the contract, dispatch, debug mediation, and the e2e exit. Writes no implementation and no contract tests. |
 | **`coder`** | sonnet | One packet (≤~5 coupled files) against its contract slice. Never reads or writes tests. |
 | **`contract-tester`** | sonnet | Tests for one contract slice from the contract alone. Never reads the implementation — the blindness is its identity. |

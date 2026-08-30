@@ -67,7 +67,7 @@ agentic/
 │       └── skills/
 ├── .github/                   # publish-docs.yml — canonical; post-merge docs→Confluence publish (no-op here)
 ├── scripts/                   # publish-docs.yml — SYMLINK into .github/workflows/, not the reverse (see README.md)
-├── tests/                     # contract tests (10 suites) for the lifecycle + scope-verification scripts
+├── tests/                     # contract tests (13 suites) for the lifecycle + scope-verification scripts
 └── docs/                      # meta-docs about the repo (this tree)
 ```
 
@@ -112,11 +112,12 @@ off to" or "is composed with."
 - **`dae`** (`/dae`) resolves the docs target, captures the story when
   `CLAUDE_DOCS_PUBLISH` is set (`confluence-mode.md`), and resolves the
   request to ONE **type**, whose **pipeline** axis selects a middle file
-  (`build.md` / `diagnose.md` / `sync.md` / `report.md` / `document.md` — ten
-  types across four pipeline values). `map` (`pipeline: report`,
-  `ship: chat`) defaults to answering in chat: explore, fill the report
-  skeleton, answer in chat — zero gates, and (per `report.md`) no branch,
-  commit, or anything staged — no worktree either at `rigor: low`. Every
+  (`build.md` / `live.md` / `diagnose.md` / `sync.md` / `report.md` /
+  `document.md` — eleven types across five pipeline values). `map`
+  (`pipeline: report`, `ship: chat`) defaults to answering in chat: explore,
+  fill the report skeleton, answer in chat — zero gates, and (per
+  `report.md`) no branch, commit, or anything staged — no worktree either at
+  `rigor: low`. Every
   other type — every `ship: publish` type, `analyze` and `document`
   included — creates the parent worktree via `workflow-setup.sh`. Types
   carrying a `planner:` cell (every `pipeline: build` type, plus
@@ -165,5 +166,5 @@ off to" or "is composed with."
   that no-ops in this repo, since this repo configures no publish target;
   it ships as a working, copyable reference for consuming projects. Still
   no build system, license, `CONTRIBUTING.md`, or `CHANGELOG`. `tests/`
-  holds 10 contract-test suites for the lifecycle + scope-verification
+  holds 13 contract-test suites for the lifecycle + scope-verification
   scripts — still no test framework or runner beyond that.

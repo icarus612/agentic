@@ -12,15 +12,28 @@
 # Reading the `rigor` cell: a bare scalar expands to all four phases (explore, plan,
 # code, pr); the map form names only the phases that diverge and every unnamed phase
 # is `low`. So `code: low` holds for every row here — addressable, never a default cost.
+#
+# The `rework:` cell is an integer persistence budget, present only on `pipeline: build`
+# rows that want one; a row with no `rework:` cell means the builder's rework loops
+# stay unbounded.
+#
+# The type named `rework` and the cell key `rework:` are unrelated — the row key sits
+# outside the flow map's `{…}`, and `cell_value()` only ever searches inside the braces.
+#
+# The `ship:` cell is either a single bare value (fixed — --ship on that row always
+# warns and is ignored) or a `|`-separated list of alternatives, e.g. `chat|publish`.
+# The first alternative is the row's default; --ship may select any listed
+# alternative and is rejected against any value outside the list.
 types:
-  feature:   {pipeline: build,  explore: auto, rigor: low,                against: forbid,   ship: publish, planner: plan-feature,   branch: feature/}
-  bugfix:    {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-bugfix,    branch: bug/,     aliases: [bug]}
-  hotfix:    {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-bugfix+minimal-scope, branch: hotfix/}
-  migration: {pipeline: build,  explore: auto, rigor: low,                against: forbid,   ship: publish, planner: plan-migration, branch: feature/}
-  rework:    {pipeline: build,  explore: auto, rigor: low,                against: require,  ship: publish, planner: plan-rework,    branch: feature/}
+  feature:   {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-feature,   branch: feature/, rework: 3}
+  bugfix:    {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-bugfix,    branch: bug/,     rework: 3, aliases: [bug]}
+  hotfix:    {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-bugfix+minimal-scope, branch: hotfix/, rework: 3}
+  migration: {pipeline: build,  explore: auto, rigor: low,                against: optional, ship: publish, planner: plan-migration, branch: feature/, rework: 3}
+  rework:    {pipeline: build,  explore: auto, rigor: low,                against: require,  ship: publish, planner: plan-rework,    branch: feature/, rework: 3}
+  live:      {pipeline: live,   explore: auto, rigor: low,                against: optional, ship: publish,      planner: plan-live,      branch: feature/, rework: 2, aliases: [adhoc]}
   diagnose:  {pipeline: plan,   explore: deep, rigor: low,                against: optional, ship: publish, planner: plan-diagnosis, branch: bug/,     aliases: [debug, triage]}
-  map:       {pipeline: report, explore: auto, rigor: low,                against: forbid,   ship: chat}
-  analyze:   {pipeline: report, explore: deep, rigor: {explore: med},     against: forbid,   ship: publish, branch: docs/}
+  map:       {pipeline: report, explore: auto, rigor: low,                against: forbid,   ship: chat|publish}
+  analyze:   {pipeline: report, explore: deep, rigor: {explore: med},     against: forbid,   ship: publish|chat, branch: docs/}
   document:  {pipeline: docs,   explore: deep, rigor: {explore: med},     against: forbid,   ship: publish, branch: docs/,   aliases: [doc]}
   sync:      {pipeline: plan,   explore: deep, rigor: {explore: med},     against: require,  ship: publish, planner: plan-reconcile, branch: sync/}
 

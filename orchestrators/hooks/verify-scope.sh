@@ -9,8 +9,10 @@
 # DESCRIPTION
 #   Invoked by the dae orchestrator's dispatch loop before merging a lane's
 #   child branch back into the parent. Computes what ACTUALLY changed in the
-#   child worktree relative to the parent branch (committed, staged, and
-#   untracked) and compares it to what the builder REPORTED touching:
+#   child worktree relative to the parent branch (committed only, after
+#   refusing a dirty worktree) and compares it to what the builder REPORTED
+#   touching:
+#     UNCOMMITTED: <file> - worktree has uncommitted changes -> FAIL
 #     UNREPORTED: <file>  - changed on disk but absent from the report -> FAIL
 #     UNCHANGED:  <file>  - reported but shows no change -> warning only
 #   Paths are compared repo-relative. An UNREPORTED file means the exit
@@ -28,7 +30,8 @@
 #
 # EXIT CODES
 #   0 - report matches the diff (UNCHANGED warnings allowed)
-#   1 - usage error, or one or more UNREPORTED files
+#   1 - usage error, an uncommitted (UNCOMMITTED) worktree, or one or more
+#       UNREPORTED files
 set -uo pipefail
 
 err() { echo "verify-scope: $*" >&2; exit 1; }
@@ -116,10 +119,25 @@ $(cat)"; fi
 fi
 reported=$(printf '%s\n' "$reported" | sed '/^$/d' | sort -u)
 
-changed=$( { git -C "$wt" diff --name-only "$parent"...HEAD;
-             git -C "$wt" diff --name-only HEAD;          # unstaged
-             git -C "$wt" diff --name-only --cached;      # staged
-             git -C "$wt" ls-files --others --exclude-standard; } | sort -u | sed '/^$/d')
+dirty=$(git -C "$wt" status --porcelain 2>/dev/null | while IFS= read -r line; do
+  p="${line:3}"
+  case "$p" in
+    \"*) p="${p#\"}"; p="${p%\"}" ;;
+  esac
+  case "$p" in
+    *' -> '*) p="${p#*' -> '}" ;;
+  esac
+  case "$p" in
+    .artifacts | .artifacts/*) ;;
+    *) printf '%s\n' "$p" ;;
+  esac
+done)
+if [ -n "$dirty" ]; then
+  printf '%s\n' "$dirty" | sed 's/^/UNCOMMITTED: /'
+  exit 1
+fi
+
+changed=$(git -C "$wt" diff --name-only "$parent"...HEAD | sort -u | sed '/^$/d')
 
 fail=0
 while IFS= read -r f; do

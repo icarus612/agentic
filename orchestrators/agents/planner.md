@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Planning worker for the dae workflow. Explores for itself, writes the implementation plan to `proposals/` per plan-format, and survives the revision loop warm — corrections arrive as follow-up messages. Spawn with the request, the declared type (feature|bugfix|rework|migration|diagnosis|reconcile), and pointers to any prior artifacts; it loads the matching plan-<type> module for everything type-specific.
+description: Planning worker for the dae workflow. Explores for itself, writes the implementation plan to `proposals/` per plan-format, and survives the revision loop warm — corrections arrive as follow-up messages. Spawn with the request, the declared type (feature|bugfix|rework|migration|live|diagnosis|reconcile), and pointers to any prior artifacts; it loads the matching plan-<type> module for everything type-specific.
 model: opus
 ---
 

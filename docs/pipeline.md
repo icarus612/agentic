@@ -52,15 +52,21 @@ dae (/dae) ─resolve type/pipeline─┤
                           push-pr --stage finalize (draft → ready)
 ```
 
+`live` (`pipeline: live`) follows the SAME `ship: publish` branch through
+setup/planner/builder-lanes/ship, but the router never leaves conversation —
+no auto-mode switch, one phase + one lane per user ask, plan grows
+monotonically, ships only when the user says so (see `live.md`).
+
 ## Types (`--type`)
 
-Ten types over four `pipeline`-axis values, resolving to five middle files
+Eleven types over five `pipeline`-axis values, resolving to six middle files
 (`pipeline: plan` resolves to `diagnose.md` or `sync.md` by planner module,
 never by type name).
 
 | `--type` | `pipeline` axis | Middle file | Middle stages |
 |---|---|---|---|
 | `feature` (default) / `bugfix` (alias `bug`) / `hotfix` / `migration` / `rework` | `build` | `build.md` | planner (type module) → plan gate → builder lanes → code gate |
+| `live` (alias `adhoc`) | `live` | `live.md` | planner (`plan-live`, warm) → conversational per-ask loop: capture ask → append one plan phase → dispatch one lane → merge → repeat → ship on request |
 | `diagnose` (aliases `debug`, `triage`) | `plan` | `diagnose.md` | planner (`plan-diagnosis`: investigate, rank likelihood × ease) → pick-the-causes gate → fix lanes → code gate |
 | `sync` | `plan` | `sync.md` | planner (`plan-reconcile`: classify done/partial/dropped/diverged vs the real diff) → confirm-the-diff gate → reconciliation-driven record |
 | `map` | `report` | `report.md` | fast `explore` → fill the report skeleton → chat answer; no planner, no gates, no branch/commit/staged — no worktree either at `rigor: low` |
@@ -78,7 +84,9 @@ Confluence requirements capture, parent worktree `<type>/<name>`) and
 `push-pr --stage update` pushes → PR gate → `finalize`) stages. `map` defaults
 to `ship: chat` — the diagram's chat branch above, with zero gates and (per
 `report.md`) no branch, commit, or anything staged — no worktree either at
-`rigor: low`; `analyze` always publishes. `bugfix` vs `diagnose`: known cause
+`rigor: low`. `map` vs `analyze`: each has a default ship mode — `map`
+defaults to chat, `analyze` defaults to publish — and either can be pushed to
+the other mode with `--ship`. `bugfix` vs `diagnose`: known cause
 → bugfix; unknown cause → diagnose.
 
 ## The three tiers
@@ -167,7 +175,10 @@ Bash, applying to a **consuming** project, not to `agentic` (except
 - Helpers (invoked, never wired): `workflow-setup.sh` (worktrees; types
   `feature|bug|hotfix|docs|sync`; `--parent` children; `--reuse` resume),
   `resolve-config.sh` (CLAUDE_* chain), `resolve-type.sh` (the only reader of
-  the type table `workflows.yaml`; prints resolved axes as `KEY=value`),
+  the type table `workflows.yaml`; prints resolved axes as `KEY=value`,
+  including `REWORK` on runs with a `code` phase; a row's `ship` cell is a
+  `|`-separated allowed-value list, first = default — `publish | chat` /
+  `chat | publish` here, a bare value where the row is fixed),
   `resolve-anchor.sh` (per-item `--against` anchor resolution to typed
   pointers; all-or-nothing), `mark-syllabus.sh`, `verify-scope.sh`,
   `verify-run-scope.sh` (whole-run diff vs the union of exit reports, at the
@@ -179,10 +190,13 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   configured rung to `resolve-config.sh`),
   `sync-install.sh` (this repo → `~/.claude`, deletions included).
 - Wired: `workflow-diff-check.sh` (`Stop` on `dae`), `scope-writes.sh`
-  (`PreToolUse`; orchestrator write-scope config),
-  `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the two provably-safe
-  lane-cleanup commands), `branch-squash-guard.sh` (`PreToolUse`; enforces the
-  squash-only branch policy per `push-policy`).
+  (`PreToolUse`; denies orchestrator writes outside the run's `.artifacts/`,
+  the resolved plans dir, and the resolved docs dir, self-configured from a
+  parent-worktree marker — no env var), `parent-tree-guard.sh`
+  (`PostToolUse` on `Bash` and on `Stop`; catches Bash-side product writes a
+  `PreToolUse` hook can't see), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
+  two provably-safe lane-cleanup commands), `branch-squash-guard.sh`
+  (`PreToolUse`; enforces the squash-only branch policy per `push-policy`).
 
 ## Naming
 

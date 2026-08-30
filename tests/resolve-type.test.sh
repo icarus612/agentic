@@ -190,10 +190,11 @@ rm -f /tmp/resolve-type-syntax-err.$$
 # TABLE PARSING (§2.1, §2.3)
 # ===========================================================================
 
-# --- Case 01: all ten canonical types resolve ------------------------------
+# --- Case 01: all eleven canonical types resolve ----------------------------
 # rework and sync are `against: require` rows (§2.1) and so are given one
-# anchor; every other row is forbid or optional and is given none.
-for t in feature bugfix hotfix migration rework diagnose map analyze document sync; do
+# anchor; every other row is forbid or optional and is given none (live is
+# `against: optional`, so it needs no anchor branch either).
+for t in feature bugfix hotfix migration rework diagnose map analyze document sync live; do
   case "$t" in
     rework|sync) run "$t" --against REF ;;
     *)           run "$t" ;;
@@ -226,6 +227,12 @@ ok_lines "02b: sync row fidelity (plan/plan-reconcile/sync/, anchor accepted)" \
 run hotfix
 ok_lines "02c: hotfix row fidelity (PLANNER=plan-bugfix+minimal-scope)" \
   'TYPE=hotfix' 'PLANNER=plan-bugfix+minimal-scope' 'BRANCH=hotfix/'
+
+# --- Case 02f: live row fidelity (contracts/l1.md §Round 3) -----------------
+run live
+ok_lines "02f: live row fidelity (live/auto/publish/plan-live/feature//REWORK=2)" \
+  'TYPE=live' 'PIPELINE=live' 'EXPLORE=auto' 'SHIP=publish' \
+  'PLANNER=plan-live' 'BRANCH=feature/' 'REWORK=2'
 
 # --- Case 03: map emits no PLANNER= and no BRANCH= -------------------------
 run map
@@ -460,7 +467,7 @@ ok_lines "22b: 'feature' with no --rigor -> all four low (row scalar form)" \
   'RIGOR_EXPLORE=low' 'RIGOR_PLAN=low' 'RIGOR_CODE=low' 'RIGOR_PR=low'
 
 # --- Case 23: code is low on every shipped row that HAS a code phase -------
-for t in feature bugfix hotfix migration rework diagnose sync; do
+for t in feature bugfix hotfix migration rework diagnose sync live; do
   case "$t" in
     rework|sync) run "$t" --against REF ;;
     *)           run "$t" ;;
@@ -552,7 +559,7 @@ ok_lines "28b: row map-form D2 still prints the remaining axes" \
   'TYPE=probe' 'PIPELINE=report' 'RIGOR_EXPLORE=med' 'SHIP=chat'
 no_lines "28c: row map-form D2 drops the absent phase (no RIGOR_PR= line)" '^RIGOR_PR='
 
-# --- Case 29: analyze's ship is now locked to publish (RIGOR_PR=low) -------
+# --- Case 29: analyze's ship defaults to publish (RIGOR_PR=low) ------------
 run analyze
 ok_lines "29a: bare 'analyze' (report+publish) carries RIGOR_PR=low" \
   'SHIP=publish' 'RIGOR_PR=low'
@@ -585,9 +592,9 @@ fi
 # ===========================================================================
 
 # --- Case 30: against: forbid + anchors -> E4 ------------------------------
-run feature -a abc123
-err_case "30: 'feature -a abc123' (against: forbid) -> E4 (type name, --against, did you mean)" \
-  'feature' '--against' 'did you mean'
+run map -a abc123
+err_case "30: 'map -a abc123' (against: forbid) -> E4 (type name, --against, did you mean)" \
+  'map' '--against' 'did you mean'
 
 # --- Case 31: against: require + no anchors -> E5 --------------------------
 run rework
@@ -606,6 +613,16 @@ run diagnose
 ok_lines "32c: 'diagnose' (optional) with no anchors -> exit 0, AGAINST_COUNT=0" 'AGAINST_COUNT=0'
 run diagnose --against REF
 ok_lines "32d: 'diagnose' (optional) with an anchor -> exit 0, AGAINST_COUNT=1" 'AGAINST_COUNT=1'
+run feature
+ok_lines "32e: 'feature' (optional) with no anchors -> exit 0, AGAINST_COUNT=0" 'AGAINST_COUNT=0'
+run feature -a PROJ-123
+ok_lines "32f: 'feature -a PROJ-123' (optional) with an anchor -> exit 0, AGAINST_COUNT=1, AGAINST_1=PROJ-123" \
+  'AGAINST_COUNT=1' 'AGAINST_1=PROJ-123'
+run migration
+ok_lines "32g: 'migration' (optional) with no anchors -> exit 0, AGAINST_COUNT=0" 'AGAINST_COUNT=0'
+run migration --against abc123,def456
+ok_lines "32h: 'migration --against abc123,def456' (optional) -> exit 0, AGAINST_COUNT=2, order preserved" \
+  'AGAINST_COUNT=2' 'AGAINST_1=abc123' 'AGAINST_2=def456'
 
 # --- Case 33: --pipeline is locked -> E3 -----------------------------------
 run map --pipeline build
@@ -626,6 +643,18 @@ run diagnose --plan /no/such/plan.md
 err_case "34d: '--plan' on diagnose -> E6" '--plan' 'diagnose' 'pipeline: build'
 run sync --against REF --plan /no/such/plan.md
 err_case "34e: '--plan' on sync -> E6" '--plan' 'sync' 'pipeline: build'
+
+run live --plan /no/such/plan.md
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub '--plan' || bad="$bad missing-stderr:[--plan]"
+if ! err_tok 'live'; then bad="$bad missing-token:[live]"; fi
+err_sub 'pipeline: build' || bad="$bad missing-stderr:[pipeline: build]"
+if [ -z "$bad" ]; then
+  pass "34f: '--plan' on live -> E6 (--plan, live, pipeline: build)"
+else
+  fail "34f: '--plan' on live -> E6 (--plan, live, pipeline: build)" "$bad; $(ctx)"
+fi
 
 # Accepted on every build pipeline, path emitted AS GIVEN, no existence check.
 for t in feature bugfix hotfix migration rework; do
@@ -656,8 +685,8 @@ run feature --explore bogus
 err_case "36a: '--explore bogus' -> E9 (explore, the value, shallow, deep, auto)" \
   'explore' 'bogus' 'shallow' 'deep' 'auto'
 run feature --ship bogus
-err_case "36b: '--ship bogus' -> locked (E3), never reaches the ship value vocabulary" \
-  '--ship' 'locked' 'feature' 'publish'
+err_case "36b: '--ship bogus' -> not in VOCAB_SHIP, stderr names ship value/bogus/not one of chat, publish" \
+  'ship value' 'bogus' 'is not one of chat, publish'
 
 # --- Case 37: value-taking flag given no value -> E11 ----------------------
 run feature --rigor
@@ -737,6 +766,7 @@ RIGOR_CODE=low
 RIGOR_PR=low
 AGAINST_COUNT=0
 SHIP=publish
+REWORK=3
 PLANNER=plan-feature
 BRANCH=feature/'
 if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_feature" ]; then
@@ -759,6 +789,7 @@ else
   fail "43b: 'map' stdout is exactly §3.6's block - dropped phases, PLANNER and BRANCH all absent" \
     "code=$CODE out=[$OUT] want=[$expected_map]"
 fi
+no_lines "43b2: 'map' emits no REWORK= line (map's row carries no rework: cell)" '^REWORK='
 
 run analyze
 expected_analyze='TYPE=analyze
@@ -774,6 +805,27 @@ if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_analyze" ]; then
 else
   fail "43c: 'analyze' stdout is exactly contracts/l1.md §4.3's block - SHIP=publish, RIGOR_PR=low, no RIGOR_PLAN/RIGOR_CODE/PLANNER" \
     "code=$CODE out=[$OUT] want=[$expected_analyze]"
+fi
+no_lines "43c2: 'analyze' emits no REWORK= line (analyze's row carries no rework: cell)" '^REWORK='
+
+run live
+expected_live='TYPE=live
+PIPELINE=live
+EXPLORE=auto
+RIGOR_EXPLORE=low
+RIGOR_PLAN=low
+RIGOR_CODE=low
+RIGOR_PR=low
+AGAINST_COUNT=0
+SHIP=publish
+REWORK=2
+PLANNER=plan-live
+BRANCH=feature/'
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_live" ]; then
+  pass "43d: 'live' stdout is exactly contracts/l1.md §Round 3's block, in order, with nothing else"
+else
+  fail "43d: 'live' stdout is exactly contracts/l1.md §Round 3's block, in order, with nothing else" \
+    "code=$CODE out=[$OUT] want=[$expected_live]"
 fi
 
 # ===========================================================================
@@ -877,30 +929,50 @@ fi
 # LOCKED --SHIP AXIS (contracts/l1.md §3.3, crits 6-12)
 # ===========================================================================
 
-# --- Case 44: feature --ship chat -> locked (§A1 regression) ---------------
+# --- Case 44: feature --ship chat -> illegal override, not available -------
 run feature --ship chat
-err_case "44: 'feature --ship chat' -> locked (E3) naming 'feature' and 'publish' (the §A1 regression: a build no longer ships chat)" \
-  '--ship' 'locked' 'feature' 'publish'
-
-# --- Case 45: analyze --ship publish -> locked even though it agrees -------
-run analyze --ship publish
-err_case "45: 'analyze --ship publish' -> locked (E3) even though the value agrees with the row's own ship" \
-  '--ship' 'locked' 'analyze' 'publish'
-
-# --- Case 46: map --sh chat -> locked, not unknown flag --------------------
-run map --sh chat
 bad=""
 [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
-err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
-err_sub 'locked' || bad="$bad missing-stderr:[locked]"
-err_sub 'map' || bad="$bad missing-stderr:[map]"
-if err_sub 'unknown flag'; then bad="$bad unexpected:[unknown flag]"; fi
+for s in 'ship value' 'chat' 'not available' 'feature' 'publish'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if ! no_key_block; then bad="$bad unexpected-partial-stdout:[$OUT]"; fi
 if [ -z "$bad" ]; then
-  pass "46: 'map --sh chat' -> the short form resolves and is refused as locked (E3), never 'unknown flag'"
+  pass "44: 'feature --ship chat' -> illegal override (exit 1), stderr names ship value/chat/not available/feature/publish, nothing on stdout (the §A1 regression: a build no longer ships chat)"
 else
-  fail "46: 'map --sh chat' -> the short form resolves and is refused as locked (E3), never 'unknown flag'" \
+  fail "44: 'feature --ship chat' -> illegal override (exit 1), stderr names ship value/chat/not available/feature/publish, nothing on stdout (the §A1 regression: a build no longer ships chat)" \
     "$bad; $(ctx)"
 fi
+
+# --- Case 45: analyze --ship publish -> warn-and-continue, already the default
+run analyze --ship publish
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=publish' || bad="$bad missing-line:[SHIP=publish]"
+err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'already the default' || bad="$bad missing-stderr:[already the default]"
+if [ -z "$bad" ]; then
+  pass "45: 'analyze --ship publish' -> exit 0 AND SHIP=publish on stdout AND a stderr warning containing '--ship'/'already the default' (the triple)"
+else
+  fail "45: 'analyze --ship publish' -> exit 0 AND SHIP=publish on stdout AND a stderr warning containing '--ship'/'already the default' (the triple)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 46: map --sh chat -> the short form resolves; chat is map's default
+run map --sh chat
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'already the default' || bad="$bad missing-stderr:[already the default]"
+if err_sub 'unknown flag'; then bad="$bad unexpected:[unknown flag]"; fi
+if [ -z "$bad" ]; then
+  pass "46a: 'map --sh chat' -> the short form resolves, chat is map's default -> warn-and-continue (exit 0, '--ship'/'already the default' warning), never 'unknown flag'"
+else
+  fail "46a: 'map --sh chat' -> the short form resolves, chat is map's default -> warn-and-continue (exit 0, '--ship'/'already the default' warning), never 'unknown flag'" \
+    "$bad; $(ctx)"
+fi
+ok_lines "46b: 'map --sh chat' still prints the full block (warn-and-continue, not dropped)" \
+  'TYPE=map' 'PIPELINE=report' 'SHIP=chat'
 
 # --- Case 47: --ship with no value -> E11, unchanged -----------------------
 run feature --ship
@@ -922,7 +994,7 @@ else
     "$bad; $(ctx)"
 fi
 
-# --- Case 49: locked error's type lists are DERIVED, via fixture -----------
+# --- Case 49: illegal-override error's type lists are DERIVED, via fixture -
 f49=$(new_scratch)
 cat >"$f49/workflows.yaml" <<'YAML'
 types:
@@ -933,21 +1005,21 @@ YAML
 run --yaml "$f49/workflows.yaml" beta --ship chat
 bad=""
 [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
-err_sub 'locked' || bad="$bad missing-stderr:[locked]"
-err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'ship value' || bad="$bad missing-stderr:[ship value]"
+err_sub 'not available' || bad="$bad missing-stderr:[not available]"
 err_sub 'beta' || bad="$bad missing-stderr:[beta]"
 err_sub 'alpha' || bad="$bad missing-stderr:[alpha]"
 for other in feature bugfix hotfix migration rework diagnose map analyze document sync; do
   if err_sub "$other"; then bad="$bad unexpected-hardcoded-type-name:[$other]"; fi
 done
 if [ -z "$bad" ]; then
-  pass "49: the locked --ship error's type lists are derived from the parsed table (mentions 'alpha'/'beta', not any shipped type name)"
+  pass "49: the illegal-override ship error's derived type lists mention only 'alpha'/'beta' (fixture's own rows), never any shipped type name"
 else
-  fail "49: the locked --ship error's type lists are derived from the parsed table (mentions 'alpha'/'beta', not any shipped type name)" \
+  fail "49: the illegal-override ship error's derived type lists mention only 'alpha'/'beta' (fixture's own rows), never any shipped type name" \
     "$bad; $(ctx)"
 fi
 
-# --- Case 50: --pipeline locked fires before --ship locked -----------------
+# --- Case 50: --pipeline locked fires before the --ship row-legality check -
 run feature --pipeline build --ship chat
 bad=""
 [ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
@@ -961,6 +1033,397 @@ else
   fail "50: 'feature --pipeline build --ship chat' -> the --pipeline locked check fires first, never mentions --ship" \
     "$bad; $(ctx)"
 fi
+
+# ===========================================================================
+# REWORK DIAL (contracts/l1.md §Round 1)
+# ===========================================================================
+
+# --- Case 51: bracket minimums and rejections for --rework ------------------
+run feature --rew 4;     r51a="$OUT"; c51a="$CODE"
+run feature --rewo 4;    r51b="$OUT"; c51b="$CODE"
+run feature --rework 4;  r51c="$OUT"; c51c="$CODE"
+if [ "$c51a" -eq 0 ] && [ "$c51b" -eq 0 ] && [ "$c51c" -eq 0 ] \
+   && [ "$r51a" = "$r51c" ] && [ "$r51b" = "$r51c" ] \
+   && printf '%s\n' "$r51c" | grep -qxF 'REWORK=4'; then
+  pass "51a: '--rew'/'--rewo'/'--rework' 4 on feature all resolve identically to REWORK=4"
+else
+  fail "51a: '--rew'/'--rewo'/'--rework' 4 on feature all resolve identically to REWORK=4" \
+    "codes=$c51a/$c51b/$c51c a=[$r51a] b=[$r51b] c=[$r51c]"
+fi
+
+run feature --re 4
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+if ! err_tok '--re'; then bad="$bad missing-token:[--re]"; fi
+if out_re '^REWORK='; then bad="$bad resolved-to-rework"; fi
+if [ -z "$bad" ]; then
+  pass "51b: '--re 4' rejected as unknown flag (4 chars, below --rew's 5-char minimum)"
+else
+  fail "51b: '--re 4' rejected as unknown flag (4 chars, below --rew's 5-char minimum)" "$bad; $(ctx)"
+fi
+
+run feature --ri 4
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'unknown flag' || bad="$bad missing-stderr:[unknown flag]"
+if ! err_tok '--ri'; then bad="$bad missing-token:[--ri]"; fi
+if out_re '^RIGOR_'; then bad="$bad resolved-to-rigor"; fi
+if out_re '^REWORK='; then bad="$bad resolved-to-rework"; fi
+if [ -z "$bad" ]; then
+  pass "51c: '--ri 4' rejected as unknown flag (4 chars, below both --rig's and --rew's 5-char minimums)"
+else
+  fail "51c: '--ri 4' rejected as unknown flag (4 chars, below both --rig's and --rew's 5-char minimums)" \
+    "$bad; $(ctx)"
+fi
+
+run feature -r 4
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in 'rigor' '4' 'low' 'med' 'high'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if out_re '^REWORK='; then bad="$bad leaked-REWORK"; fi
+if [ -z "$bad" ]; then
+  pass "51d: '-r 4' still resolves to --rigor (single-dash alias stays rigor's alone) and fails on the rigor value vocabulary, not treated as --rework"
+else
+  fail "51d: '-r 4' still resolves to --rigor (single-dash alias stays rigor's alone) and fails on the rigor value vocabulary, not treated as --rework" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 52: --rework value validation --------------------------------------
+run feature --rework 0
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in '--rework' '0' 'an integer 1 or greater'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if ! no_key_block; then bad="$bad unexpected-partial-stdout:[$OUT]"; fi
+if [ -z "$bad" ]; then
+  pass "52a: 'feature --rework 0' -> exit 1, stderr names --rework/0/'an integer 1 or greater', nothing on stdout"
+else
+  fail "52a: 'feature --rework 0' -> exit 1, stderr names --rework/0/'an integer 1 or greater', nothing on stdout" \
+    "$bad; $(ctx)"
+fi
+
+run feature --rework abc
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in '--rework' 'abc' 'an integer 1 or greater'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if ! no_key_block; then bad="$bad unexpected-partial-stdout:[$OUT]"; fi
+if [ -z "$bad" ]; then
+  pass "52b: 'feature --rework abc' -> exit 1, stderr names --rework/abc/'an integer 1 or greater', nothing on stdout"
+else
+  fail "52b: 'feature --rework abc' -> exit 1, stderr names --rework/abc/'an integer 1 or greater', nothing on stdout" \
+    "$bad; $(ctx)"
+fi
+
+run feature --rework 7
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0 - above-ceiling --rework warns but does not fail)"
+line 'REWORK=7' || bad="$bad missing-line:[REWORK=7]"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+if [ -z "$bad" ]; then
+  pass "52c: 'feature --rework 7' -> exit 0 AND REWORK=7 on stdout AND a warning on stderr (the triple)"
+else
+  fail "52c: 'feature --rework 7' -> exit 0 AND REWORK=7 on stdout AND a warning on stderr (the triple)" \
+    "$bad; $(ctx)"
+fi
+
+run feature --rework 1
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'REWORK=1' || bad="$bad missing-line:[REWORK=1]"
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "52c2: 'feature --rework 1' -> exit 0, REWORK=1, no warning (1 is within the typical ceiling)"
+else
+  fail "52c2: 'feature --rework 1' -> exit 0, REWORK=1, no warning (1 is within the typical ceiling)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 53: --rework dropped with a warning on a no-code-phase type -------
+run map --rework 3
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_tok '--rework' || bad="$bad warning-does-not-name-flag:[--rework]"
+err_tok 'map' || bad="$bad warning-does-not-name-type:[map]"
+if [ -z "$bad" ]; then
+  pass "53a: 'map --rework 3' -> exit 0, warning naming --rework and map, REWORK= dropped"
+else
+  fail "53a: 'map --rework 3' -> exit 0, warning naming --rework and map, REWORK= dropped" \
+    "$bad; $(ctx)"
+fi
+no_lines "53a2: 'map --rework 3' emits no REWORK= line (map has no code phase)" '^REWORK='
+
+run document --rework 3
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_tok '--rework' || bad="$bad warning-does-not-name-flag:[--rework]"
+err_tok 'document' || bad="$bad warning-does-not-name-type:[document]"
+if [ -z "$bad" ]; then
+  pass "53b: 'document --rework 3' -> exit 0, warning naming --rework and document, REWORK= dropped"
+else
+  fail "53b: 'document --rework 3' -> exit 0, warning naming --rework and document, REWORK= dropped" \
+    "$bad; $(ctx)"
+fi
+no_lines "53b2: 'document --rework 3' emits no REWORK= line (document has no code phase)" '^REWORK='
+
+run map
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "53c: bare 'map' (no --rework flag) -> no warning at all (nothing to drop)"
+else
+  fail "53c: bare 'map' (no --rework flag) -> no warning at all (nothing to drop)" "$bad; $(ctx)"
+fi
+
+# --- Case 54: row default vs. flag override ----------------------------------
+run feature
+ok_lines "54a: bare 'feature' -> REWORK=3 (row default)" 'REWORK=3'
+
+run feature --rework 5
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'REWORK=5' || bad="$bad missing-line:[REWORK=5]"
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "54b: 'feature --rework 5' -> REWORK=5 (flag wins over row default), no warning (5 is within the ceiling)"
+else
+  fail "54b: 'feature --rework 5' -> REWORK=5 (flag wins over row default), no warning (5 is within the ceiling)" \
+    "$bad; $(ctx)"
+fi
+
+# ===========================================================================
+# SHIP AS A PER-ROW LIST (contracts/l1.md §Round 2)
+# ===========================================================================
+
+# --- Case 55: split parsing of the '|'-separated ship list -----------------
+f55a=$(new_scratch)
+cat >"$f55a/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  probe:     {pipeline: report, explore: auto, rigor: low, against: forbid, ship: chat|banana}
+default_type: feature
+YAML
+run --yaml "$f55a/workflows.yaml" probe
+err_case "55a: malformed row (ship alternative 'banana' not in VOCAB_SHIP) -> exit 1, 'malformed' + 'banana'" \
+  'malformed' 'banana'
+
+f55b=$(new_scratch)
+cat >"$f55b/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  probe:     {pipeline: report, explore: auto, rigor: low, against: forbid, ship: chat|}
+default_type: feature
+YAML
+run --yaml "$f55b/workflows.yaml" probe
+err_case "55b: malformed row (a stray trailing '|' is an empty alternative, not a silently dropped one) -> exit 1, 'malformed' + 'empty alternative'" \
+  'malformed' 'empty alternative'
+
+f55c_tight=$(new_scratch)
+cat >"$f55c_tight/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  probe:     {pipeline: report, explore: auto, rigor: low, against: forbid, ship: publish|chat}
+default_type: feature
+YAML
+f55c_spaced=$(new_scratch)
+cat >"$f55c_spaced/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  probe:     {pipeline: report, explore: auto, rigor: low, against: forbid, ship: publish | chat}
+default_type: feature
+YAML
+run --yaml "$f55c_tight/workflows.yaml" probe;  r55c_tight="$OUT";  c55c_tight="$CODE"
+run --yaml "$f55c_spaced/workflows.yaml" probe; r55c_spaced="$OUT"; c55c_spaced="$CODE"
+if [ "$c55c_tight" -eq 0 ] && [ "$c55c_spaced" -eq 0 ] \
+   && printf '%s\n' "$r55c_tight" | grep -qxF 'SHIP=publish' \
+   && [ "$r55c_tight" = "$r55c_spaced" ]; then
+  pass "55c: 'ship: publish|chat' (tight) and 'ship: publish | chat' (spaced) parse identically, both defaulting to SHIP=publish"
+else
+  fail "55c: 'ship: publish|chat' (tight) and 'ship: publish | chat' (spaced) parse identically, both defaulting to SHIP=publish" \
+    "tight_code=$c55c_tight spaced_code=$c55c_spaced tight=[$r55c_tight] spaced=[$r55c_spaced]"
+fi
+
+# --- Case 56: the first alternative is the row's default -------------------
+f56=$(new_scratch)
+cat >"$f56/workflows.yaml" <<'YAML'
+types:
+  feature:   {pipeline: build,  explore: auto, rigor: low, against: forbid, ship: publish, planner: plan-feature, branch: feature/}
+  probe:     {pipeline: report, explore: auto, rigor: low, against: forbid, ship: chat|publish}
+default_type: feature
+YAML
+run --yaml "$f56/workflows.yaml" probe
+ok_lines "56: bare 'probe' (row 'ship: chat|publish', no --ship flag) -> SHIP=chat (first alternative is the default, not 'publish')" \
+  'SHIP=chat'
+
+# --- Case 57: warn-on-equal, fixed (single-valued) row ----------------------
+run feature --ship publish
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=publish' || bad="$bad missing-line:[SHIP=publish]"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'fixed' || bad="$bad missing-stderr:[fixed]"
+err_sub 'feature' || bad="$bad missing-stderr:[feature]"
+if [ -z "$bad" ]; then
+  pass "57: 'feature --ship publish' -> exit 0, SHIP=publish, warning naming '--ship'/'fixed'/'feature' (single-valued row, equal to its own fixed value)"
+else
+  fail "57: 'feature --ship publish' -> exit 0, SHIP=publish, warning naming '--ship'/'fixed'/'feature' (single-valued row, equal to its own fixed value)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 58: warn-on-equal, overridable (multi-valued) row ----------------
+# Deliberate duplicate of case 45 - that one lives in the "locked axis"
+# section for continuity with its history, this one lives with its topical
+# siblings.
+run analyze --ship publish
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=publish' || bad="$bad missing-line:[SHIP=publish]"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_sub '--ship' || bad="$bad missing-stderr:[--ship]"
+err_sub 'already the default' || bad="$bad missing-stderr:[already the default]"
+if [ -z "$bad" ]; then
+  pass "58: 'analyze --ship publish' -> exit 0, SHIP=publish, warning naming '--ship'/'already the default' (multi-valued row, deliberate duplicate of case 45)"
+else
+  fail "58: 'analyze --ship publish' -> exit 0, SHIP=publish, warning naming '--ship'/'already the default' (multi-valued row, deliberate duplicate of case 45)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 59: apply-on-legal-override ---------------------------------------
+run analyze --ship chat
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=chat' || bad="$bad missing-line:[SHIP=chat]"
+if out_re '^RIGOR_PR='; then bad="$bad unexpected:[RIGOR_PR=]"; fi
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "59: 'analyze --ship chat' -> exit 0, SHIP=chat (legal override applies), no RIGOR_PR= line, no warning"
+else
+  fail "59: 'analyze --ship chat' -> exit 0, SHIP=chat (legal override applies), no RIGOR_PR= line, no warning" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 60: error-on-illegal-override -------------------------------------
+# Deliberate duplicate of case 44 - that one lives in the "locked axis"
+# section for continuity with its history, this one lives with its topical
+# siblings.
+run feature --ship chat
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in 'ship value' 'chat' 'not available' 'feature'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if [ -z "$bad" ]; then
+  pass "60: 'feature --ship chat' -> exit 1, illegal override (deliberate duplicate of case 44)"
+else
+  fail "60: 'feature --ship chat' -> exit 1, illegal override (deliberate duplicate of case 44)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 61: map --ship publish -> the phase-existence table sees ship ----
+run map --ship publish
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=publish' || bad="$bad missing-line:[SHIP=publish]"
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "61a: 'map --ship publish' -> exit 0, SHIP=publish, no warning (legal override, different from map's chat default)"
+else
+  fail "61a: 'map --ship publish' -> exit 0, SHIP=publish, no warning (legal override, different from map's chat default)" \
+    "$bad; $(ctx)"
+fi
+ok_lines "61b: 'map --ship publish' -> RIGOR_PR=low now present (the phase-existence table sees the resolved ship value)" \
+  'RIGOR_PR=low'
+
+# --- Case 62: precedence, complementing case 50 -----------------------------
+# document is a non-build, single-valued-ship row; pair an illegal --ship
+# override with a second problem that would otherwise also fire, to show the
+# ship check fires first.
+run document --ship chat --plan /no/such.md
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in 'ship value' 'chat' 'not available' 'document'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if err_sub '--plan'; then bad="$bad unexpected-stderr:[--plan]"; fi
+if [ -z "$bad" ]; then
+  pass "62a: 'document --ship chat --plan /no/such.md' -> the --ship row-legality check fires first, never mentions --plan"
+else
+  fail "62a: 'document --ship chat --plan /no/such.md' -> the --ship row-legality check fires first, never mentions --plan" \
+    "$bad; $(ctx)"
+fi
+
+run document --ship chat --against X
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+for s in 'ship value' 'chat' 'not available' 'document'; do
+  err_sub "$s" || bad="$bad missing-stderr:[$s]"
+done
+if err_sub '--against'; then bad="$bad unexpected-stderr:[--against]"; fi
+if err_sub 'did you mean'; then bad="$bad unexpected-stderr:[did you mean]"; fi
+if [ -z "$bad" ]; then
+  pass "62b: 'document --ship chat --against X' -> the --ship row-legality check fires first, never mentions --against or 'did you mean'"
+else
+  fail "62b: 'document --ship chat --against X' -> the --ship row-legality check fires first, never mentions --against or 'did you mean'" \
+    "$bad; $(ctx)"
+fi
+
+# ===========================================================================
+# THE LIVE TYPE (contracts/l1.md §Round 3)
+# ===========================================================================
+
+# --- Case 63a: alias 'adhoc' resolves to the canonical 'live' --------------
+run adhoc
+ok_lines "63a: alias 'adhoc' resolves to canonical TYPE=live (not the alias itself)" 'TYPE=live'
+
+# --- Case 63b: live --ship chat -> illegal override (ship: publish only) ---
+run live --ship chat
+bad=""
+[ "$CODE" -eq 1 ] || bad="exit=$CODE(want 1)"
+err_sub 'ship value' || bad="$bad missing-stderr:[ship value]"
+err_sub 'chat' || bad="$bad missing-stderr:[chat]"
+err_sub 'not available' || bad="$bad missing-stderr:[not available]"
+if ! err_tok 'live'; then bad="$bad missing-token:[live]"; fi
+err_sub 'publish' || bad="$bad missing-stderr:[publish]"
+if ! no_key_block; then bad="$bad unexpected-partial-stdout:[$OUT]"; fi
+if [ -z "$bad" ]; then
+  pass "63b: 'live --ship chat' -> illegal override (exit 1), stderr names ship value/chat/not available/live/publish, nothing on stdout"
+else
+  fail "63b: 'live --ship chat' -> illegal override (exit 1), stderr names ship value/chat/not available/live/publish, nothing on stdout" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 63c: live --ship publish -> warn-and-continue, fixed row ---------
+run live --ship publish
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=publish' || bad="$bad missing-line:[SHIP=publish]"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_sub 'fixed' || bad="$bad missing-stderr:[fixed]"
+if ! err_tok 'live'; then bad="$bad missing-token:[live]"; fi
+if [ -z "$bad" ]; then
+  pass "63c: 'live --ship publish' -> exit 0, SHIP=publish, warning naming 'fixed' and 'live' (single-valued row, equal to its own fixed value)"
+else
+  fail "63c: 'live --ship publish' -> exit 0, SHIP=publish, warning naming 'fixed' and 'live' (single-valued row, equal to its own fixed value)" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 63d: live --rework 4 -> flag overrides the row's rework: 2 -------
+run live --rework 4
+ok_lines "63d: 'live --rework 4' -> REWORK=4 (flag overrides the row's rework: 2)" 'REWORK=4'
+
+# --- Case 63e: live -a PROJ-123 -> against: optional accepts one anchor ----
+run live -a PROJ-123
+ok_lines "63e: 'live -a PROJ-123' -> AGAINST_COUNT=1, AGAINST_1=PROJ-123 (against: optional)" \
+  'AGAINST_COUNT=1' 'AGAINST_1=PROJ-123'
 
 # ---------------------------------------------------------------------------
 # Summary

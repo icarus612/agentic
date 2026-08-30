@@ -3,19 +3,20 @@
 #
 # SYNOPSIS
 #   resolve-type.sh [<type>] [--t[ype] <t>] [--exp[lore] <v>] [--rig[or] <spec>]
-#                   [--ag[ainst] <a>[,<a>...]]... [--pl[an] <path>]
-#                   [--yaml <path>]
+#                   [--ag[ainst] <a>[,<a>...]]... [--sh[ip] <v>] [--pl[an] <path>]
+#                   [--rew[ork] <n>] [--yaml <path>]
 #
 # DESCRIPTION
 #   Every dae type is a preset over five axes (pipeline, explore, rigor,
 #   against, ship). The presets live in the type table
 #   ../skills/dae/workflows.yaml, one flow-map row per type. This script is
 #   the ONLY reader of that table: it resolves a type name or alias to its
-#   row, applies the free-tier flag overrides (--explore, --rigor),
+#   row, applies the free-tier flag overrides (--explore, --rigor, --rework),
 #   validates the constrained and locked axes (--against arity, --plan
-#   placement, --pipeline and --ship are locked), and prints the resolved
-#   axes as KEY=value lines on stdout for the router to consume. The router
-#   never interprets the yaml itself.
+#   placement, --pipeline alone is locked, --ship is constrained per row
+#   against its allowed-value list), and prints the resolved axes as
+#   KEY=value lines on stdout for the router to consume. The router never
+#   interprets the yaml itself.
 #
 #   The table is parsed with bash builtins and awk only — no jq, no YAML
 #   library, matching this repo's other hooks (resolve-config.sh:21). That is
@@ -54,6 +55,17 @@ split_commas() { # split_commas <string> -> SPLIT[] (empty items preserved)
     case "$s" in
       *,*) item="${s%%,*}"; s="${s#*,}"; SPLIT+=("$item") ;;
       *)   SPLIT+=("$s"); break ;;
+    esac
+  done
+}
+
+split_pipes() { # split_pipes <string> -> SPLIT[] (empty items preserved)
+  SPLIT=()
+  local s="$1" item
+  while :; do
+    case "$s" in
+      *'|'*) item="${s%%|*}"; s="${s#*|}"; SPLIT+=("$item") ;;
+      *)     SPLIT+=("$s"); break ;;
     esac
   done
 }
@@ -118,7 +130,7 @@ join_comma() { # join_comma <item>... -> JOINED (", "-separated; no subshell)
   done
 }
 
-VOCAB_PIPELINE="build plan report docs"
+VOCAB_PIPELINE="build plan report docs live"
 VOCAB_EXPLORE="shallow deep auto"
 VOCAB_SHIP="chat publish"
 VOCAB_AGAINST="require optional forbid"
@@ -130,7 +142,7 @@ VOCAB_PHASE="explore plan code pr"
 # bracket minimum it is at least as long as. Below-minimum tokens (`--r`, which
 # used to be `--ref`; `--p`, which is below both `--pl` and `--pi`) are unknown
 # flags — never guessed at. `--yaml` is internal and matches exactly.
-FLAG_TABLE="--type:--t --explore:--exp --rigor:--rig --against:--ag --ship:--sh --plan:--pl --pipeline:--pi"
+FLAG_TABLE="--type:--t --explore:--exp --rigor:--rig --against:--ag --ship:--sh --plan:--pl --pipeline:--pi --rework:--rew"
 
 resolve_flag() { # resolve_flag <token> -> CANON
   local tok="$1" entry long min matches="" count=0
@@ -142,7 +154,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
     -r) CANON="rigor"; return 0 ;;
     -a) CANON="against"; return 0 ;;
     --*) ;;
-    *) err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan?" ;;
+    *) err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan, --rework?" ;;
   esac
   for entry in $FLAG_TABLE; do
     long="${entry%%:*}"; min="${entry##*:}"
@@ -150,7 +162,7 @@ resolve_flag() { # resolve_flag <token> -> CANON
     [ "${#tok}" -ge "${#min}" ] || continue
     matches="$matches $long"; count=$((count+1))
   done
-  [ "$count" -ne 0 ] || err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan? (short forms need at least --t, --exp, --rig, --ag, --pl)"
+  [ "$count" -ne 0 ] || err "unknown flag: '$tok' — did you mean one of --type, --explore, --rigor, --against, --plan, --rework? (short forms need at least --t, --exp, --rig, --ag, --pl, --rew)"
   [ "$count" -eq 1 ] || err "ambiguous flag: '$tok' matches$matches — which one did you mean?"
   trim "$matches"; long="$TRIM"
   CANON="${long#--}"
@@ -160,9 +172,10 @@ resolve_flag() { # resolve_flag <token> -> CANON
 # --- argv ------------------------------------------------------------------
 type_name=""; positional_count=0
 explore_override=""; have_explore=0
-ship_given=0
+ship_override=""; ship_given=0
 plan_path=""; have_plan=0
 pipeline_given=0
+rework_override=""; have_rework=0
 yaml_path=""
 rigor_items=(); anchors=()
 
@@ -191,9 +204,10 @@ while [ $# -gt 0 ]; do
       case "$canon" in
         type)     set_type "$val" ;;
         explore)  explore_override="$val"; have_explore=1 ;;
-        ship)     ship_given=1 ;;
+        ship)     ship_override="$val"; ship_given=1 ;;
         plan)     plan_path="$val"; have_plan=1 ;;
         pipeline) pipeline_given=1 ;;
+        rework)   rework_override="$val"; have_rework=1 ;;
         yaml)     yaml_path="$val" ;;
         rigor)
           split_commas "$val"
@@ -263,8 +277,15 @@ while IFS=$'\t' read -r key raw; do
     [ "$CELLVAL" != "require" ] || require_types+=("$key")
   fi
   if cell_value "$INNER" "ship"; then
-    [ "$CELLVAL" != "chat" ]    || chat_types+=("$key")
-    [ "$CELLVAL" != "publish" ] || publish_types+=("$key")
+    split_pipes "$CELLVAL"
+    chat_found=0; publish_found=0
+    for alt in ${SPLIT[@]+"${SPLIT[@]}"}; do
+      trim "$alt"; alt="$TRIM"
+      [ "$alt" != "chat" ]    || chat_found=1
+      [ "$alt" != "publish" ] || publish_found=1
+    done
+    [ "$chat_found" = 0 ]    || chat_types+=("$key")
+    [ "$publish_found" = 0 ] || publish_types+=("$key")
   fi
   if cell_value "$INNER" "aliases"; then
     alias_list="$CELLVAL"
@@ -337,15 +358,14 @@ in_list "$explore" "$VOCAB_EXPLORE" || err "malformed row for type '$resolved_ty
 require_cell "against"; against_rule="$CELLVAL"
 in_list "$against_rule" "$VOCAB_AGAINST" || err "malformed row for type '$resolved_type': key 'against' has value '$against_rule', which is not one of $VOCAB_AGAINST — which did you mean?"
 
-require_cell "ship"; ship="$CELLVAL"
-in_list "$ship" "$VOCAB_SHIP" || err "malformed row for type '$resolved_type': key 'ship' has value '$ship', which is not one of $VOCAB_SHIP — which did you mean?"
-
 require_cell "rigor"; row_rigor="$CELLVAL"
 
 planner=""; have_planner=0
 if row_cell "planner"; then planner="$CELLVAL"; have_planner=1; fi
 branch=""; have_branch=0
 if row_cell "branch"; then branch="$CELLVAL"; have_branch=1; fi
+rework_row=""; have_rework_row=0
+if row_cell "rework"; then rework_row="$CELLVAL"; have_rework_row=1; fi
 
 # --- free-tier overrides ---------------------------------------------------
 if [ "$have_explore" = 1 ]; then
@@ -353,10 +373,62 @@ if [ "$have_explore" = 1 ]; then
   explore="$explore_override"
 fi
 
+if [ "$have_rework" = 1 ]; then
+  case "$rework_override" in
+    ''|*[!0-9]*) err "--rework value '$rework_override' is not an integer 1 or greater — what should the persistence budget be?" ;;
+  esac
+  [ "$rework_override" -ge 1 ] || err "--rework value '$rework_override' is not an integer 1 or greater — what should the persistence budget be?"
+  [ "$rework_override" -le 5 ] || warn "--rework value '$rework_override' is above the typical ceiling of 5 — the run continues with it."
+fi
+
+# --- ship: locked pipeline, then per-row constrained ship -------------------
+[ "$pipeline_given" = 0 ] || err "--pipeline is locked: a type IS its pipeline, and type '$resolved_type' is pipeline '$pipeline' — pick the type whose pipeline you want instead?"
+
+require_cell "ship"; ship_row_raw="$CELLVAL"
+split_pipes "$ship_row_raw"
+ship_alts=()
+for item in "${SPLIT[@]}"; do
+  trim "$item"; alt="$TRIM"
+  [ -n "$alt" ] || err "malformed row for type '$resolved_type': key 'ship' has an empty alternative in '$ship_row_raw' — a silently dropped alternative is worse than an error; fix that row in the type table?"
+  in_list "$alt" "$VOCAB_SHIP" || err "malformed row for type '$resolved_type': key 'ship' has alternative '$alt', which is not one of $VOCAB_SHIP — which did you mean?"
+  ship_alts+=("$alt")
+done
+ship_default="${ship_alts[0]}"
+ship="$ship_default"
+
+if [ "$ship_given" = 1 ]; then
+  if ! in_list "$ship_override" "$VOCAB_SHIP"; then
+    err "ship value '$ship_override' is not one of chat, publish — which did you mean?"
+  elif [ "$ship_override" = "$ship_default" ]; then
+    if [ "${#ship_alts[@]}" -gt 1 ]; then
+      warn "--ship '$ship_override' is already the default for '$resolved_type' — the run continues."
+    else
+      warn "--ship is fixed on '$resolved_type' ('$ship_default') — the flag is being ignored; the run continues."
+    fi
+  elif in_list "$ship_override" "${ship_alts[*]}"; then
+    ship="$ship_override"
+  else
+    ship_parts=()
+    if [ "${#chat_types[@]}" -gt 0 ]; then
+      join_comma "${chat_types[@]}"; ship_parts+=("for a chat answer run $JOINED")
+    fi
+    if [ "${#publish_types[@]}" -gt 0 ]; then
+      join_comma "${publish_types[@]}"; ship_parts+=("for a published report run $JOINED")
+    fi
+    join_comma "${ship_alts[@]}"; alts_str="$JOINED"
+    if [ "${#ship_parts[@]}" -gt 0 ]; then
+      join_comma "${ship_parts[@]}"; tail="$JOINED"
+      err "ship value '$ship_override' is not available on type '$resolved_type' (ships $alts_str) — $tail?"
+    else
+      err "ship value '$ship_override' is not available on type '$resolved_type' (ships $alts_str) — pick the type whose ship mode you want instead?"
+    fi
+  fi
+fi
+
 # --- f(pipeline, ship): which rigor phases this run HAS ---------------------
 has_explore_phase=1; has_plan_phase=0; has_code_phase=0; has_pr_phase=0
 case "$pipeline" in
-  build|plan) has_plan_phase=1; has_code_phase=1; has_pr_phase=1 ;;
+  build|plan|live) has_plan_phase=1; has_code_phase=1; has_pr_phase=1 ;;
   docs)       has_pr_phase=1 ;;
   report)     [ "$ship" = "publish" ] && has_pr_phase=1 ;;
 esac
@@ -470,29 +542,10 @@ drop_phase() { # drop_phase <phase> <named?>
 [ "$has_code_phase" = 1 ] || drop_phase "code" "$named_code"
 [ "$has_pr_phase" = 1 ] || drop_phase "pr" "$named_pr"
 
-# --- constraints: locked, then placement, then arity -----------------------
+# --- constraints: placement, then arity -------------------------------------
 # Placement is judged before arity so that a misplaced --plan is reported as
 # such even on a type that also wants an anchor — the flag that cannot belong
 # here at all is the more useful thing to say first.
-[ "$pipeline_given" = 0 ] || err "--pipeline is locked: a type IS its pipeline, and type '$resolved_type' is pipeline '$pipeline' — pick the type whose pipeline you want instead?"
-
-if [ "$ship_given" = 1 ]; then
-  ship_parts=()
-  if [ "${#chat_types[@]}" -gt 0 ]; then
-    join_comma ${chat_types[@]+"${chat_types[@]}"}; chat_str="$JOINED"
-    ship_parts+=("for a chat answer run $chat_str")
-  fi
-  if [ "${#publish_types[@]}" -gt 0 ]; then
-    join_comma ${publish_types[@]+"${publish_types[@]}"}; publish_str="$JOINED"
-    ship_parts+=("for a published report run $publish_str")
-  fi
-  if [ "${#ship_parts[@]}" -gt 0 ]; then
-    join_comma ${ship_parts[@]+"${ship_parts[@]}"}; ship_parts_str="$JOINED"
-    err "--ship is locked: a type IS its ship mode, and type '$resolved_type' ships '$ship' — $ship_parts_str?"
-  fi
-  err "--ship is locked: a type IS its ship mode, and type '$resolved_type' ships '$ship' — pick the type whose ship mode you want instead?"
-fi
-
 if [ "$have_plan" = 1 ] && [ "$pipeline" != "build" ]; then
   if [ "${#build_types[@]}" -eq 0 ]; then
     err "--plan is accepted only on a 'pipeline: build' type, and type '$resolved_type' is pipeline '$pipeline' — drop --plan (the table at '$yaml_path' defines no pipeline: build type at all)?"
@@ -532,6 +585,19 @@ for anchor in ${anchors[@]+"${anchors[@]}"}; do
   echo "AGAINST_$i=$anchor"
 done
 echo "SHIP=$ship"
+if [ "$has_code_phase" = 1 ]; then
+  if [ "$have_rework" = 1 ]; then
+    echo "REWORK=$rework_override"
+  elif [ "$have_rework_row" = 1 ] && [ -n "$rework_row" ]; then
+    echo "REWORK=$rework_row"
+  fi
+else
+  if [ "$have_rework" = 1 ]; then
+    warn "--rework does not apply to type '$resolved_type' (no code phase) — dropped; the run continues."
+  fi
+  # a row-sourced value on a code-phase-less run drops SILENTLY (no row carries one
+  # today; a future row must not warn spuriously either)
+fi
 [ "$have_planner" = 1 ] && echo "PLANNER=$planner"
 [ "$have_branch" = 1 ] && echo "BRANCH=$branch"
 [ "$have_plan" = 1 ] && echo "PLAN=$plan_path"

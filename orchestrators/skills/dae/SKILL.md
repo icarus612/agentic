@@ -1,6 +1,6 @@
 ---
 name: dae
-description: Entry-point orchestrator — resolves each request to exactly one type, whose pipeline selects one middle file, and drives the planner and builder workers through cold review gates to a PR (or, for a report type, answers in chat), managing context for the whole run. Invoke as /dae [--type|-t <t>] on a feature, fix, rework, migration, investigation, docs pass, reconciliation, or a question answered as a report.
+description: Entry-point orchestrator — resolves each request to exactly one type, whose pipeline selects one middle file, and drives the planner and builder workers through cold review gates to a PR (or, for a report type, answers in chat), managing context for the whole run. Invoke as /dae [--type|-t <t>] on a feature, fix, rework, migration, an ad-hoc conversational build, investigation, docs pass, reconciliation, or a question answered as a report.
 domain: universal
 rules: [verify-dont-assume, model-policy, artifact-locations, run-artifacts]
 model: opus
@@ -16,7 +16,7 @@ hooks:
 
 # dae
 
-You are a **router**, not a pipeline. Parse the invocation, resolve the request to exactly ONE **type** — a preset row in the type table, the user-facing API (`--type rework`) — then read and follow that type's resolved **pipeline** — which middle file executes (`build.md`, `diagnose.md`, `sync.md`, `report.md`, `document.md`), installed next to this one. Each middle file owns its full stage sequence; this body owns only what is common to all of them. A type's pipeline reads five **axes** (`pipeline`, `explore`, `rigor`, `against`, `ship`, plus `--plan`) that decide which skills and loops actually load. "Workflow" may still name the dae system as a whole ("the dae workflow"); it never names a middle file or a type in this document.
+You are a **router**, not a pipeline. Parse the invocation, resolve the request to exactly ONE **type** — a preset row in the type table, the user-facing API (`--type rework`) — then read and follow that type's resolved **pipeline** — which middle file executes (`build.md`, `diagnose.md`, `sync.md`, `report.md`, `document.md`, `live.md`), installed next to this one. Each middle file owns its full stage sequence; this body owns only what is common to all of them. A type's pipeline reads five **axes** (`pipeline`, `explore`, `rigor`, `against`, `ship`, plus `--plan`) that decide which skills and loops actually load. "Workflow" may still name the dae system as a whole ("the dae workflow"); it never names a middle file or a type in this document.
 
 ## Flags
 
@@ -29,6 +29,8 @@ Bracket notation (vim-style): the bracketed tail is optional — `--exp[lore]` a
 | `--rig[or]` | `-r` | scalar `low` \| `med` \| `high`, and/or per-phase `<phase>:<value>` over `explore` \| `plan` \| `code` \| `pr`; comma-separated, mixed form allowed (`med,explore:high`) | per the resolved type row |
 | `--ag[ainst]` | `-a` | an **array** of anchors — git refs, Jira tickets, plan paths; repeatable flag AND comma-separated, order preserved | per the resolved type row's `against:` rule (`forbid`\|`optional`\|`require`) |
 | `--pl[an]` | *(none)* | path to a promoted, gate-approved plan | none — adopts only when passed |
+| `--sh[ip]` | *(none)* | `chat` \| `publish` | per the resolved type row's `ship:` list — first value is the default; a single-value row is fixed |
+| `--rew[ork]` | *(none)* | `<n>` — integer ≥ 1 | per the resolved type row |
 | `--work[tree]` | `-w` | `new` \| `resume [<name>]` \| `none` — see `worktree-modes.md` | `new` |
 | `--b[ase]` | `-b` | `<branch>` | `CLAUDE_BASE_BRANCH` chain, resolved silently by `workflow-setup.sh` |
 | `--n[ame]` | `-n` | `<slug>` | derived from the task (overrides, e.g. to join a resumable run) |
@@ -36,49 +38,56 @@ Bracket notation (vim-style): the bracketed tail is optional — `--exp[lore]` a
 Facts settled below are not to be re-litigated by a later reader:
 
 - **`--ref` — the old anchor flag — is retired.** Its `-r` alias is retired in the anchor sense: `-r` now belongs to `--rigor`. Anchors are `--against` / `-a` only.
-- **The bracket minimums are `--t`, `--exp`, `--rig`, `--ag`, `--pl`** — this is what `resolve-type.sh` actually accepts (its `FLAG_TABLE` and `resolve_flag()` are the authority). A token shorter than its flag's minimum is an **unknown flag**, never guessed at.
+- **The bracket minimums are `--t`, `--exp`, `--rig`, `--ag`, `--pl`, `--sh`, `--rew`** — this is what `resolve-type.sh` actually accepts (its `FLAG_TABLE` and `resolve_flag()` are the authority). A token shorter than its flag's minimum is an **unknown flag**, never guessed at.
 - **Why `--rig` and not `--r`,** even though `--rigor` is the only `r`-initial flag left and `--r` would parse unambiguously: a stale `--r`/`--ref` typed from muscle memory must ERROR rather than silently resolve to a different axis. This is deliberate.
 - **Why `--pl` and not `--p`:** `--plan` and `--pipeline` collide on `--p`, so neither may shorten to it; `--pl`/`--pi` each uniquely prefix their flag.
+- **Why `--rew` and not `--re`:** `--rework` and `--rigor` share the `--r` prefix space, so both carry a 5-character minimum and `-r` stays `--rigor`'s alone; `--rework` has no single-dash alias.
 - **`-s` and `-p` are deliberately unassigned.** `--ship`, `--plan`, and `--pipeline` have no single-dash alias — don't invent one; the resolver rejects it.
-- **`--pipeline` and `--ship` are internal-only and never appear as a row in this table.** A type IS its pipeline, so `--pipeline` is **locked**: recognized only in order to be **rejected** with a plain error naming the type's actual pipeline, never treated as an unknown flag. `dae map --pipeline build` is a category error, not a customization. `--ship` is locked the same way and for the same reason: recognized only in order to be rejected, never treated as an unknown flag. No row has a legitimate second ship value — `map` is the chat one; wanting a document means using `analyze`; chat is meaningless for a build, docs, diagnose, or sync run. A per-row `require|optional|forbid` policy would imply some row wants the choice, and none does.
-- **Override tiers:** `--explore` and `--rigor` are **free** (cost/quality dials; an override can never produce an incoherent run — this is the escape hatch that keeps types from proliferating); `--against` and `--plan` are **constrained** (validated mechanically at parse time, before setup); `--pipeline` and `--ship` are **locked**. Types are the API; axes are internals. `--ship` sits with `--pipeline`, not in the free tier, precisely because the free tier's own definition is that an override can never produce an incoherent run — `dae feature --ship chat` would be a build run that does not ship, which is incoherent.
+- **`--pipeline` alone is locked.** A type IS its pipeline, so `--pipeline` is recognized only in order to be **rejected** with a plain error naming the type's actual pipeline, never treated as an unknown flag. `dae map --pipeline build` is a category error, not a customization. **`--ship` is constrained per row, not locked** — it returned to the flag table after a short-lived reversal: `report-pipeline-and-locations-08-26-26` §1.2 (commit `5108f1d`) locked it, on the reasoning that no row wanted a second ship value; that reasoning is superseded here. The real defect the lock fixed was that `dae feature --ship chat` was accepted — a build run that does not ship, which is incoherent — and per-row legality fixes that defect exactly, without taking the choice away from the two rows (`map`, `analyze`) where it is legitimate.
+- **Override tiers:** `--explore` and `--rework` are **free** (cost/quality dials; an override can never produce an incoherent run — this is the escape hatch that keeps types from proliferating); `--against`, `--plan`, and `--ship` are **constrained** (validated mechanically at parse time, before setup); `--pipeline` alone is **locked**. Types are the API; axes are internals. `--ship` sits in the constrained tier, not the free one, precisely because coherence is row-dependent: legal on `map`/`analyze`, incoherent on a build — naming a value a row doesn't allow is still an error, so the free tier's unconditional guarantee doesn't hold for it.
+- **`--rework` is a build DIAL, not a sixth axis.** There are still five axes (see above, and the type-selection intro below). Rework is a *persistence budget* — how many times a builder may re-dispatch before giving up; rigor is *verification width* — how many cold reviewers judge. The two are orthogonal: a run may raise one without the other.
+- **The `--ship` warn-vs-error rule:** naming the value a row already defaults to is a **warning** and the run continues (worded by whether the row is overridable — "already the default" — or fixed — "`--ship` is fixed on `<type>`; ignoring"); naming a different value the row's `ship:` list allows **applies** it; naming a value the row does not allow is an **error**; a value outside `chat`/`publish` is an error as before.
 - **An unknown flag is an error — say so and stop; never silently ignore one.** `resolve-type.sh` is what enforces this, before setup (see below).
 
 `--worktree`, `--base`, and `--name` are **run continuity**, not axes: they are the router's own, they are NOT passed to `resolve-type.sh`, and `--worktree` in particular is not an anchor — a resume target must point at something *dae* created, while an anchor must point at something git / Jira / the filesystem can resolve.
 
 ## Type selection
 
-Ten types, keyed on `--type`. Columns: pipeline · middle file · planner module · branch prefix · `against` rule · ship default.
+Eleven types, keyed on `--type`. Columns: pipeline · middle file · planner module · branch prefix · `against` rule · ship (a single value is fixed; `a | b` is overridable, first = default).
 
 | `--type` | pipeline | middle file | planner module | branch | `against` | ship |
 |---|---|---|---|---|---|---|
-| `feature` (default) | `build` | `build.md` | `plan-feature` | `feature/` | forbid | publish |
+| `feature` (default) | `build` | `build.md` | `plan-feature` | `feature/` | optional | publish |
 | `bugfix` (alias `bug`) | `build` | `build.md` | `plan-bugfix` | `bug/` | optional | publish |
 | `hotfix` | `build` | `build.md` | `plan-bugfix` + minimal-scope | `hotfix/` | optional | publish |
-| `migration` | `build` | `build.md` | `plan-migration` | `feature/` | forbid | publish |
+| `migration` | `build` | `build.md` | `plan-migration` | `feature/` | optional | publish |
 | `rework` | `build` | `build.md` | `plan-rework` | `feature/` | require | publish |
+| `live` (alias `adhoc`) | `live` | `live.md` | `plan-live` | `feature/` | optional | publish |
 | `diagnose` (aliases `debug`, `triage`) | `plan` | `diagnose.md` | `plan-diagnosis` | `bug/` | optional | publish |
 | `sync` | `plan` | `sync.md` | `plan-reconcile` | `sync/` | require | publish |
-| `map` | `report` | `report.md` | — | — | forbid | chat |
-| `analyze` | `report` | `report.md` | — | `docs/` | forbid | publish |
+| `map` | `report` | `report.md` | — | — | forbid | chat \| publish |
+| `analyze` | `report` | `report.md` | — | `docs/` | forbid | publish \| chat |
 | `document` (alias `doc`) | `docs` | `document.md` | — | `docs/` | forbid | publish |
 
 - **`pipeline: plan` resolves to `diagnose.md` or `sync.md` by PLANNER MODULE, never by type name** — two files until a third plan-pipeline type appears.
 - **The alias flips are breaking and intentional:** `debug` and `triage` now route to **`diagnose`** (they used to reach `bugfix`) — the line is cause-known → `bugfix`, cause-unknown → `diagnose`. And **`map` is its own type**, no longer an alias off `document` — its own pipeline, its own ship profile.
-- **`map` vs `analyze`:** the same pipeline at different presets — `map` is fast (`explore: auto`, `rigor: low`), `analyze` is rigorous (`explore: deep`, `rigor: {explore: med}`). `map` skips the publishing pre/post run steps entirely and answers in chat; `analyze` always publishes. They still differ ONLY in axis values, never in shape, which is why one file serves both.
+- **`map` vs `analyze`:** the same pipeline at different presets — `map` is fast (`explore: auto`, `rigor: low`), `analyze` is rigorous (`explore: deep`, `rigor: {explore: med}`). Each has a default ship mode — `map` defaults to chat, `analyze` defaults to publish — and either can be pushed to the other mode with `--ship`. They still differ ONLY in axis values, never in shape, which is why one file serves both.
+- **`feature` and `migration` now allow `--against`** (`optional`, not `forbid`): a Jira key is a first-class anchor kind, and a local-docs feature or migration run previously had no way to name its ticket. A behavior change on two shipped rows, recorded here rather than left silent.
 - **No control flow keys off a type name.** Every branch in this file and every middle branches on a resolved AXIS value, never on `TYPE`.
 
 **bugfix vs diagnose:** `bugfix` = the cause is known or the user states the defect — plan the fix directly. `diagnose` = the cause is unknown — investigate, rank, gate on the pick, then fix. An ambiguous "X is broken" with an unknown cause classifies as `diagnose`.
+
+**feature vs live:** `feature` = the shape of the work is knowable up front — plan it whole, gate it once, build it in auto mode. `live` = the shape emerges ask by ask — the router stays in conversation, each ask becomes one phase and one lane, and the run ships when the user says ship. "Let's start with X and see" is `live`; a described outcome is `feature`.
 
 ## Type resolution
 
 Before setup, run `~/.claude/hooks/resolve-type.sh` (or the project's `.claude/hooks/` copy) with the type and the axis flags above. It reads the type table `workflows.yaml`, installed next to this file, and prints the resolved axes as `KEY=value` lines on stdout. **The router never interprets `workflows.yaml` itself**, and never re-derives or second-guesses a resolved axis — it consumes exactly what `resolve-type.sh` prints.
 
-The keys, exactly as the script emits them: `TYPE`, `PIPELINE`, `EXPLORE`, `RIGOR_EXPLORE` / `RIGOR_PLAN` / `RIGOR_CODE` / `RIGOR_PR`, `AGAINST_COUNT` (plus `AGAINST_1` … `AGAINST_n` when non-zero), `SHIP`, and `PLANNER` / `BRANCH` / `PLAN` where the row or invocation supplies them. **Absent values are omitted, never emitted empty** — a rigor phase the run does not have, and `PLANNER`/`BRANCH` on rows that have none, simply do not appear; consume the block accordingly.
+The keys, exactly as the script emits them: `TYPE`, `PIPELINE`, `EXPLORE`, `RIGOR_EXPLORE` / `RIGOR_PLAN` / `RIGOR_CODE` / `RIGOR_PR`, `AGAINST_COUNT` (plus `AGAINST_1` … `AGAINST_n` when non-zero), `SHIP`, `REWORK` (only on runs with a `code` phase; omitted, never emitted empty, otherwise), and `PLANNER` / `BRANCH` / `PLAN` where the row or invocation supplies them. **Absent values are omitted, never emitted empty** — a rigor phase the run does not have, and `PLANNER`/`BRANCH` on rows that have none, simply do not appear; consume the block accordingly.
 
-**Non-zero exit = a constraint violation.** Present its plain-language ask to the user and STOP — before setup, before any worktree exists. The error set: `--against` arity against the row's `require|optional|forbid`, `--plan` placement (`pipeline: build` types only), locked `--pipeline`, locked `--ship`, unknown flags, unknown type, malformed table.
+**Non-zero exit = a constraint violation.** Present its plain-language ask to the user and STOP — before setup, before any worktree exists. The error set: `--against` arity against the row's `require|optional|forbid`, `--plan` placement (`pipeline: build` types only), locked `--pipeline`, `--ship` legality against the row's `ship:` list, `--rework` value validation (integer ≥ 1), unknown flags, unknown type, malformed table.
 
-**A stderr warning is not an error.** A rigor entry naming a phase this run does not have is dropped, warned about on stderr, and the run **continues** at exit 0 — surface the warning to the user, never abort on it. (Example: `dae map --rigor pr:high` — a `ship: chat` run has no `pr` phase.)
+**A stderr warning is not an error.** A rigor entry naming a phase this run does not have is dropped, warned about on stderr, and the run **continues** at exit 0 — surface the warning to the user, never abort on it. (Examples: `dae map --rigor pr:high` — a `ship: chat` run has no `pr` phase; `dae map --rework 3` — a `report` pipeline has no `code` phase, so the dial is dropped; `dae feature --ship publish` — `--ship` is fixed on `feature`, so the flag is ignored and the run continues with `SHIP=publish`.)
 
 Anchors are passed through **raw**: resolving them is `resolve-anchor.sh`'s job, invoked only when `AGAINST_COUNT` is non-zero. `--plan` is checked for placement only, never for existence, at this stage.
 
@@ -90,6 +99,7 @@ The router loads only its own `SKILL.md` + the type table + `resolve-type.sh` (+
 |---|---|
 | always | this `SKILL.md`, `workflows.yaml`, `resolve-type.sh` (+ `resolve-config.sh`) |
 | `pipeline: build` | `build.md` |
+| `pipeline: live` | `live.md` |
 | `pipeline: report` | `report.md` |
 | `pipeline: plan` | `diagnose.md` or `sync.md`, by `PLANNER` module |
 | `pipeline: docs` | `document.md` |
@@ -130,7 +140,7 @@ Every `ship: publish` run executes **setup** first and **ship** last; the middle
 - **The plan is amendable at ANY stage.** When the user changes or adds requirements mid-run — any stage, build included — route the change to the warm planner (same plan file, amended in place), re-run `validate-plan.sh` — NOT an installed hook: it ships inside the `review-plan` skill, next to its SKILL.md (`<review-plan skill dir>/scripts/validate-plan.sh`, e.g. `~/.claude/skills/review-plan/scripts/validate-plan.sh`) — and re-gate when the change is material. Undispatched work follows the amended plan; already-merged work the amendment contradicts is flagged to the user, never silently kept or silently redone. Every gate re-reads the plan FILE at verdict time, so a review always judges against the plan as it stands now. A promotion changes the plan's path mid-run, so amendment messages to the warm planner and every later gate invocation must carry the CURRENT path — the current path lives in the progress log and travels in every message; no agent re-derives a path from a slug.
 - **Maintain the progress log.** Rewrite `<run-dir>/progress-log.md` in place at every state change — stage transitions, gate rounds (count + one-line outcome + report path), lane dispatch/merge events, plan amendments, open questions. Record the plan's CURRENT path and its lifecycle state (proposal / active / completed), not just that it exists. Once the draft PR is open, also record its URL, its draft state, and the last pushed commit, so a resume knows a PR already exists rather than opening a second one. All small- and medium-sized run information lands there, not only in chat: it is what a resumed or compacted session reconstructs the run from (with the plan syllabus). Never committed; it lives inside the parent worktree and dies WITH that worktree — so never tear the worktree down while the run is still in flight, and let `cleanup-merged` be what removes it.
 - Only a builder's own e2e phase exits its build loop; gates judge, workers build — you do neither.
-- Your writes are harness-scoped — the plan file and run artifacts, never the product (`scope-writes.sh` enforces this when wired; its allowlist is exactly those paths). This is machine-audited: the PR gate runs `verify-run-scope.sh`, and a product change no builder exit report claims is a blocking finding — a stalled or dead lane is NEVER a license to do its work yourself; respawn per `build-dispatch.md`, and after the bounded respawns escalate to the user. The harness-scoped write allowance already covers the whole resolved plans dir (`verify-run-scope.sh:106` resolves and allows it), so promotion commits inside a run's diff are NOT flagged by the scope check — no script change is implied or needed here.
+- Your writes are harness-scoped — the run's `.artifacts/`, the resolved plans dir, and the resolved docs dir, never the product (`scope-writes.sh` enforces this as a `PreToolUse` hook on `Write|Edit|MultiEdit|NotebookEdit`, self-configured from a parent-worktree marker with no env var; `parent-tree-guard.sh` is its Bash-side companion, `PostToolUse` on `Bash` and `Stop`, catching shell-side product writes a tool-level hook can't see). This is machine-audited: the PR gate runs `verify-run-scope.sh`, and a product change no builder exit report claims is a blocking finding — a stalled or dead lane is NEVER a license to do its work yourself; respawn per `build-dispatch.md`, and after the bounded respawns escalate to the user. The harness-scoped write allowance already covers the whole resolved plans dir (`verify-run-scope.sh:106` resolves and allows it), so promotion commits inside a run's diff are NOT flagged by the scope check — no script change is implied or needed here.
 - Pass pointers, not payloads: workers and forks get file paths and short summaries; keep raw dumps out of your context. Surface only blockers, gate verdicts, and completion summaries.
 - Publishing happens ONLY through `push-pr`, across all three stages of a run's ship arc: per D4, `push-pr --stage update` is the ONLY per-lane push mechanism — no direct `git push` from the router, no helper script, no second publisher named anywhere. Never push yourself, never force-push, never push the base branch.
 - An unrecoverable blocker stops the run — bring it to the user, don't improvise around it.
