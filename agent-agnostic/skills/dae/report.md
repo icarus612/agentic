@@ -1,14 +1,14 @@
 # report — the map / analyze workflow (`--type map`, `--type analyze`)
 
-For a question that needs an ANSWER, not a code change: a fast read (`map`) or a rigorous one (`analyze`) over the codebase, delivered as a structured report. The router hands this file the run's already-resolved axes — `explore` depth, the rigor profile (`RIGOR_EXPLORE`, and `RIGOR_PR` when the run has a PR phase), `ship`, and the row's `branch:` prefix where one exists — plus the user's question VERBATIM; this file's job starts after resolution. One file serves both types because `map` and `analyze` are the same pipeline at different presets: they differ ONLY in the axis values their `workflows.yaml` rows set, never in shape. Every branch below is on a resolved axis VALUE (`ship`, `rigor`), never on the type name — that is the only thing keeping the two presets from drifting apart, and it is why this is one file and not two.
+For a question that needs an ANSWER, not a code change: a fast read (`map`) or a rigorous one (`analyze`) over the codebase, delivered as a structured report. The router hands this file the run's already-resolved axes — `explore` depth, the rigor profile (`RIGOR_EXPLORE`, and `RIGOR_PR` when the run has a PR phase), `ship`, and the row's `branch:` prefix — plus the user's question VERBATIM; this file's job starts after resolution. One file serves both types because `map` and `analyze` are the same pipeline at different presets: they differ ONLY in the axis values their `workflows.yaml` rows set, never in shape. Every branch below is on a resolved axis VALUE (`ship`, `rigor`), never on the type name — that is the only thing keeping the two presets from drifting apart, and it is why this is one file and not two.
 
 `map` is a cheap `analyze`: it skips the publishing pre/post run steps entirely. It is cheaper because it
 
 - **explores less** — `explore: auto`, which MAY resolve to SHALLOW; that is intended, not a shortfall, and `map`'s depth is never aligned with `analyze`'s `deep`;
 - **verifies less** — `rigor: low`: one explorer, no committee;
-- **loads none of the publish seam.**
+- **loads none of the publish seam** — true at `map`'s default `ship: chat`; a `map` run pushed to `ship: publish` loads it like any other publish run, because this axis moves with `--ship`, never with the type name.
 
-It is not cheaper because it writes a shorter document — an output-length axis was proposed and rejected, and nothing here reintroduces one by implication. `--explore` remains a free dial on `map` and `analyze` alike, the row value a default rather than a prohibition — exactly what distinguishes it from `ship`, which resolves to the row's value only and accepts no flag at all (see Setup, below).
+It is not cheaper because it writes a shorter document — an output-length axis was proposed and rejected, and nothing here reintroduces one by implication. `--explore` remains a free dial on `map` and `analyze` alike, the row value a default rather than a prohibition — exactly what distinguishes it from `ship`, which is constrained per row: a flag can select among the values the row's own `ship:` list allows, never step outside it (see Setup, below).
 
 ## Stages
 

@@ -5,7 +5,7 @@
 #   bash tests/resolve-scratch.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/resolve-scratch.sh — the
+#   Blind contract test for agent-agnostic/hooks/resolve-scratch.sh — the
 #   report-scratch-dir resolver for a `ship: chat` run (contracts/l2.md §A):
 #   the four-scope CLAUDE_SCRATCH_DIR chain (rung 1, via resolve-config.sh),
 #   the in-repo default rooted at the MAIN checkout (rung 2), and the
@@ -13,7 +13,7 @@
 #   usage-error surface of --slug / --runid / --root.
 #
 #   Written from contracts/l2.md §A ALONE. This suite NEVER reads
-#   orchestrators/hooks/resolve-scratch.sh's source — no cat, grep, sed, head,
+#   agent-agnostic/hooks/resolve-scratch.sh's source — no cat, grep, sed, head,
 #   or read against it. The only interaction with that file is invoking it as
 #   a black box, plus the case-00 `bash -n` sanity precondition, which runs it
 #   through the parser without inspecting its logic. Every expected path is
@@ -45,7 +45,7 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/resolve-scratch.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/resolve-scratch.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

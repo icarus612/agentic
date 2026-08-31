@@ -222,15 +222,14 @@ Consuming projects adopting Antigravity should create an `.agents/GEMINI.md` fil
 
 - Edit **in this repo first**, never in `~/.claude/` — that's an install, not
   the source.
-- A skill is bound to nothing (`domain: universal` → `orchestrators/` or
-  `agent-agnostic/`) or to exactly one tech (`domain: <tech>` → `tool-based/<tech>/`).
-  There is no third option.
+- A skill is bound to nothing (`domain: universal` → `agent-agnostic/`) or to exactly
+  one tech (`domain: <tech>` → `tool-based/<tech>/`). There is no third option.
 - Every skill declares `description`, `domain`, `model` + `model-fallback`, and
   `rules:`.
 - Keep rules short and frontmatter-light — they're always-on context.
 - Never let a skill or rule name a directory in this repo.
 - A new `--type` row is judged against the four standing review rules in
-  [`orchestrators/AGENTS.md`](../orchestrators/AGENTS.md#review-rules-for-future-types)
+  [`agent-agnostic/AGENTS.md`](../agent-agnostic/AGENTS.md#review-rules-for-future-types)
   — loops attach to axis values, never to type names; the seam rule; the
   carried invariants; `pipeline` is not an array. Not repeated here.
 - Distribution is deliberately copy-paste, not symlinks or a setup script, so it

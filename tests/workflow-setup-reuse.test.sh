@@ -5,7 +5,7 @@
 #   bash tests/workflow-setup-reuse.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/workflow-setup.sh's --reuse
+#   Blind contract test for agent-agnostic/hooks/workflow-setup.sh's --reuse
 #   guard (contracts/l7.md, subphase 2.3): the [ -e "$path" ] check at :142
 #   must become --reuse-aware so a surviving *worktree* (not just a surviving
 #   *branch*) can be adopted after a crashed lane, guarded by a decision
@@ -30,7 +30,7 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/workflow-setup.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/workflow-setup.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

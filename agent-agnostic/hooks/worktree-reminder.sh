@@ -9,7 +9,7 @@
 #   block session start (code.claude.com/docs/en/hooks.md) — there is no
 #   sandboxing mechanism. The best a hook can do is inject additionalContext
 #   that the model reads and must voluntarily act on, exactly like the
-#   existing skill-driven `cd` pattern (see orchestrators/hooks/workflow-setup.sh).
+#   existing skill-driven `cd` pattern (see agent-agnostic/hooks/workflow-setup.sh).
 #   This hook makes that expectation apply to EVERY session, not just ones
 #   that invoke an orchestrator skill (dae) — see
 #   artifact-locations and push-policy.

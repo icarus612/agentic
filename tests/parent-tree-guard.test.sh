@@ -5,7 +5,7 @@
 #   bash tests/parent-tree-guard.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/parent-tree-guard.sh (Packet
+#   Blind contract test for agent-agnostic/hooks/parent-tree-guard.sh (Packet
 #   2, subphase 4.2): a PostToolUse/Stop hook that walks up from the JSON
 #   payload's "cwd" (or the process's actual $PWD if cwd is missing/the
 #   payload can't be parsed) looking for an ancestor directory containing
@@ -19,7 +19,7 @@
 #   offending path on stderr.
 #
 #   Written from the contract text alone. Never reads
-#   orchestrators/hooks/parent-tree-guard.sh's source, in any mode -- nor
+#   agent-agnostic/hooks/parent-tree-guard.sh's source, in any mode -- nor
 #   scope-writes.sh's or verify-scope.sh's. resolve-config.sh IS read and
 #   shelled out to (a pattern/tool, not the implementation under test) to
 #   learn the real resolved plans/docs dirs for fixtures.
@@ -37,8 +37,8 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/parent-tree-guard.sh"
-RESOLVE_CONFIG="$REPO_ROOT/orchestrators/hooks/resolve-config.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/parent-tree-guard.sh"
+RESOLVE_CONFIG="$REPO_ROOT/agent-agnostic/hooks/resolve-config.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping
@@ -108,7 +108,7 @@ resolved_docs_dir() {
 # new_parent_worktree -- prints a fresh scratch dir path: git init'd, one
 # baseline commit (README.md, a committed .gitignore containing
 # `.artifacts/` -- the real repo's own convention per artifact-locations --
-# and an ordinary tracked product file under orchestrators/hooks/), then the
+# and an ordinary tracked product file under agent-agnostic/hooks/), then the
 # .artifacts/progress-log.md marker created (untracked -- the hook detects
 # the marker by file EXISTENCE via -f, not via git, per the contract's
 # fixture-construction note).
@@ -125,8 +125,8 @@ new_parent_worktree() {
   git_init_repo "$dir"
   printf '# fixture repo\n' >"$dir/README.md"
   printf '.artifacts/\n' >"$dir/.gitignore"
-  mkdir -p "$dir/orchestrators/hooks"
-  printf 'echo baseline\n' >"$dir/orchestrators/hooks/some-file.sh"
+  mkdir -p "$dir/agent-agnostic/hooks"
+  printf 'echo baseline\n' >"$dir/agent-agnostic/hooks/some-file.sh"
   commit_all "$dir" "baseline"
   mkdir -p "$dir/.artifacts"
   printf 'baseline progress\n' >"$dir/.artifacts/progress-log.md"
@@ -192,13 +192,13 @@ case02() {
   local label="02: modified tracked product file -> exit 2, stderr names it"
   local wt
   wt=$(new_parent_worktree)
-  printf 'echo modified\n' >"$wt/orchestrators/hooks/some-file.sh"
+  printf 'echo modified\n' >"$wt/agent-agnostic/hooks/some-file.sh"
   run_guard "$wt"
   if [ "$CODE" -ne 2 ]; then
     fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
     return
   fi
-  if ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/some-file.sh"; then
+  if ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/some-file.sh"; then
     fail "$label -> stderr contains the literal path" "err=[$ERR]"
     return
   fi
@@ -213,13 +213,13 @@ case03() {
   local label="03: untracked product file -> exit 2, stderr names it"
   local wt
   wt=$(new_parent_worktree)
-  printf 'echo brand new\n' >"$wt/orchestrators/hooks/new-file.sh"
+  printf 'echo brand new\n' >"$wt/agent-agnostic/hooks/new-file.sh"
   run_guard "$wt"
   if [ "$CODE" -ne 2 ]; then
     fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
     return
   fi
-  if ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/new-file.sh"; then
+  if ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/new-file.sh"; then
     fail "$label -> stderr contains the literal path" "err=[$ERR]"
     return
   fi
@@ -288,8 +288,8 @@ case06() {
   wt=$(new_scratch)
   git_init_repo "$wt"
   printf '# fixture repo\n' >"$wt/README.md"
-  mkdir -p "$wt/orchestrators/hooks"
-  printf 'echo baseline\n' >"$wt/orchestrators/hooks/some-file.sh"
+  mkdir -p "$wt/agent-agnostic/hooks"
+  printf 'echo baseline\n' >"$wt/agent-agnostic/hooks/some-file.sh"
   printf '.artifacts/\n' >"$wt/.gitignore"
   commit_all "$wt" "baseline with .artifacts/ gitignored"
   mkdir -p "$wt/.artifacts"
@@ -323,13 +323,13 @@ case07() {
   local label="07: git mv rename outside plans/docs -> exit 2, stderr contains the new path"
   local wt
   wt=$(new_parent_worktree)
-  git -C "$wt" mv "orchestrators/hooks/some-file.sh" "orchestrators/hooks/renamed-file.sh"
+  git -C "$wt" mv "agent-agnostic/hooks/some-file.sh" "agent-agnostic/hooks/renamed-file.sh"
   run_guard "$wt"
   if [ "$CODE" -ne 2 ]; then
     fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
     return
   fi
-  if ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/renamed-file.sh"; then
+  if ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/renamed-file.sh"; then
     fail "$label -> stderr contains the new path" "err=[$ERR]"
     return
   fi
@@ -394,7 +394,7 @@ case10() {
   local label_b="10b: empty stdin, \$PWD has no marker in its ancestry -> exit 0 (fallback to \$PWD)"
   local wt no_marker_dir prev_pwd
   wt=$(new_parent_worktree)
-  printf 'echo modified\n' >"$wt/orchestrators/hooks/some-file.sh"
+  printf 'echo modified\n' >"$wt/agent-agnostic/hooks/some-file.sh"
 
   prev_pwd=$(pwd)
   local out_f err_f
@@ -408,7 +408,7 @@ case10() {
 
   if [ "$CODE" -ne 2 ]; then
     fail "$label_a" "code=$CODE out=[$OUT] err=[$ERR]"
-  elif ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/some-file.sh"; then
+  elif ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/some-file.sh"; then
     fail "$label_a -> stderr names the path" "err=[$ERR]"
   else
     pass "$label_a"
@@ -439,18 +439,18 @@ case11() {
   local label="11: two product changes (one modified, one untracked) -> exit 2, stderr names both"
   local wt
   wt=$(new_parent_worktree)
-  printf 'echo modified\n' >"$wt/orchestrators/hooks/some-file.sh"
-  printf 'echo new\n' >"$wt/orchestrators/hooks/another-new-file.sh"
+  printf 'echo modified\n' >"$wt/agent-agnostic/hooks/some-file.sh"
+  printf 'echo new\n' >"$wt/agent-agnostic/hooks/another-new-file.sh"
   run_guard "$wt"
   if [ "$CODE" -ne 2 ]; then
     fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
     return
   fi
-  if ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/some-file.sh"; then
+  if ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/some-file.sh"; then
     fail "$label -> stderr names the modified path" "err=[$ERR]"
     return
   fi
-  if ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/another-new-file.sh"; then
+  if ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/another-new-file.sh"; then
     fail "$label -> stderr names the untracked path" "err=[$ERR]"
     return
   fi
@@ -466,14 +466,14 @@ case12() {
   local label="12: Stop-shape payload (stop_hook_active, no tool_name) -> exit 2 on a product change"
   local wt stdin_json
   wt=$(new_parent_worktree)
-  printf 'echo modified\n' >"$wt/orchestrators/hooks/some-file.sh"
+  printf 'echo modified\n' >"$wt/agent-agnostic/hooks/some-file.sh"
   stdin_json=$(printf '{"cwd": "%s", "stop_hook_active": false}' "$wt")
   run_guard "$wt" "$stdin_json"
   if [ "$CODE" -ne 2 ]; then
     fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
     return
   fi
-  if ! printf '%s\n' "$ERR" | grep -qF "orchestrators/hooks/some-file.sh"; then
+  if ! printf '%s\n' "$ERR" | grep -qF "agent-agnostic/hooks/some-file.sh"; then
     fail "$label -> stderr names the path" "err=[$ERR]"
     return
   fi

@@ -6,8 +6,8 @@
 #
 # DESCRIPTION
 #   Blind contract test for the shared claims_from_report exit-report-claims
-#   parser added to orchestrators/hooks/verify-run-scope.sh and
-#   orchestrators/hooks/verify-scope.sh (contracts/l6.md, Packet 1 + Packet 1t).
+#   parser added to agent-agnostic/hooks/verify-run-scope.sh and
+#   agent-agnostic/hooks/verify-scope.sh (contracts/l6.md, Packet 1 + Packet 1t).
 #   Written from the contract text alone. Builds throwaway git-init'd fixture
 #   worktrees under mktemp with real committed changes and synthetic
 #   reports/*-exit.md files, and asserts on exit codes and stdout/stderr
@@ -25,8 +25,8 @@ set -uo pipefail
 # Locate the scripts under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT_RUN="$REPO_ROOT/orchestrators/hooks/verify-run-scope.sh"
-SCRIPT_VERIFY="$REPO_ROOT/orchestrators/hooks/verify-scope.sh"
+SCRIPT_RUN="$REPO_ROOT/agent-agnostic/hooks/verify-run-scope.sh"
+SCRIPT_VERIFY="$REPO_ROOT/agent-agnostic/hooks/verify-scope.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

@@ -6,16 +6,15 @@ technology. That single question also decides where it installs.
 ```
 agentic/
 ├── AGENTS.md                  ← this file
-├── orchestrators/             ← ENTRY POINTS and WORKERS
-│   ├── skills/                dae (/dae — router + workflow siblings), orchestrate (/orchestrate)
-│   ├── hooks/                 workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
-│   │                          sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
-│   └── agents/                planner.md (+ planner/plan-*.md modules), builder.md,
-│                              coder.md, contract-tester.md
-├── agent-agnostic/            ← GLOBAL: bound to no technology
+├── agent-agnostic/            ← GLOBAL: bound to no technology (ENTRY POINTS, WORKERS, and forks/gates)
 │   ├── rules/                 the always-on set (verify-dont-assume, push-policy, …)
-│   ├── skills/                explore, init-workspace, review-*, document-local, push-pr
-│   ├── hooks/                 smart-lint.sh, smart-test.sh, … (wired via settings.json)
+│   ├── skills/                dae (/dae — router + workflow siblings), orchestrate (/orchestrate),
+│   │                          explore, init-workspace, review-*, document-local, push-pr
+│   ├── agents/                planner.md (+ planner/plan-*.md modules), builder.md,
+│   │                          coder.md, contract-tester.md, committee.md
+│   ├── hooks/                 workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
+│   │                          sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
+│   │                          smart-lint.sh, smart-test.sh, … (wired via settings.json)
 │   └── settings/              settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                ← bound to ONE technology or service
 │   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
@@ -37,7 +36,7 @@ thing is bound to:
 | `<tech>` (`svelte`, `django`, `medusa`, `confluence`, …) | one technology or service | this repo | **project level**: the consuming project's `.claude/` / `.agents/` |
 | `<project-name>` (`mythic-made`, …) | one project — its brand tokens, its layout | **that project only** | it's already there |
 
-Everything in `orchestrators/` and `agent-agnostic/` is `domain: universal` — it goes
+Everything in `agent-agnostic/` is `domain: universal` — it goes
 in once, globally, and is available everywhere. Everything under
 `tool-based/<tech>/` is `domain: <tech>` — it ships with the projects that
 actually use that tech, discovered from real manifests, never assumed
@@ -86,6 +85,6 @@ to bindings by `domain:`.
 Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
 every time, mechanically"* → hook.
 
-Guides: [`orchestrators/AGENTS.md`](orchestrators/AGENTS.md) (the dae pipeline,
-the tier model, the workers), [`agent-agnostic/AGENTS.md`](agent-agnostic/AGENTS.md) (the
-global layer), [`tool-based/AGENTS.md`](tool-based/AGENTS.md) (the tech layers).
+Guides: [`agent-agnostic/AGENTS.md`](agent-agnostic/AGENTS.md) (the dae pipeline,
+the tier model, the workers, and the global layer), [`tool-based/AGENTS.md`](tool-based/AGENTS.md)
+(the tech layers).

@@ -52,7 +52,7 @@ jobs:
           resolver=""
           for candidate in \
             ".claude/hooks/resolve-config.sh" \
-            "orchestrators/hooks/resolve-config.sh" \
+            "agent-agnostic/hooks/resolve-config.sh" \
             "$HOME/.claude/hooks/resolve-config.sh"; do
             if [ -f "$candidate" ]; then
               resolver="$candidate"
@@ -60,8 +60,8 @@ jobs:
             fi
           done
           if [ -z "$resolver" ]; then
-            echo "publish-docs: resolve-config.sh not found; tried .claude/hooks/resolve-config.sh, orchestrators/hooks/resolve-config.sh, \$HOME/.claude/hooks/resolve-config.sh" >&2
-            echo "publish-docs: install it from the agentic repo's orchestrators/hooks/resolve-config.sh" >&2
+            echo "publish-docs: resolve-config.sh not found; tried .claude/hooks/resolve-config.sh, agent-agnostic/hooks/resolve-config.sh, \$HOME/.claude/hooks/resolve-config.sh" >&2
+            echo "publish-docs: install it from the agentic repo's agent-agnostic/hooks/resolve-config.sh" >&2
             exit 1
           fi
           echo "publish-docs: using resolver at $resolver" >&2

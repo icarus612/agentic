@@ -5,7 +5,7 @@
 #   bash tests/resolve-anchor.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/resolve-anchor.sh (Packet B,
+#   Blind contract test for agent-agnostic/hooks/resolve-anchor.sh (Packet B,
 #   contracts/l1-slices/pbt.md, sections B-1 through B-5). Written from the
 #   contract text alone; NEVER reads resolve-anchor.sh's source. Covers the
 #   26 cases enumerated in the contract: per-kind classification (plan /
@@ -32,7 +32,7 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/resolve-anchor.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/resolve-anchor.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

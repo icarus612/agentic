@@ -18,7 +18,7 @@
 #
 #   The extracted block is executed with:
 #     - PR_REVIEW exported to the fixture path under test,
-#     - PATH prefixed with <REPO_ROOT>/orchestrators/hooks so the bare names
+#     - PATH prefixed with <REPO_ROOT>/agent-agnostic/hooks so the bare names
 #       `validate-report.sh` and `report-verdict.sh` resolve to the real
 #       scripts in this repo,
 #     - stdin from /dev/null, stdout/stderr captured, exit status recorded.
@@ -53,7 +53,7 @@ set -uo pipefail
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_MD="$REPO_ROOT/agent-agnostic/skills/push-pr/SKILL.md"
-HOOKS_DIR="$REPO_ROOT/orchestrators/hooks"
+HOOKS_DIR="$REPO_ROOT/agent-agnostic/hooks"
 REPORT_VERDICT="$HOOKS_DIR/report-verdict.sh"
 MARKER='<!-- pr-gate-check -->'
 

@@ -5,7 +5,7 @@
 #   bash tests/sync-install-settings-merge.test.sh
 #
 # DESCRIPTION
-#   Contract test for the settings.json unit of orchestrators/hooks/sync-install.sh.
+#   Contract test for the settings.json unit of agent-agnostic/hooks/sync-install.sh.
 #   That unit is MERGED rather than copied, because Claude Code writes to the
 #   live file during normal use (`/model` persists "model"; "always allow"
 #   appends to permissions.allow) and a whole-file copy clobbers it.
@@ -29,7 +29,7 @@
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/sync-install.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/sync-install.sh"
 
 PASS=0; FAIL=0; SCRATCH=()
 cleanup() { local d; for d in "${SCRATCH[@]:-}"; do [ -n "$d" ] && rm -rf "$d"; done; }
@@ -44,9 +44,9 @@ check(){ [ "$2" = "$3" ] && ok "$1" || bad "$1" "expected '$3', got '$2'"; }
 # make_repo <source-json> -> prints repo path
 make_repo() {
   local d; d=$(mktemp -d); SCRATCH+=("$d")
-  mkdir -p "$d/agent-agnostic/rules" "$d/orchestrators/hooks" "$d/agent-specific/claude"
+  mkdir -p "$d/agent-agnostic/rules" "$d/agent-agnostic/hooks" "$d/agent-specific/claude"
   printf '%s\n' "$1" > "$d/agent-specific/claude/settings.json"
-  cp "$SCRIPT" "$d/orchestrators/hooks/sync-install.sh"
+  cp "$SCRIPT" "$d/agent-agnostic/hooks/sync-install.sh"
   git -C "$d" -c init.defaultBranch=main init -q
   git -C "$d" -c user.email=t@t -c user.name=t add -A >/dev/null 2>&1
   git -C "$d" -c user.email=t@t -c user.name=t commit -qm init >/dev/null 2>&1
@@ -60,8 +60,8 @@ make_home() {
   echo "$d"
 }
 
-run_sync()  { ( cd "$1" && bash orchestrators/hooks/sync-install.sh --claude --home "$2" --full 2>&1 ); }
-run_check() { ( cd "$1" && bash orchestrators/hooks/sync-install.sh --claude --home "$2" --check 2>&1 ); }
+run_sync()  { ( cd "$1" && bash agent-agnostic/hooks/sync-install.sh --claude --home "$2" --full 2>&1 ); }
+run_check() { ( cd "$1" && bash agent-agnostic/hooks/sync-install.sh --claude --home "$2" --check 2>&1 ); }
 jget()      { python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(eval(sys.argv[2]))" "$1" "$2"; }
 
 SRC='{
@@ -124,7 +124,7 @@ for t in bash env sh git diff mv rm find sort sed awk cut basename dirname mkdir
          cp printf grep wc tr cat ls mktemp head tail rmdir readlink; do
   p=$(command -v "$t" 2>/dev/null) && ln -sf "$p" "$fakebin/$t"
 done
-out=$( cd "$repo3" && PATH="$fakebin" bash orchestrators/hooks/sync-install.sh --claude --home "$home3" --full 2>&1 )
+out=$( cd "$repo3" && PATH="$fakebin" bash agent-agnostic/hooks/sync-install.sh --claude --home "$home3" --full 2>&1 )
 case "$out" in *"REFUSING to sync settings.json"*) ok "C9 refuses when python3 is unavailable" ;;
   *) bad "C9 refuses when python3 is unavailable" "output was: $out" ;; esac
 check "C9 live install untouched by the refusal" \

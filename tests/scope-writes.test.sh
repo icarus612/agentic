@@ -5,7 +5,7 @@
 #   bash tests/scope-writes.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/scope-writes.sh (Packet 1,
+#   Blind contract test for agent-agnostic/hooks/scope-writes.sh (Packet 1,
 #   4.1): a PreToolUse hook that reads a JSON tool-call payload on stdin and
 #   decides whether a write-shaped tool call (Write/Edit/NotebookEdit, plus
 #   documented Antigravity aliases) targets an out-of-scope location under a
@@ -16,7 +16,7 @@
 #
 #   All fixtures are throwaway mktemp -d directories, cleaned up on exit via
 #   trap. The plans-dir and docs-dir ALLOW cases resolve their roots via the
-#   real orchestrators/hooks/resolve-config.sh (a tool, not the implementation
+#   real agent-agnostic/hooks/resolve-config.sh (a tool, not the implementation
 #   under test) rather than hardcoding this repo's configured defaults.
 #
 # EXIT CODES
@@ -31,8 +31,8 @@ set -uo pipefail
 # Locate the scripts relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/scope-writes.sh"
-RESOLVE_SCRIPT="$REPO_ROOT/orchestrators/hooks/resolve-config.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/scope-writes.sh"
+RESOLVE_SCRIPT="$REPO_ROOT/agent-agnostic/hooks/resolve-config.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping
@@ -170,7 +170,7 @@ case01() {
   local label="01: Write to out-of-scope path under marked parent -> deny"
   local parent target payload
   parent=$(new_marked_worktree)
-  target="$parent/orchestrators/hooks/foo.sh"
+  target="$parent/agent-agnostic/hooks/foo.sh"
   payload=$(printf '{"tool_name": "Write", "file_path": "%s"}' "$target")
   run_hook "$payload"
   if [ "$CODE" -ne 2 ]; then
@@ -258,7 +258,7 @@ case05() {
   local label="05: Write under an unmarked tree (child-worktree stand-in) -> allow"
   local child target payload
   child=$(new_unmarked_tree)
-  target="$child/sub/dir/orchestrators/hooks/foo.sh"
+  target="$child/sub/dir/agent-agnostic/hooks/foo.sh"
   payload=$(printf '{"tool_name": "Write", "file_path": "%s"}' "$target")
   run_hook "$payload"
   if [ "$CODE" -ne 0 ]; then
@@ -296,7 +296,7 @@ case06
 case07() {
   local parent target
   parent=$(new_marked_worktree)
-  target="$parent/orchestrators/hooks/foo.sh"
+  target="$parent/agent-agnostic/hooks/foo.sh"
 
   local payload
   payload=$(printf '{"tool_name": "Read", "file_path": "%s"}' "$target")
@@ -334,7 +334,7 @@ case08() {
   local label="08: Antigravity alias (write_to_file/TargetFile) out-of-scope -> deny"
   local parent target payload
   parent=$(new_marked_worktree)
-  target="$parent/orchestrators/hooks/aliased.sh"
+  target="$parent/agent-agnostic/hooks/aliased.sh"
   payload=$(printf '{"tool_name": "write_to_file", "TargetFile": "%s"}' "$target")
   run_hook "$payload"
   if [ "$CODE" -ne 2 ]; then
@@ -387,7 +387,7 @@ case11() {
   local label="11: Edit tool, out-of-scope file_path -> deny"
   local parent target payload
   parent=$(new_marked_worktree)
-  target="$parent/orchestrators/hooks/edited.sh"
+  target="$parent/agent-agnostic/hooks/edited.sh"
   payload=$(printf '{"tool_name": "Edit", "file_path": "%s"}' "$target")
   run_hook "$payload"
   if [ "$CODE" -ne 2 ]; then
@@ -410,7 +410,7 @@ case12() {
   local label="12: NotebookEdit tool, out-of-scope notebook_path -> deny"
   local parent target payload
   parent=$(new_marked_worktree)
-  target="$parent/orchestrators/hooks/notebook.ipynb"
+  target="$parent/agent-agnostic/hooks/notebook.ipynb"
   payload=$(printf '{"tool_name": "NotebookEdit", "notebook_path": "%s"}' "$target")
   run_hook "$payload"
   if [ "$CODE" -ne 2 ]; then

@@ -6,15 +6,15 @@
 #
 # DESCRIPTION
 #   Invoked by the push-main skill (step 4) right after a push lands, NOT a hook.
-#   Universal-domain content is everything under agent-agnostic/ and orchestrators/;
+#   Universal-domain content is everything under agent-agnostic/;
 #   tool-based/ (tech-bound) and this repo's own .claude/ (project-scoped) are
 #   never synced. Mapping, per the source-push-sync rule:
 #
-#     {agent-agnostic,orchestrators}/skills/<name>/**  -> ~/.claude/skills/<name>/   (whole directory)
-#     {agent-agnostic,orchestrators}/hooks/<file>      -> ~/.claude/hooks/<file>
-#     {agent-agnostic,orchestrators}/rules/<name>.md   -> ~/.claude/rules/<name>.md
-#     orchestrators/agents/<name>.md            -> ~/.claude/agents/<name>.md
-#     orchestrators/agents/<dir>/**             -> ~/.claude/agents/<dir>/    (whole directory)
+#     agent-agnostic/skills/<name>/**  -> ~/.claude/skills/<name>/   (whole directory)
+#     agent-agnostic/hooks/<file>      -> ~/.claude/hooks/<file>
+#     agent-agnostic/rules/<name>.md   -> ~/.claude/rules/<name>.md
+#     agent-agnostic/agents/<name>.md  -> ~/.claude/agents/<name>.md
+#     agent-agnostic/agents/<dir>/**   -> ~/.claude/agents/<dir>/    (whole directory)
 #     agent-specific/claude/settings.json                      -> ~/.claude/settings.json
 #     agent-specific/antigravity/hooks.json                    -> ~/.gemini/config/hooks.json (if --agy)
 #     agent-specific/antigravity/{rules,skills}/**             -> ~/.gemini/config/... (if --agy; never Claude)
@@ -98,8 +98,8 @@ if [ "$agy" = 1 ] || { [ "$claude" = 0 ] && [ "$agy" = 0 ]; }; then targets+=("a
 # --- preconditions ----------------------------------------------------------
 root=$(git rev-parse --show-toplevel 2>/dev/null) || err "not inside a git repository"
 cd "$root"
-[ -d "$root/agent-agnostic" ] && [ -d "$root/orchestrators" ] \
-  || err "source dirs agent-agnostic/ and orchestrators/ not found — run from the agentic repo"
+[ -d "$root/agent-agnostic" ] \
+  || err "source dir agent-agnostic/ not found — run from the agentic repo"
 gitdir=$(git rev-parse --git-dir)
 common=$(git rev-parse --git-common-dir)
 [ "$gitdir" = "$common" ] || err "inside a linked worktree — sync only from the main checkout"
@@ -124,10 +124,10 @@ for TARGET_MODE in "${targets[@]}"; do
     case "$p" in
       agent-specific/antigravity/skills/*/*)                      [ "$TARGET_MODE" = "agy" ] && echo "skills/${p#*/skills/}" ;;
       agent-specific/antigravity/rules/*)                         [ "$TARGET_MODE" = "agy" ] && echo "rules/${p#*/rules/}" ;;
-      agent-agnostic/skills/*/*|orchestrators/skills/*/*) echo "skills/${p#*/skills/}" ;;
-      agent-agnostic/hooks/*|orchestrators/hooks/*)       echo "hooks/${p#*/hooks/}" ;;
-      agent-agnostic/rules/*|orchestrators/rules/*)       echo "rules/${p#*/rules/}" ;;
-      orchestrators/agents/*)                      echo "agents/${p#orchestrators/agents/}" ;;
+      agent-agnostic/skills/*/*)                   echo "skills/${p#*/skills/}" ;;
+      agent-agnostic/hooks/*)                      echo "hooks/${p#*/hooks/}" ;;
+      agent-agnostic/rules/*)                      echo "rules/${p#*/rules/}" ;;
+      agent-agnostic/agents/*)                     echo "agents/${p#agent-agnostic/agents/}" ;;
       agent-specific/claude/settings.json)                        [ "$TARGET_MODE" = "claude" ] && echo "settings.json" ;;
       agent-specific/antigravity/hooks.json)                      [ "$TARGET_MODE" = "agy" ] && echo "hooks.json" ;;
     esac
@@ -144,13 +144,11 @@ for TARGET_MODE in "${targets[@]}"; do
 
   source_of() {
     local unit="$1" cand
-    for cand in "agent-agnostic/$unit" "orchestrators/$unit" \
-                "agent-agnostic/${unit#skills/}" ; do :; done
     case "$unit" in
-      skills/*) for cand in "agent-agnostic/$unit" "orchestrators/$unit" $([ "$TARGET_MODE" = "agy" ] && echo "agent-specific/antigravity/$unit"); do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
-      hooks/*)  for cand in "agent-agnostic/$unit" "orchestrators/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
-      rules/*)  for cand in "agent-agnostic/$unit" "orchestrators/$unit" $([ "$TARGET_MODE" = "agy" ] && echo "agent-specific/antigravity/$unit"); do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
-      agents/*) cand="orchestrators/$unit"; [ -e "$cand" ] && echo "$cand" ;;
+      skills/*) for cand in "agent-agnostic/$unit" $([ "$TARGET_MODE" = "agy" ] && echo "agent-specific/antigravity/$unit"); do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
+      hooks/*)  for cand in "agent-agnostic/$unit"; do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
+      rules/*)  for cand in "agent-agnostic/$unit" $([ "$TARGET_MODE" = "agy" ] && echo "agent-specific/antigravity/$unit"); do [ -e "$cand" ] && { echo "$cand"; return; }; done ;;
+      agents/*) cand="agent-agnostic/$unit"; [ -e "$cand" ] && echo "$cand" ;;
       settings.json) cand="agent-specific/claude/settings.json"; [ "$TARGET_MODE" = "claude" ] && [ -e "$cand" ] && echo "$cand" ;;
       hooks.json)    cand="agent-specific/antigravity/hooks.json"; [ "$TARGET_MODE" = "agy" ] && [ -e "$cand" ] && echo "$cand" ;;
     esac
@@ -231,7 +229,7 @@ PY
   }
 
   all_source_files() {
-    find agent-agnostic orchestrators agent-specific -type f ! -name AGENTS.md ! -name .gitkeep \
+    find agent-agnostic agent-specific -type f ! -name AGENTS.md ! -name .gitkeep \
       \( -path '*/skills/*' -o -path '*/hooks/*' -o -path '*/rules/*' -o -path '*/agents/*' \
          -o -path 'agent-specific/claude/settings.json' -o -path 'agent-specific/antigravity/hooks.json' \) \
       2>/dev/null | sort
@@ -285,7 +283,7 @@ PY
         rel=$(install_path "$q"); [ -n "$rel" ] || continue
         units="$units$(unit_of "$rel")\n"
       done
-    done < <(git diff --name-status "$range" -- agent-agnostic orchestrators agent-specific)
+    done < <(git diff --name-status "$range" -- agent-agnostic agent-specific)
   fi
 
   units=$(printf '%b' "$units" | sort -u | sed '/^$/d')

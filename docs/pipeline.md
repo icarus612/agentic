@@ -1,6 +1,6 @@
 # The dae pipeline
 
-Canonical guide: [`orchestrators/AGENTS.md`](../orchestrators/AGENTS.md). This
+Canonical guide: [`agent-agnostic/AGENTS.md`](../agent-agnostic/AGENTS.md). This
 page is the meta-summary; edit pipeline behavior in the payload files, not here.
 
 **"Pipeline" is used in two senses here — this page's own title is the
@@ -59,7 +59,7 @@ monotonically, ships only when the user says so (see `live.md`).
 
 ## Types (`--type`)
 
-Eleven types over five `pipeline`-axis values, resolving to six middle files
+Twelve types over six `pipeline`-axis values, resolving to seven middle files
 (`pipeline: plan` resolves to `diagnose.md` or `sync.md` by planner module,
 never by type name).
 
@@ -72,6 +72,7 @@ never by type name).
 | `map` | `report` | `report.md` | fast `explore` → fill the report skeleton → chat answer; no planner, no gates, no branch/commit/staged — no worktree either at `rigor: low` |
 | `analyze` | `report` | `report.md` | rigorous `explore` (deep, `rigor: med`) → fill the report skeleton → a published report under the resolved docs root's `reports/` (record/PR stages below); no planner |
 | `document` (alias `doc`) | `docs` | `document.md` | deep `explore` (map on disk) → map-driven record; no planner |
+| `prove` (alias `disprove`) | `proof` | `prove.md` | fix the claim → gather (`explore`, committee at `rigor ≥ med`) → a cold falsification pass (committee at `rigor ≥ med`), mandatory at every rigor tier → verdict written to `proof-skeleton.md`; chat answer or a published record under the resolved docs root's `proofs/`; no planner |
 
 **Alias flips (breaking):** `debug`/`triage` now route to `diagnose` — they
 used to reach `bugfix`; the line is cause-known → `bugfix`, cause-unknown →

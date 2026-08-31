@@ -5,9 +5,8 @@
 `agentic` is a **library** of AI-agent skills, rules, and hooks, not a project
 you run (root [`README.md`](../README.md)). Nothing in it executes on its own;
 consumers install pieces of it into Claude Code's expected locations. The only
-execution surfaces are the shell scripts under `agent-agnostic/hooks/` and
-`orchestrators/hooks/`, which run inside a *consuming* project's sessions, not
-inside this repo.
+execution surfaces are the shell scripts under `agent-agnostic/hooks/`, which run
+inside a *consuming* project's sessions, not inside this repo.
 
 ## The organizing principle: one question
 
@@ -43,21 +42,18 @@ universal skill is an example only; real tech knowledge belongs to a
 agentic/
 ├── README.md                  # pitch, map, install
 ├── AGENTS.md                  # the index (payload)
-├── orchestrators/             # entry points + workers          (domain: universal)
-│   ├── AGENTS.md
-│   ├── skills/                #   dae (router + workflows.yaml type table + middle
-│   │                          #   files + report-skeleton.md), orchestrate
-│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
-│   │                          #   resolve-type.sh, resolve-anchor.sh, sync-install.sh,
-│   │                          #   scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
-│   │                          #   plan-lifecycle.sh, …
-│   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
-│                              #   contract-tester.md, committee.md
-├── agent-agnostic/                   # the global layer                (domain: universal)
+├── agent-agnostic/             # the global layer                (domain: universal)
 │   ├── AGENTS.md
 │   ├── rules/                 #   the always-on set (10)
-│   ├── skills/                #   the 9 tech-agnostic forks/gates
-│   ├── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired)
+│   ├── skills/                #   the 9 tech-agnostic forks/gates, plus dae (router +
+│   │                          #   workflows.yaml type table + middle files +
+│   │                          #   report-skeleton.md) and orchestrate
+│   ├── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired),
+│   │                          #   plus workflow-setup.sh, resolve-config.sh, resolve-type.sh,
+│   │                          #   resolve-anchor.sh, sync-install.sh, scope-writes.sh,
+│   │                          #   mark-syllabus.sh, verify-scope.sh, plan-lifecycle.sh, …
+│   ├── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
+│   │                          #   contract-tester.md, committee.md
 │   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # the tech layers                 (domain: <tech>)
 │   ├── AGENTS.md
@@ -113,7 +109,7 @@ off to" or "is composed with."
   `CLAUDE_DOCS_PUBLISH` is set (`confluence-mode.md`), and resolves the
   request to ONE **type**, whose **pipeline** axis selects a middle file
   (`build.md` / `live.md` / `diagnose.md` / `sync.md` / `report.md` /
-  `document.md` — eleven types across five pipeline values). `map`
+  `document.md` / `prove.md` — twelve types across six pipeline values). `map`
   (`pipeline: report`, `ship: chat`) defaults to answering in chat: explore,
   fill the report skeleton, answer in chat — zero gates, and (per
   `report.md`) no branch, commit, or anything staged — no worktree either at

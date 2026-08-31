@@ -6,7 +6,7 @@
 #
 # DESCRIPTION
 #   Blind contract test for the NEW clean-worktree gate added to
-#   orchestrators/hooks/verify-scope.sh (contracts/l6.md, Packet 4.4). Before
+#   agent-agnostic/hooks/verify-scope.sh (contracts/l6.md, Packet 4.4). Before
 #   any of the script's older "what changed vs. what was reported" comparison
 #   logic runs, the script must now first check `git status --porcelain` on
 #   the worktree and refuse (exit 1, one `UNCOMMITTED: <path>` line per
@@ -22,7 +22,7 @@
 #   git_init_repo / commit_all / run_script / run_script_stdin idioms from
 #   the sibling suite tests/verify-scope-parsing.test.sh (a test of a
 #   different, shared behavior of the same script family). Never reads
-#   orchestrators/hooks/verify-scope.sh's source, nor scope-writes.sh's, nor
+#   agent-agnostic/hooks/verify-scope.sh's source, nor scope-writes.sh's, nor
 #   parent-tree-guard.sh's, in any mode.
 #
 # EXIT CODES
@@ -37,7 +37,7 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT_VERIFY="$REPO_ROOT/orchestrators/hooks/verify-scope.sh"
+SCRIPT_VERIFY="$REPO_ROOT/agent-agnostic/hooks/verify-scope.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

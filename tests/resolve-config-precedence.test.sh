@@ -5,7 +5,7 @@
 #   bash tests/resolve-config-precedence.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/resolve-config.sh's resolution
+#   Blind contract test for agent-agnostic/hooks/resolve-config.sh's resolution
 #   chain (contracts/l1.md, Packet 6 / C9): the $HOME tier reorder that makes
 #   $HOME/.claude/settings.json rank ahead of $HOME/.gemini/config/settings.json,
 #   while leaving the project tiers (<root>/.agents/..., <root>/.claude/...)
@@ -31,7 +31,7 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/resolve-config.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/resolve-config.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

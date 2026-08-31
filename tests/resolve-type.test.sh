@@ -5,9 +5,9 @@
 #   bash tests/resolve-type.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/resolve-type.sh — the dae type
+#   Blind contract test for agent-agnostic/hooks/resolve-type.sh — the dae type
 #   resolver that maps a type (or alias) plus axis flags onto the five axes in
-#   orchestrators/skills/dae/workflows.yaml and prints them as KEY=value lines.
+#   agent-agnostic/skills/dae/workflows.yaml and prints them as KEY=value lines.
 #
 #   Written from the contract text of contracts/l2.md ALONE (§2 the yaml table,
 #   §3.2 the CLI, §3.3 flag/prefix resolution, §3.4 the resolution algorithm,
@@ -24,8 +24,8 @@
 #   substring columns (§3.5, §3.8) make contractual; the surrounding sentence
 #   wording belongs to the implementer. Assertions on stdout use exact-line
 #   matching, and absence of a line is asserted explicitly — an omitted rigor
-#   phase, and map's absent PLANNER=/BRANCH=, are contractually ABSENT rather
-#   than empty.
+#   phase, and map's absent PLANNER= (BRANCH=docs/ is present since 4.1's
+#   defect fix), are contractually ABSENT rather than empty.
 #
 #   Fixture yamls are written into throwaway `mktemp -d` directories and passed
 #   via the contract's internal `--yaml <path>` flag. Nothing is written
@@ -48,7 +48,7 @@ set -uo pipefail
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT="$REPO_ROOT/orchestrators/hooks/resolve-type.sh"
+SCRIPT="$REPO_ROOT/agent-agnostic/hooks/resolve-type.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping
@@ -190,11 +190,12 @@ rm -f /tmp/resolve-type-syntax-err.$$
 # TABLE PARSING (§2.1, §2.3)
 # ===========================================================================
 
-# --- Case 01: all eleven canonical types resolve ----------------------------
+# --- Case 01: all twelve canonical types resolve ----------------------------
 # rework and sync are `against: require` rows (§2.1) and so are given one
-# anchor; every other row is forbid or optional and is given none (live is
-# `against: optional`, so it needs no anchor branch either).
-for t in feature bugfix hotfix migration rework diagnose map analyze document sync live; do
+# anchor; every other row is forbid or optional and is given none (live and
+# prove are both `against: optional`, so neither needs the anchor branch
+# either).
+for t in feature bugfix hotfix migration rework diagnose map analyze document sync live prove; do
   case "$t" in
     rework|sync) run "$t" --against REF ;;
     *)           run "$t" ;;
@@ -234,10 +235,18 @@ ok_lines "02f: live row fidelity (live/auto/publish/plan-live/feature//PATIENCE=
   'TYPE=live' 'PIPELINE=live' 'EXPLORE=auto' 'SHIP=publish' \
   'PLANNER=plan-live' 'BRANCH=feature/' 'PATIENCE=2'
 
-# --- Case 03: map emits no PLANNER= and no BRANCH= -------------------------
+# --- Case 02g: prove row fidelity (contracts/l4.md §1.3) --------------------
+run prove
+ok_lines "02g: prove row fidelity (proof/deep/publish/docs//RIGOR_EXPLORE=med/RIGOR_PR=low)" \
+  'TYPE=prove' 'PIPELINE=proof' 'EXPLORE=deep' 'SHIP=publish' \
+  'BRANCH=docs/' 'RIGOR_EXPLORE=med' 'RIGOR_PR=low'
+no_lines "02g2: prove emits no RIGOR_PLAN=/RIGOR_CODE=/PATIENCE= lines (no plan/code phase, no patience cell)" \
+  '^RIGOR_PLAN=' '^RIGOR_CODE=' '^PATIENCE='
+
+# --- Case 03: map emits no PLANNER=; BRANCH=docs/ is now present (4.1) -----
 run map
-no_lines "03: map emits no PLANNER= and no BRANCH= line (omitted, not empty)" \
-  '^PLANNER=' '^BRANCH='
+no_lines "03a: map emits no PLANNER= line (omitted, not empty)" '^PLANNER='
+ok_lines "03b: map emits BRANCH=docs/ (map's missing-branch defect fix, 4.1)" 'BRANCH=docs/'
 
 # --- Case 04: analyze carries BRANCH=docs/ with SHIP=publish ---------------
 run analyze
@@ -474,7 +483,7 @@ for t in feature bugfix hotfix migration rework diagnose sync live; do
   esac
   ok_lines "23/$t: RIGOR_CODE=low with no override" 'RIGOR_CODE=low'
 done
-for t in map analyze document; do
+for t in map analyze document prove; do
   run "$t"
   no_lines "23/$t: no RIGOR_CODE= line (the pipeline has no code phase)" '^RIGOR_CODE='
 done
@@ -782,11 +791,12 @@ PIPELINE=report
 EXPLORE=auto
 RIGOR_EXPLORE=low
 AGAINST_COUNT=0
-SHIP=chat'
+SHIP=chat
+BRANCH=docs/'
 if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_map" ]; then
-  pass "43b: 'map' stdout is exactly §3.6's block - dropped phases, PLANNER and BRANCH all absent"
+  pass "43b: 'map' stdout is exactly §3.6's block - dropped phases and PLANNER absent, BRANCH=docs/ present (4.1)"
 else
-  fail "43b: 'map' stdout is exactly §3.6's block - dropped phases, PLANNER and BRANCH all absent" \
+  fail "43b: 'map' stdout is exactly §3.6's block - dropped phases and PLANNER absent, BRANCH=docs/ present (4.1)" \
     "code=$CODE out=[$OUT] want=[$expected_map]"
 fi
 no_lines "43b2: 'map' emits no PATIENCE= line (map's row carries no patience: cell)" '^PATIENCE='
@@ -826,6 +836,23 @@ if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_live" ]; then
 else
   fail "43d: 'live' stdout is exactly contracts/l1.md §Round 3's block, in order, with nothing else" \
     "code=$CODE out=[$OUT] want=[$expected_live]"
+fi
+
+# --- Case 43e: prove's whole KEY=value block, verbatim and in order --------
+run prove
+expected_prove='TYPE=prove
+PIPELINE=proof
+EXPLORE=deep
+RIGOR_EXPLORE=med
+RIGOR_PR=low
+AGAINST_COUNT=0
+SHIP=publish
+BRANCH=docs/'
+if [ "$CODE" -eq 0 ] && [ "$OUT" = "$expected_prove" ]; then
+  pass "43e: 'prove' stdout is exactly contracts/l4.md §1.3's block, in order, with nothing else"
+else
+  fail "43e: 'prove' stdout is exactly contracts/l4.md §1.3's block, in order, with nothing else" \
+    "code=$CODE out=[$OUT] want=[$expected_prove]"
 fi
 
 # ===========================================================================
@@ -1436,6 +1463,48 @@ ok_lines "63d: 'live --patience 4' -> PATIENCE=4 (flag overrides the row's patie
 # --- Case 63e: live -a PROJ-123 -> against: optional accepts one anchor ----
 run live -a PROJ-123
 ok_lines "63e: 'live -a PROJ-123' -> AGAINST_COUNT=1, AGAINST_1=PROJ-123 (against: optional)" \
+  'AGAINST_COUNT=1' 'AGAINST_1=PROJ-123'
+
+# ===========================================================================
+# THE PROVE TYPE (contracts/l4.md — Phase 4)
+# ===========================================================================
+
+# --- Case 64a: alias 'disprove' resolves to the canonical 'prove' ----------
+run disprove
+ok_lines "64a: alias 'disprove' resolves to canonical TYPE=prove (not the alias itself)" 'TYPE=prove'
+
+# --- Case 64b: prove --ship chat -> legal override, no RIGOR_PR line -------
+run prove --ship chat
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+line 'SHIP=chat' || bad="$bad missing-line:[SHIP=chat]"
+if out_re '^RIGOR_PR='; then bad="$bad unexpected:[RIGOR_PR=]"; fi
+if err_sub 'warning'; then bad="$bad unexpected-warning"; fi
+if [ -z "$bad" ]; then
+  pass "64b: 'prove --ship chat' -> exit 0, SHIP=chat (legal override), no RIGOR_PR= line, no warning"
+else
+  fail "64b: 'prove --ship chat' -> exit 0, SHIP=chat (legal override), no RIGOR_PR= line, no warning" \
+    "$bad; $(ctx)"
+fi
+
+# --- Case 64c: prove --patience 3 -> warn-and-drop (no code phase) ---------
+run prove --patience 3
+bad=""
+[ "$CODE" -eq 0 ] || bad="exit=$CODE(want 0)"
+err_sub 'warning' || bad="$bad missing-stderr:[warning]"
+err_tok '--patience' || bad="$bad warning-does-not-name-flag:[--patience]"
+err_tok 'prove' || bad="$bad warning-does-not-name-type:[prove]"
+if [ -z "$bad" ]; then
+  pass "64c: 'prove --patience 3' -> exit 0, warning naming --patience and prove, PATIENCE= dropped"
+else
+  fail "64c: 'prove --patience 3' -> exit 0, warning naming --patience and prove, PATIENCE= dropped" \
+    "$bad; $(ctx)"
+fi
+no_lines "64c2: 'prove --patience 3' emits no PATIENCE= line (prove has no code phase)" '^PATIENCE='
+
+# --- Case 64d: prove -a PROJ-123 -> against: optional accepts one anchor ---
+run prove -a PROJ-123
+ok_lines "64d: 'prove -a PROJ-123' -> AGAINST_COUNT=1, AGAINST_1=PROJ-123 (against: optional)" \
   'AGAINST_COUNT=1' 'AGAINST_1=PROJ-123'
 
 # ---------------------------------------------------------------------------

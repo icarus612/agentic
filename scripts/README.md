@@ -40,6 +40,6 @@ or whose base branch isn't `main`, edits those two lists directly in
 ## What else belongs here
 
 `scripts/` is a plausible future home for install tooling. It does **not**
-currently hold any — in particular, `orchestrators/hooks/sync-install.sh`
+currently hold any — in particular, `agent-agnostic/hooks/sync-install.sh`
 does not move here. That script is live and load-bearing for this repo's
 own push flow (`source-push-sync`) and stays where it is.

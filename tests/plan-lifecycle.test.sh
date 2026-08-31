@@ -5,7 +5,7 @@
 #   bash tests/plan-lifecycle.test.sh
 #
 # DESCRIPTION
-#   Blind contract test for orchestrators/hooks/plan-lifecycle.sh, written from
+#   Blind contract test for agent-agnostic/hooks/plan-lifecycle.sh, written from
 #   the contract text alone (contracts/l2.md, Packet 1 + Packet 1t). Builds a
 #   throwaway git-tracked fixture tree under mktemp, exercises every
 #   subcommand's guards and success paths, and asserts on exit codes,
@@ -23,7 +23,7 @@ set -uo pipefail
 # ---------------------------------------------------------------------------
 # Locate the script under test relative to this file's own location.
 # ---------------------------------------------------------------------------
-SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/orchestrators/hooks/plan-lifecycle.sh"
+SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/agent-agnostic/hooks/plan-lifecycle.sh"
 
 # ---------------------------------------------------------------------------
 # Bookkeeping

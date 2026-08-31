@@ -6,7 +6,7 @@
 #
 # DESCRIPTION
 #   A `ship: chat` report run has no branch and no worktree, therefore no
-#   run dir (orchestrators/skills/dae/report.md). Its explore map, committee
+#   run dir (agent-agnostic/skills/dae/report.md). Its explore map, committee
 #   claim files, and report land in a scratch dir instead, resolved across
 #   three rungs, first hit wins:
 #     1. CLAUDE_SCRATCH_DIR, read via resolve-config.sh (the four-scope

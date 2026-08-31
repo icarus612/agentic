@@ -24,15 +24,16 @@ vanish. Nothing inside a skill or rule may reference this repo's layout.
 ```
 agentic/
 ├── AGENTS.md                  # the index — read this first
-├── orchestrators/             # ENTRY POINTS and WORKERS             (domain: universal)
-│   ├── skills/                #   dae (/dae), orchestrate (/orchestrate)
-│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
-│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh
-│   └── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md, contract-tester.md
 ├── agent-agnostic/                   # GLOBAL: bound to no technology       (domain: universal)
+│   │                          #   ENTRY POINTS, WORKERS, and forks/gates all live here
 │   ├── rules/                 #   the always-on set
-│   ├── skills/                #   explore, init-workspace, review-*, document-local, push-pr
-│   ├── hooks/                 #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
+│   ├── skills/                #   dae (/dae), orchestrate (/orchestrate),
+│   │                          #   explore, init-workspace, review-*, document-local, push-pr
+│   ├── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
+│   │                          #   contract-tester.md, committee.md
+│   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
+│   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
+│   │                          #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
 │   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
 ├── tool-based/                # bound to ONE technology              (domain: <tech>)
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
@@ -47,7 +48,7 @@ agentic/
 ## The dae pipeline
 
 `/dae` routes every request to exactly one workflow — the full type list
-lives in [`orchestrators/AGENTS.md`](orchestrators/AGENTS.md) — and drives
+lives in [`agent-agnostic/AGENTS.md`](agent-agnostic/AGENTS.md) — and drives
 two workers through cold gates:
 
 ```
@@ -63,7 +64,7 @@ planner ‖ init-workspace → review-plan ⇄ (human gate, capped)
 Coders never see tests; contract-testers never see implementation — the
 anti-cheating is structural, not disciplinary. Each builder works in its own
 child worktree and merges back into the run's parent branch. Details:
-[`orchestrators/AGENTS.md`](orchestrators/AGENTS.md).
+[`agent-agnostic/AGENTS.md`](agent-agnostic/AGENTS.md).
 
 ## Skills, rules, hooks
 
@@ -83,13 +84,13 @@ every time, mechanically"* → hook.
 
 ## Install
 
-1. Copy `orchestrators/skills/*` and `agent-agnostic/skills/*` (whole directories —
-   several carry sibling files and `scripts/`) into `~/.claude/skills/` (or `~/.gemini/config/skills/`),
-   `orchestrators/agents/*` into `~/.claude/agents/` (or `~/.gemini/config/agents/`), and `agent-agnostic/rules/*`
+1. Copy `agent-agnostic/skills/*` (whole directories — several carry sibling
+   files and `scripts/`) into `~/.claude/skills/` (or `~/.gemini/config/skills/`),
+   `agent-agnostic/agents/*` into `~/.claude/agents/` (or `~/.gemini/config/agents/`), and `agent-agnostic/rules/*`
    into your `CLAUDE.md` context (or `~/.gemini/config/rules/`).
 2. Copy each `tool-based/<tech>/` layer your project uses into that **project's**
    `.claude/` (or `.agents/`).
-3. Hooks (`agent-agnostic/hooks/`, `orchestrators/hooks/`) go to `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) —
+3. Hooks (`agent-agnostic/hooks/`) go to `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) —
    automated by Nix home-manager in this setup; copy them manually otherwise.
 4. Grant the install standing permission in **`~/.claude/settings.json`** (global,
    not a project file) for Claude Code, or wire up `agent-specific/antigravity/hooks.json` for Antigravity. Copying the payload in is not enough: every `Skill`
@@ -148,7 +149,7 @@ every time, mechanically"* → hook.
 
 Distribution is deliberately copy-paste, not symlinks or a setup script, so it
 behaves identically across platforms with zero tooling.
-`orchestrators/hooks/sync-install.sh` automates the universal-domain copy for
+`agent-agnostic/hooks/sync-install.sh` automates the universal-domain copy for
 THIS repo's own working copy to both Claude and Antigravity (accepts `--claude` and `--agy` flags). It is what the repo-local `push-main` skill runs
 after every landing, deletions included.
 
@@ -156,7 +157,7 @@ after every landing, deletions included.
 
 - Edit **here first**, never in `~/.claude/` — that's an install, not the source.
 - A skill in THIS repo is bound to nothing (`domain: universal`, goes in
-  `orchestrators/` or `agent-agnostic/`) or to exactly one tech (`domain: <tech>`, goes
+  `agent-agnostic/`) or to exactly one tech (`domain: <tech>`, goes
   in `tool-based/<tech>/`). A third value, `domain: <project-name>`, exists for
   irreducibly project-local content — but that never lives here, only in the
   project itself.

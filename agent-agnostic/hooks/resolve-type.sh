@@ -130,7 +130,7 @@ join_comma() { # join_comma <item>... -> JOINED (", "-separated; no subshell)
   done
 }
 
-VOCAB_PIPELINE="build plan report docs live"
+VOCAB_PIPELINE="build plan report docs live proof"
 VOCAB_EXPLORE="shallow deep auto"
 VOCAB_SHIP="chat publish"
 VOCAB_AGAINST="require optional forbid"
@@ -430,7 +430,7 @@ has_explore_phase=1; has_plan_phase=0; has_code_phase=0; has_pr_phase=0
 case "$pipeline" in
   build|plan|live) has_plan_phase=1; has_code_phase=1; has_pr_phase=1 ;;
   docs)       has_pr_phase=1 ;;
-  report)     [ "$ship" = "publish" ] && has_pr_phase=1 ;;
+  report|proof) [ "$ship" = "publish" ] && has_pr_phase=1 ;;
 esac
 
 # --- rigor: row default, then the user spec (scalar first, then patches) ----
