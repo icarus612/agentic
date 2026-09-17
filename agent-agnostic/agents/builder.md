@@ -34,4 +34,13 @@ You are a **builder**: the per-chunk mini-orchestrator of the build stage. You r
 
 ## Exit report
 
+**Before you write it, run the teardown hygiene scan** — once, over your whole lane diff:
+
+```sh
+check-diff-hygiene.sh --base "<parent-branch>" --scope all
+```
+
+It enforces two universal rules that are never contingent on your dispatch mentioning them: `no-attribution-trailers` (no `Co-Authored-By`, no session trailer, no session URL) and `minimal-code-comments` (comment only what the code cannot say — no banner comments, no restating the next line; **tests are not exempt**, and a test file that is a quarter comment lines is a violation). A non-zero exit is a defect in YOUR lane: fix it and re-run before reporting. Do not report `success` with a failing scan, and do not record it as a known issue — "nobody told me the comment bar" is not a defence, the rules are always-on context.
+
+
 Commit your lane before writing the exit report — `git status --porcelain` empty. An exit report naming files the branch doesn't actually contain is invalid, and `validate-report.sh` cannot catch it: it reads the report file, not git, so no downstream check catches an uncommitted lane — committing before you report is your own responsibility, not something the caller verifies for you. Your exit report is a FILE first: write `<run-dir>/reports/<lane-id>-exit.md` before returning — a fenced header (`status: success|blocked|needs-input|failed`, your subphase IDs), a `## Files touched` list (every file — the caller verifies it against your real diff before merging your branch), and a `## Evidence` section quoting **each acceptance criterion with the command run and observed output that satisfied it** — real runs observed, never assumptions. Run `validate-report.sh --kind exit <report>` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy); fix any FAIL before returning. Then return the shared worker envelope (see the conventions doc "Worker return envelope"): `status`; `artifacts[]` = exit report path, contract path, e2e suite path; `next` = merge-back; `blockers[]` = scope gaps or plan issues found. Body: a digest — subphase IDs and the one-line outcome per criterion — the evidence lives in the file, not in your message.

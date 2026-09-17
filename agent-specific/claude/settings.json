@@ -130,6 +130,14 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/no-attribution-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pr-ready-hygiene-guard.sh"
+          },
+          {
+            "type": "command",
             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
             "if": "Bash(git branch:*)"
           },

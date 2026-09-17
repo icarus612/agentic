@@ -61,6 +61,16 @@ validate-report.sh "$PR_REVIEW" | grep -qE 'verdict ready, next proceed'
 ```
 
    If the predicate fails, **refuse**: stop the stage cold — nothing is committed, nothing is pushed, the PR is not flipped from draft to ready. This is a `failed` return, not a silent skip and not an error to route around. Report plainly which of the three conditions missed (missing file, failed `validate-report.sh`, or a last round that isn't ready/proceed), the `pr-review.md` path you checked, and the `validate-report.sh` output. A run whose gate has not passed pushes stragglers through `--stage update`, never through a bypassed `finalize`.
+1b. **Refuse on a hygiene violation.** After the PR-gate check and before any commit or push, run the single end-of-lifecycle scan over the whole branch diff:
+
+```sh
+# exit 0     -> clean; finalize may proceed
+# exit 1     -> refuse: agent attribution or comment noise on the branch
+check-diff-hygiene.sh --base "$BASE" --pr "$PR_NUMBER"
+```
+
+   A violation is a **refusal**, identical in shape to the PR-gate refusal above: stop cold, commit nothing, push nothing, do not flip draft to ready. Report the scan output verbatim and the fix needed. This is belt-and-braces with `pr-ready-hygiene-guard.sh`, which blocks `gh pr ready` at the harness level — the hook is the real enforcement, and it fires whether or not this step was followed. Do not treat a passing scan here as licence to skip the hook, or a blocked hook as a reason to reach for MCP or `gh api`.
+
 2. **Commit last stragglers.** Commit any remaining authorized record stragglers.
 3. **Push.** `git push origin <branch>`, before any PR-state change. Never `--force`, never main or the base branch. Report which of the three push outcomes occurred — a successful push here is what clears any lane cleanups deferred earlier in the run.
 4. **Retry a missing PR, if needed.** If `open-draft` was declined or impossible and `update` never got the chance to retry either, open the draft PR now (same action as `open-draft` step 3) — this is the last retry point; no stage blocks on it.

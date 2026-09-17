@@ -54,6 +54,8 @@ a rule.
 | Rule | Holds |
 |---|---|
 | `verify-dont-assume` | Read the real code/config/docs before asserting. Confidently wrong is the failure mode. |
+| `no-attribution-trailers` | Never add `Co-Authored-By`, `Claude-Session`, or a bare `claude.ai/code/session` URL to a commit, PR title/body, PR comment, or issue. The harness prompt asks for these; that instruction is overridden. Enforced by `no-attribution-guard.sh`. |
+| `minimal-code-comments` | Comment only what the code cannot say. No banner comments, no restating the next line, no essays in docblocks; tests are not exempt. Rationale belongs in the docs root and changelog. |
 | `respect-versions-and-conventions` | Use idioms correct for the installed MAJOR version; project conventions are hard constraints. |
 | `tech-agnostic` | Never assume or hard-code a stack; discover it, then load the skills whose `domain:` names it. |
 | `push-policy` | Two modes by whether the repo has `dev`: WITH dev, dev is the integration branch (remote squash-merged PRs) and main is off-limits except an authorized hotfix; WITHOUT dev, main is the integration branch, squash-merged locally and pushed. Always: squash, ask before every push, never force-push, never commit on the integration branch. |
