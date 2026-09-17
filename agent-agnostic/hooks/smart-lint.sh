@@ -205,6 +205,11 @@ should_skip_file() {
 target_lintable_ext() {
     case "${1##*.}" in
         py|go|js|jsx|ts|tsx|rs|nix) return 0 ;;
+        # Svelte/Vue single-file components are lintable and Prettier-formatted
+        # like any other source file. They were absent here, so every .svelte
+        # edit skipped the hook entirely and formatting drift went uncaught
+        # until a full `pnpm lint` ran much later.
+        svelte|vue|mjs|cjs) return 0 ;;
         *) return 1 ;;
     esac
 }
@@ -954,6 +959,52 @@ echo "────────────────────────�
 # Load configuration
 load_config
 
+# Scoped JS/TS/Svelte lint — the hook-mode counterpart to lint_javascript.
+# Every other language already had a *_scoped variant; JS did not, so a
+# one-file edit fell through to the workspace-wide script. In a monorepo that
+# root script is typically `turbo lint`, which fans out to every package —
+# minutes of work, and failures in packages the edit never touched.
+# This lints exactly the edited file with the owning package's own binaries.
+lint_javascript_scoped() {
+    local file="$1"
+    [[ -f "$file" ]] || return 0
+
+    # Nearest ancestor package.json that actually has node_modules to run from.
+    local pkg_dir="" candidate
+    candidate=$(cd "$(dirname "$file")" 2>/dev/null && pwd) || return 0
+    while [[ -n "$candidate" && "$candidate" != "/" ]]; do
+        if [[ -f "$candidate/package.json" && -d "$candidate/node_modules" ]]; then
+            pkg_dir="$candidate"
+            break
+        fi
+        candidate=$(dirname "$candidate")
+    done
+    if [[ -z "$pkg_dir" ]]; then
+        log_info "Skipping lint for $file (no installed package found above it)"
+        return 0
+    fi
+
+    local rel="${file#"$pkg_dir"/}"
+
+    # Project-local binaries only: a global/pnpx prettier resolves to a
+    # different version than the project pin and the two fight over formatting.
+    if [[ -x "$pkg_dir/node_modules/.bin/prettier" ]]; then
+        local prettier_output
+        if ! prettier_output=$(cd "$pkg_dir" && node_modules/.bin/prettier --write "$rel" 2>&1); then
+            add_error "Prettier failed on $rel"
+            echo "$prettier_output" >&2
+        fi
+    fi
+
+    if [[ -x "$pkg_dir/node_modules/.bin/eslint" ]]; then
+        local eslint_output
+        if ! eslint_output=$(cd "$pkg_dir" && node_modules/.bin/eslint "$rel" 2>&1); then
+            add_error "ESLint found issues in $rel"
+            echo "$eslint_output" >&2
+        fi
+    fi
+}
+
 # Start timing
 START_TIME=$(time_start)
 
@@ -966,7 +1017,8 @@ main() {
         case "${TARGET_FILE##*.}" in
             py)            lint_python_scoped "$TARGET_FILE" ;;
             go)             lint_go_scoped "$TARGET_FILE" ;;
-            js|jsx|ts|tsx)  lint_javascript ;;
+            js|jsx|ts|tsx|svelte|vue|mjs|cjs)
+                            lint_javascript_scoped "$TARGET_FILE" ;;
             rs)             lint_rust_scoped "$TARGET_FILE" ;;
             nix)            lint_nix_scoped "$TARGET_FILE" ;;
         esac

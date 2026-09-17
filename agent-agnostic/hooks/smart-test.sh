@@ -563,10 +563,59 @@ run_javascript_tests() {
     if [[ "$file" =~ \.(test|spec)\.[tj]sx?$ ]]; then
         echo -e "${BLUE}🧪 Running test file directly: $file${NC}" >&2
 
+        # Resolve the package that OWNS this file, and refuse to hand a file
+        # path to a workspace task orchestrator. In a monorepo the hook's cwd is
+        # the repo root, whose `test` script is typically `turbo test` (or nx /
+        # lerna). `pnpm test -- <path>` then expands to `turbo test <path>`, and
+        # turbo parses the path as a TASK NAME -- failing with a confusing
+        # "missing task" error on every edit, for every file.
+        local pkg_dir="" candidate
+        candidate=$(cd "$(dirname "$file")" 2>/dev/null && pwd)
+        while [[ -n "$candidate" && "$candidate" != "/" ]]; do
+            if [[ -f "$candidate/package.json" ]] \
+               && jq -e '.scripts.test' "$candidate/package.json" >/dev/null 2>&1; then
+                # Accept only a real runner; skip orchestrator scripts.
+                if ! jq -re '.scripts.test' "$candidate/package.json" \
+                     | grep -qE '(^|[[:space:]/])(turbo|nx|lerna)([[:space:]]|$)'; then
+                    pkg_dir="$candidate"
+                    break
+                fi
+            fi
+            candidate=$(dirname "$candidate")
+        done
+
         local test_output
-        if [[ -f "package.json" ]] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then
+        if [[ -n "$pkg_dir" ]]; then
+            # Pass a path relative to the owning package -- vitest/jest resolve
+            # their filters against their own root, not the repo root.
+            local rel_file="${file#"$pkg_dir"/}"
+
+            # Prefer invoking the runner directly over `<pm> test -- <file>`.
+            # A wrapper script like "test": "pnpm run test:unit -- --run"
+            # swallows the filter through the second `--`, so the whole suite
+            # runs instead of the one file -- correct, but needlessly slow on
+            # every edit. Calling the local binary keeps the filter intact.
+            local runner=""
+            if [[ -x "$pkg_dir/node_modules/.bin/vitest" ]]; then
+                runner="node_modules/.bin/vitest run"
+            elif [[ -x "$pkg_dir/node_modules/.bin/jest" ]]; then
+                runner="node_modules/.bin/jest"
+            fi
+
+            if [[ -n "$runner" ]]; then
+                if ! test_output=$(
+                    cd "$pkg_dir" && $runner "$rel_file" 2>&1); then
+                    echo -e "${RED}❌ Tests failed in $file${NC}" >&2
+                    echo -e "\n${RED}Failed test output:${NC}" >&2
+                    format_test_output "$test_output" "javascript" >&2
+                    return 1
+                fi
+                echo -e "${GREEN}✅ Tests passed in $file${NC}" >&2
+                return 0
+            fi
+
             if ! test_output=$(
-                $pkg_manager test -- "$file" 2>&1); then
+                cd "$pkg_dir" && $pkg_manager test -- "$rel_file" 2>&1); then
                 echo -e "${RED}❌ Tests failed in $file${NC}" >&2
                 echo -e "\n${RED}Failed test output:${NC}" >&2
                 format_test_output "$test_output" "javascript" >&2
