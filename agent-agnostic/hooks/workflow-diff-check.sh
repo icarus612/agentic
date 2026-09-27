@@ -94,22 +94,69 @@ if [ ${#go[@]} -gt 0 ] && command -v go >/dev/null 2>&1; then
 fi
 
 # ---- Python: pytest on changed test files / dirs of changed sources -------
+# Tests may sit inside, beside, or at the root of a package - hence the walk up.
 if [ ${#py[@]} -gt 0 ]; then
   pyrun=""
   if command -v pytest >/dev/null 2>&1; then pyrun="pytest"
   elif command -v python >/dev/null 2>&1 && python -m pytest --version >/dev/null 2>&1; then pyrun="python -m pytest"; fi
   if [ -n "$pyrun" ]; then
+    # depth 2 catches both loose test files and a tests/ subdir one level down.
+    dir_has_tests() {
+      [ -n "$(find "$1" -maxdepth 2 \( -name 'test_*.py' -o -name '*_test.py' \) \
+              -print -quit 2>/dev/null)" ]
+    }
+    # Nearest enclosing tests dir, walking up to and including the repo root.
+    nearest_test_dir() {
+      d=$1
+      while :; do
+        for c in "$d/tests" "$d/test"; do
+          if [ -d "$c" ]; then printf '%s' "${c#./}"; return 0; fi
+        done
+        [ "$d" = "." ] && return 1
+        d=$(dirname "$d")
+      done
+    }
     targets=()
     for f in "${py[@]}"; do
       b=$(basename "$f")
-      case "$b" in test_*.py|*_test.py) targets+=("$f") ;; *) targets+=("$(dirname "$f")") ;; esac
+      case "$b" in
+        test_*.py|*_test.py) targets+=("$f") ;;
+        *)
+          d=$(dirname "$f")
+          if dir_has_tests "$d"; then
+            targets+=("$d")
+          elif t=$(nearest_test_dir "$d"); then
+            targets+=("$t")
+          fi
+          # Nothing above it holds tests -> nothing runnable; add no target.
+          ;;
+      esac
     done
-    uniq_targets=()
-    while IFS= read -r line; do uniq_targets+=("$line"); done \
-      < <(printf '%s\n' "${targets[@]}" | sort -u)
-    targets=("${uniq_targets[@]}")
-    out=$($pyrun -q "${targets[@]}" 2>&1) \
-      || add_fail "pytest ($root)" "$(printf '%s\n' "$out" | tail -30)"
+    if [ ${#targets[@]} -gt 0 ]; then
+      uniq_targets=()
+      while IFS= read -r line; do uniq_targets+=("$line"); done \
+        < <(printf '%s\n' "${targets[@]}" | sort -u)
+      targets=("${uniq_targets[@]}")
+      # Drop a file target already covered by a directory target, or pytest
+      # collects it twice and reports one failure as two.
+      final=()
+      for t in "${targets[@]}"; do
+        skip=""
+        if [ -f "$t" ]; then
+          for u in "${targets[@]}"; do
+            [ -d "$u" ] || continue
+            case "$t" in "$u"/*) skip=1; break ;; esac
+          done
+        fi
+        [ -n "$skip" ] || final+=("$t")
+      done
+      targets=("${final[@]}")
+      out=$($pyrun -q "${targets[@]}" 2>&1); rc=$?
+      # rc 5 is pytest's "no tests collected" - nothing runnable, not a failure.
+      if [ "$rc" -ne 0 ] && [ "$rc" -ne 5 ]; then
+        add_fail "pytest ($root)" "$(printf '%s\n' "$out" | tail -30)"
+      fi
+    fi
   fi
 fi
 
