@@ -3,6 +3,7 @@
 #
 # SYNOPSIS
 #   workflow-setup.sh [--name <name>] [--base <branch>] [--type <type>] [--parent <branch>] [--reuse]
+#   workflow-setup.sh --set-role <orchestrator|planner|builder> [--root <path>]
 #
 # DESCRIPTION
 #   Invoked by orchestrator skills (the dae orchestrator and its workflows),
@@ -15,11 +16,16 @@
 #   <type>/<name> off the base branch, where <type> is one of feature
 #   (default), bug, hotfix, docs, or sync.
 #   For a PARENT worktree it also creates the run dir <worktree>/.artifacts/
-#   (with contracts/ and reports/) and makes sure .gitignore carries an
-#   .artifacts/ entry so it never reaches the product branch — see
-#   run-artifacts. That entry must be COMMITTED to take effect inside a
-#   worktree; if it is not yet committed on the start-point branch, a warning
-#   says so. Child worktrees (--parent) get no run dir; they use the parent's.
+#   (with contracts/ and reports/), seeds <run dir>/progress-log.md and
+#   <run dir>/dae-role (= "orchestrator") when they do not already exist
+#   (idempotent under --reuse — an existing marker is NEVER overwritten), and
+#   makes sure .gitignore carries an .artifacts/ entry so it never reaches the
+#   product branch — see run-artifacts. That entry must be COMMITTED to take
+#   effect inside a worktree; if it is not yet committed on the start-point
+#   branch, a warning says so. Child worktrees (--parent) get no run dir and
+#   no markers; they use the parent's.
+#   A separate --set-role mode (see SYNOPSIS) flips an existing parent
+#   worktree's dae-role marker without touching any worktree.
 #   With --parent <branch>, the worktree is cut off that branch instead of
 #   the base branch — the parent/child scheme: an orchestrator's run
 #   worktree sits on <type>/<name> off base, and each builder lane's child
@@ -48,6 +54,38 @@
 set -uo pipefail
 
 err() { echo "workflow-setup: $*" >&2; exit 1; }
+
+# --- --set-role mode: flip an existing parent worktree's role marker -------
+# A second, mutually-exclusive top-level mode, detected FIRST — before any of
+# the worktree-creation arg parsing below — so it never interferes with
+# normal creation. Lets the router (build.md/live.md/diagnose.md) flip the
+# ALREADY-CREATED parent worktree's role marker when it spawns/returns from
+# the planner. This is a pure marker flip: it never creates, adopts, or
+# touches a worktree, and it does not print the WORKTREE/BRANCH/BASE/REUSED
+# stdout contract used by worktree creation.
+#
+#   workflow-setup.sh --set-role <orchestrator|planner|builder> [--root <path>]
+if [ "${1:-}" = "--set-role" ]; then
+  set_role_token="${2:-}"
+  set_role_root="$PWD"
+  if [ $# -ge 1 ]; then shift; fi
+  if [ $# -ge 1 ]; then shift; fi
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --root) set_role_root="${2:-}"; shift 2 ;;
+      *) err "unknown argument: $1 (usage: workflow-setup.sh --set-role <orchestrator|planner|builder> [--root <path>])" ;;
+    esac
+  done
+  case "$set_role_token" in
+    orchestrator|planner|builder) : ;;
+    *) err "invalid --set-role token '$set_role_token' (must be one of: orchestrator, planner, builder)" ;;
+  esac
+  [ -f "$set_role_root/.artifacts/progress-log.md" ] \
+    || err "no run dir at $set_role_root — --set-role only applies to an existing parent worktree"
+  printf '%s\n' "$set_role_token" > "$set_role_root/.artifacts/dae-role"
+  echo "workflow-setup: role set to '$set_role_token' at $set_role_root/.artifacts/dae-role" >&2
+  exit 0
+fi
 
 # --- args ------------------------------------------------------------------
 name=""
@@ -209,6 +247,25 @@ rundir=""
 if [ -z "$parent" ]; then
   rundir="$path/.artifacts"
   mkdir -p "$rundir/contracts" "$rundir/reports"
+  # Idempotent under --reuse: an existing progress-log.md/dae-role is NEVER
+  # overwritten (byte-for-byte preserved) — an in-flight run's current role
+  # (e.g. mid-planner-spawn) must survive a crash-resume unchanged.
+  if [ ! -f "$rundir/progress-log.md" ]; then
+    {
+      echo "# Run: $name"
+      echo ""
+      echo "- Branch: \`$branch\`"
+      echo "- Base: \`$base\`"
+      echo "- Created: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      echo ""
+      echo "## State"
+      echo ""
+      echo "(not yet started)"
+    } > "$rundir/progress-log.md"
+  fi
+  if [ ! -f "$rundir/dae-role" ]; then
+    printf '%s\n' "orchestrator" > "$rundir/dae-role"
+  fi
 fi
 
 echo "WORKTREE: $(cd "$path" && pwd)"

@@ -3,7 +3,7 @@ name: explore
 description: Shared mapping fork — deep (full project) or shallow (docs/AGENTS.md/README only) exploration, monorepo-aware; writes the full structured map (stack, patterns, conventions, dependency graph) to disk and returns an envelope pointing at it. Invoked by the planner worker as its deep-exploration escalation and by the dae document workflow; not for ad-hoc file searches.
 domain: universal
 context: fork
-rules: [verify-dont-assume, tech-agnostic, artifact-locations, doc-format]
+rules: [verify-dont-assume, tech-agnostic, artifact-locations, run-artifacts, doc-format]
 model: sonnet
 model-fallback: [gemini-pro]
 ---
@@ -23,7 +23,7 @@ You are NOT a mandatory pre-plan phase: the planner explores for itself and call
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), the rigor tier (`low`/`med`/`high`; default `low`), and optionally the output path for the map file. If no output path is given, write the map to the resolved workflows dir (`CLAUDE_WORKFLOWS_DIR` chain per `artifact-locations`, default `.workflows/` — gitignored) as `explore-map-<scope-slug>-<MM-DD-YY>.md`. The map never goes in the plans dir — it is ephemeral like everything else on the workflows side of the split, and a map is not a plan record. At `rigor: med|high` the output path you're handed may instead be a **member** path — write your claims there exactly as you would write the map anywhere else; see "Rigor — orthogonal to mode" below for what that does and doesn't change.
+You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect: the target scope (whole repo, or one app + its dependencies for a monorepo), the mode (AUTO/DEEP/SHALLOW; default AUTO), the rigor tier (`low`/`med`/`high`; default `low`), and optionally the output path for the map file. If no output path is given, write the map to the run dir (`.artifacts/` at the root of the parent worktree, per `run-artifacts`) as `explore-map-<scope-slug>-<MM-DD-YY>.md`. The map never goes in the plans dir — it is ephemeral like everything else on the workflows side of the split, and a map is not a plan record. At `rigor: med|high` the output path you're handed may instead be a **member** path — write your claims there exactly as you would write the map anywhere else; see "Rigor — orthogonal to mode" below for what that does and doesn't change.
 
 ## Modes
 

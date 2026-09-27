@@ -130,6 +130,7 @@ load_config() {
 # ============================================================================
 
 # Check if we have input (hook mode) or running standalone (CLI mode)
+CWD_FROM_PAYLOAD="$PWD"
 if [ -t 0 ]; then
     # No input on stdin - CLI mode
     FILE_PATH="./..."
@@ -145,6 +146,9 @@ else
                   | head -1 | sed -E "s/^\"$1\"[[:space:]]*:[[:space:]]*\"//; s/\"$//" \
                   | sed -E 's/\\(["\\/])/\1/g' || true
             }
+
+            CWD_FROM_PAYLOAD=$(_extract_field cwd)
+            [[ -n "$CWD_FROM_PAYLOAD" ]] || CWD_FROM_PAYLOAD="$PWD"
 
             TOOL_NAME=$(_extract_field tool_name)
             [ -n "$TOOL_NAME" ] || TOOL_NAME=$(_extract_field name)
@@ -181,6 +185,37 @@ else
     esac
 
 fi
+
+# --- blind-role short-circuit -----------------------------------------------
+# coder and contract-tester must never see this hook's suite output (the
+# isolation breach this subphase exists to close) -- exit 0 before running
+# anything. Absent/garbage marker or role -> today's behavior, unchanged
+# (fail open): this is a courtesy skip, not a security boundary, so any
+# resolution problem must fall through to running tests normally, never to
+# a silent skip that looks like a pass.
+smart_test_role() {
+    local dir role
+    dir=$(realpath -m -- "${1:-$PWD}" 2>/dev/null) || dir="${1:-$PWD}"
+    while [ -n "$dir" ]; do
+        if [ -f "$dir/.artifacts/dae-role" ]; then
+            role=$(cat "$dir/.artifacts/dae-role" 2>/dev/null | tr -d '[:space:]') || role=""
+            printf '%s\n' "$role"
+            return 0
+        fi
+        [ "$dir" = "/" ] && break
+        dir=$(dirname -- "$dir")
+    done
+    printf '\n'
+    return 0
+}
+
+ROLE=$(smart_test_role "${CWD_FROM_PAYLOAD:-$PWD}")
+case "$ROLE" in
+    coder|contract-tester)
+        echo "smart-test: role '$ROLE' is blind by design -- skipping (the builder runs the suite at its own join/e2e phases)." >&2
+        exit 0
+        ;;
+esac
 
 # Load configuration
 load_config

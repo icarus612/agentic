@@ -569,6 +569,202 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Fixture helpers for the --base-branch-default git heuristic (case sets 16+).
+# Blind contract test for contracts/l3.md Packet 2: resolve-config.sh's
+# `CLAUDE_BASE_BRANCH --base-branch-default --root <dir>` fallback must use a
+# git heuristic (local branch 'main', else the short name of origin/HEAD,
+# else fail) rather than a hardcoded value. Written from the contract text
+# alone; never reads resolve-config.sh's source.
+#
+# Each helper builds a small throwaway git repo under mktemp -d (via the
+# existing new_scratch, so it follows the same fixture-directory convention
+# as new_home/new_root above). No real network remote is ever used --
+# "origin/HEAD" fixtures are faked entirely with local refs.
+# ---------------------------------------------------------------------------
+
+# new_git_repo_with_main -- a repo with a local branch literally named
+# 'main' and one reachable commit.
+new_git_repo_with_main() {
+  local d
+  d=$(new_scratch)
+  git init -q -b main "$d" >/dev/null 2>&1
+  git -C "$d" -c user.email=test@example.com -c user.name=test \
+    commit --allow-empty -q -m init >/dev/null 2>&1
+  printf '%s' "$d"
+}
+
+# new_git_repo_no_main_origin_head <origin-branch> -- a repo whose initial
+# (and only) local branch is 'trunk', NOT 'main', with
+# refs/remotes/origin/HEAD symbolically pointed at
+# refs/remotes/origin/<origin-branch> (both faked locally with
+# update-ref/symbolic-ref -- no real remote is contacted).
+new_git_repo_no_main_origin_head() {
+  local origin_branch="$1" d sha
+  d=$(new_scratch)
+  git init -q -b trunk "$d" >/dev/null 2>&1
+  git -C "$d" -c user.email=test@example.com -c user.name=test \
+    commit --allow-empty -q -m init >/dev/null 2>&1
+  sha=$(git -C "$d" rev-parse HEAD)
+  git -C "$d" update-ref "refs/remotes/origin/$origin_branch" "$sha" >/dev/null 2>&1
+  git -C "$d" symbolic-ref "refs/remotes/origin/HEAD" \
+    "refs/remotes/origin/$origin_branch" >/dev/null 2>&1
+  printf '%s' "$d"
+}
+
+# new_git_repo_neither -- a real git repo with a reachable commit, but no
+# local 'main' branch and no origin/HEAD set at all.
+new_git_repo_neither() {
+  local d
+  d=$(new_scratch)
+  git init -q -b trunk "$d" >/dev/null 2>&1
+  git -C "$d" -c user.email=test@example.com -c user.name=test \
+    commit --allow-empty -q -m init >/dev/null 2>&1
+  printf '%s' "$d"
+}
+
+# new_non_git_dir -- a plain empty directory, never git init'ed.
+new_non_git_dir() {
+  new_scratch
+}
+
+# ---------------------------------------------------------------------------
+# Case set 16: contract AC1 -- local branch 'main' exists at --root ->
+# resolved value is exactly 'main', exit 0. This case is itself the fixture's
+# positive control per the contract's fixture-requirement section: if 'main'
+# were not really created, this case fails loudly (it is still a valid repo,
+# just the wrong branch, so it cannot silently degenerate into the
+# not-a-repo path).
+# ---------------------------------------------------------------------------
+c16_home=$(new_home)
+c16_root=$(new_git_repo_with_main)
+
+if ! git -C "$c16_root" show-ref --verify --quiet refs/heads/main; then
+  fail "16: fixture precondition -- local branch 'main' exists in c16_root" \
+    "show-ref --verify --quiet refs/heads/main did not succeed on the freshly-built fixture"
+else
+  run_resolve "$c16_home" CLAUDE_BASE_BRANCH --base-branch-default --root "$c16_root"
+  if [ "$CODE" -eq 0 ] && [ "$OUT" = "main" ]; then
+    pass "16: --base-branch-default, local 'main' branch exists at --root -> stdout 'main', exit 0"
+  else
+    fail "16: --base-branch-default, local 'main' branch exists at --root -> stdout 'main', exit 0" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 17: contract AC2 -- no local 'main', but refs/remotes/origin/HEAD
+# is a symbolic ref -> resolved value is the SHORT name of that ref
+# (origin/<branch>, origin/ prefix kept), exit 0. Fixture preconditions
+# (unscored) prove no local 'main' exists and that origin/HEAD really
+# resolves to the expected ref before the scored case trusts the script's
+# success.
+# ---------------------------------------------------------------------------
+c17_home=$(new_home)
+c17_branch="trunk"
+c17_root=$(new_git_repo_no_main_origin_head "$c17_branch")
+
+c17_fixture_ok=1
+if git -C "$c17_root" show-ref --verify --quiet refs/heads/main; then
+  fail "17: fixture precondition -- no local 'main' branch in c17_root" \
+    "show-ref --verify --quiet refs/heads/main unexpectedly succeeded"
+  c17_fixture_ok=0
+fi
+c17_symref=$(git -C "$c17_root" symbolic-ref -q --short refs/remotes/origin/HEAD)
+if [ "$c17_symref" != "origin/$c17_branch" ]; then
+  fail "17: fixture precondition -- origin/HEAD resolves to origin/$c17_branch in c17_root" \
+    "symbolic-ref -q --short refs/remotes/origin/HEAD printed [$c17_symref]"
+  c17_fixture_ok=0
+fi
+
+if [ "$c17_fixture_ok" -eq 1 ]; then
+  run_resolve "$c17_home" CLAUDE_BASE_BRANCH --base-branch-default --root "$c17_root"
+  if [ "$CODE" -eq 0 ] && [ "$OUT" = "origin/$c17_branch" ]; then
+    pass "17: --base-branch-default, no 'main' but origin/HEAD set -> stdout 'origin/$c17_branch', exit 0"
+  else
+    fail "17: --base-branch-default, no 'main' but origin/HEAD set -> stdout 'origin/$c17_branch', exit 0" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 18: contract AC3 -- neither a local 'main' branch nor origin/HEAD
+# exists in a real git repo at --root -> exit 1, empty stdout, non-empty
+# stderr. Fixture preconditions (unscored) prove both are really absent
+# before trusting the scored failure as meaningful.
+# ---------------------------------------------------------------------------
+c18_home=$(new_home)
+c18_root=$(new_git_repo_neither)
+
+c18_fixture_ok=1
+if git -C "$c18_root" show-ref --verify --quiet refs/heads/main; then
+  fail "18: fixture precondition -- no local 'main' branch in c18_root" \
+    "show-ref --verify --quiet refs/heads/main unexpectedly succeeded"
+  c18_fixture_ok=0
+fi
+if git -C "$c18_root" symbolic-ref -q --short refs/remotes/origin/HEAD >/dev/null 2>&1; then
+  fail "18: fixture precondition -- origin/HEAD is not set in c18_root" \
+    "symbolic-ref -q --short refs/remotes/origin/HEAD unexpectedly succeeded"
+  c18_fixture_ok=0
+fi
+
+if [ "$c18_fixture_ok" -eq 1 ]; then
+  run_resolve "$c18_home" CLAUDE_BASE_BRANCH --base-branch-default --root "$c18_root"
+  if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] && [ -n "$ERR" ]; then
+    pass "18: --base-branch-default, no 'main' and no origin/HEAD -> exit 1, empty stdout, non-empty stderr"
+  else
+    fail "18: --base-branch-default, no 'main' and no origin/HEAD -> exit 1, empty stdout, non-empty stderr" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 19: contract AC4 -- --root points at a directory that is not a
+# git repository at all (plain mktemp -d, never git init'ed) -> exit 1,
+# empty stdout, non-empty stderr. Fixture precondition (unscored) proves the
+# directory really is outside any git repo before trusting the script's
+# exit-1 as meaningful.
+# ---------------------------------------------------------------------------
+c19_home=$(new_home)
+c19_root=$(new_non_git_dir)
+
+if git -C "$c19_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  fail "19: fixture precondition -- c19_root is not inside a git repository" \
+    "rev-parse --is-inside-work-tree unexpectedly succeeded on a plain mktemp -d directory"
+else
+  run_resolve "$c19_home" CLAUDE_BASE_BRANCH --base-branch-default --root "$c19_root"
+  if [ "$CODE" -eq 1 ] && [ -z "$OUT" ] && [ -n "$ERR" ]; then
+    pass "19: --base-branch-default, --root is not a git repository -> exit 1, empty stdout, non-empty stderr"
+  else
+    fail "19: --base-branch-default, --root is not a git repository -> exit 1, empty stdout, non-empty stderr" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Case set 20: contract AC5 -- an explicit CLAUDE_BASE_BRANCH value in a
+# settings file still wins over the git heuristic, even in a --root repo
+# where the heuristic would independently succeed and pick a DIFFERENT
+# answer ('main'). Proves the override actually overrides something, not
+# just that it works when the heuristic would have failed anyway.
+# ---------------------------------------------------------------------------
+c20_home=$(new_home)
+c20_root=$(new_git_repo_with_main)
+write_settings_json "$c20_home/.claude/settings.json" "CLAUDE_BASE_BRANCH=explicit-branch-value"
+
+if ! git -C "$c20_root" show-ref --verify --quiet refs/heads/main; then
+  fail "20: fixture precondition -- local branch 'main' exists in c20_root" \
+    "show-ref --verify --quiet refs/heads/main did not succeed on the freshly-built fixture"
+else
+  run_resolve "$c20_home" CLAUDE_BASE_BRANCH --base-branch-default --root "$c20_root"
+  if [ "$CODE" -eq 0 ] && [ "$OUT" = "explicit-branch-value" ]; then
+    pass "20: explicit CLAUDE_BASE_BRANCH in settings wins over the git heuristic even though 'main' exists at --root"
+  else
+    fail "20: explicit CLAUDE_BASE_BRANCH in settings wins over the git heuristic even though 'main' exists at --root" \
+      "code=$CODE out=[$OUT] err=[$ERR]"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"

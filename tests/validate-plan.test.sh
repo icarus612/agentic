@@ -7,26 +7,34 @@
 # DESCRIPTION
 #   Blind contract test for
 #   agent-agnostic/skills/review-plan/scripts/validate-plan.sh (Packet B,
-#   contracts/l7.md, section B-2, against B-1's behaviour / output
-#   additions / acceptance criteria and section 0's shared ask-of-record
-#   schema). Written from the contract text alone; NEVER reads
-#   validate-plan.sh's source.
+#   contracts/l2.md, section B-2, against B-1's behaviour / acceptance
+#   criteria and section 0.1's shared "Ask of record" section schema).
+#   Written from the contract text alone; NEVER reads validate-plan.sh's
+#   source.
 #
-#   Covers cases C1-C12: the new check 6 (ask-of-record schema: existing
-#   path, no-durable-ask statement, missing declaration, dangling path,
-#   the three accepted markups, the two accepted locations, story.md as an
-#   ordinary Form P path, a malformed declaration, one-FAIL-never-a-cascade,
-#   a fully conforming plan's exact OK/INFO output, and usage errors) plus
-#   a regression pass over the five pre-existing checks (syllabus-first,
-#   phase-with-no-subphase, checkbox-with-no-detail, detail-with-no-checkbox,
-#   after: naming a nonexistent id, and a dependency cycle), each fired in
-#   isolation against an otherwise-conforming fixture, and silent against a
-#   fully conforming control.
+#   Checks 1-5 (syllabus-first, phase-has-subphase, checkbox<->detail 1:1,
+#   (after:) targets real, acyclic) are unchanged by this contract, and are
+#   covered here only as a regression pass (case series C9) fired in
+#   isolation against an otherwise-conforming fixture, plus a fully
+#   conforming control.
+#
+#   Check 6 is REPLACED by this contract: the old two-form ask-of-record
+#   POINTER (a backticked path resolved on disk, or a "no durable ask
+#   exists" statement) is retired. The new check looks, in the plan's
+#   PREAMBLE only (everything before the first "## " line), for a markdown
+#   heading (level 3 through 6) whose text contains "ask of record"
+#   case-insensitively, opening a section of one or more dated, verbatim
+#   entries. There is no filesystem resolution of anything inside that
+#   section's text -- none. Cases C1-C8 below cover B-1's 11 numbered
+#   acceptance criteria for this new check, one case per criterion (C9's
+#   regression series absorbs criterion 9; C10 absorbs the INFO-line half of
+#   criterion 11; C11 absorbs criterion 10's usage-error wording).
 #
 #   All fixtures are synthetic plan files written into throwaway `mktemp -d`
-#   scratch dirs, never into this repo. Per the contract's "the awk here is
-#   mawk, exit status is not evidence" convention (Sec 1.3), every case here
-#   asserts on actual stdout/stderr CONTENT, never on exit status alone.
+#   scratch dirs, never into this repo. Per the contract's "the grep here
+#   may be ugrep, the awk may be mawk -- exit status is not evidence"
+#   convention, every case here asserts on actual stdout/stderr CONTENT,
+#   never on exit status alone.
 #
 # EXIT CODES
 #   0  every case passed
@@ -99,6 +107,10 @@ fail_count() {
   printf '%s\n' "$COMBINED" | grep -c '^FAIL:'
 }
 
+first_fail_line() {
+  printf '%s\n' "$COMBINED" | grep '^FAIL:' | head -n1
+}
+
 has_ok() {
   printf '%s\n' "$COMBINED" | grep -q '^OK: plan is structurally valid'
 }
@@ -133,12 +145,16 @@ rm -f /tmp/validate-plan-syntax-err.$$
 # Detail blocks deliberately mix BOTH accepted opening markups within the
 # same fixture (bold lead-in "**N.M:" for phase 1, heading "### N.M --
 # Title" for phase 2) so neither markup style is ever the accidental cause
-# of a pass or a fail.
+# of a pass or a fail on checks 1-5 (unrelated to the ask schema).
 #
-# build_plan <ask-line-or-empty> <placement: preamble|goalscope> <mutation>
+# build_plan <ask-section-block-or-empty> <mutation>
 # Mutations: none | v1_syllabus_not_first | v2_phase_no_subphase |
 #            v3_checkbox_no_detail | v4_detail_no_checkbox |
-#            v5_after_nonexistent | v6_cycle | double_malformed_ask
+#            v5_after_nonexistent | v6_cycle
+#
+# The ask-section block, when non-empty, is inserted verbatim into the
+# PREAMBLE (before "## Phase syllabus", the first "## " section) -- the new
+# schema is preamble-only, so there is no "placement" parameter any more.
 # ---------------------------------------------------------------------------
 
 SYLLABUS_BLOCK='## Phase syllabus
@@ -149,7 +165,9 @@ SYLLABUS_BLOCK='## Phase syllabus
   - [ ] 2.1: First beta thing (after: 1.2)'
 
 GOAL_SCOPE_BLOCK='## Goal & scope
-In scope: the alpha and beta things. Out of scope: everything else.'
+In scope: the alpha and beta things. Out of scope: everything else. The ask
+itself lives in the Ask of record section above; this section only restates
+scope.'
 
 STACK_BLOCK='## Stack & MAJOR versions
 Bash 5, verified from this repo'"'"'s own tooling.'
@@ -174,25 +192,51 @@ None.
 ## Skill mapping
 Not applicable to this fixture.'
 
-build_plan() {
-  local ask_line="$1" placement="$2" mutation="$3"
-  local syllabus="$SYLLABUS_BLOCK"
-  local goalscope="$GOAL_SCOPE_BLOCK"
-  local phase1="$PHASE1_BLOCK"
-  local preamble_ask=""
-  local goalscope_ask=""
+# ---------------------------------------------------------------------------
+# Ask-of-record section fixtures (section 0.1's new schema).
+# ---------------------------------------------------------------------------
 
-  if [ -n "$ask_line" ]; then
-    if [ "$placement" = "preamble" ]; then
-      preamble_ask="
-$ask_line
-"
-    else
-      goalscope="## Goal & scope
-In scope: the alpha and beta things. Out of scope: everything else.
-$ask_line"
-    fi
-  fi
+# A fully conforming section: level-3 heading, one dated verbatim entry.
+ASK_SECTION_L3='### Ask of record
+
+**09-01-26:** Build a small tool that validates project plans against the
+contract shape described in this fixture, exactly as requested, verbatim.'
+
+# A fully conforming section using the OTHER end of the accepted heading
+# range (level 6), to prove the whole 3-6 span is tolerated, not just 3.
+ASK_SECTION_L6='###### Ask of record
+
+**09-01-26:** Build a small tool that validates project plans against the
+contract shape described in this fixture, exactly as requested, verbatim.'
+
+# Heading present, but nothing except blank lines follows it before the
+# preamble ends (i.e. before "## Phase syllabus").
+ASK_SECTION_HEADING_ONLY='### Ask of record
+
+'
+
+# A conforming section whose entry text happens to mention a file path that
+# does not exist anywhere on disk. Proves check 6 never resolves it.
+ASK_SECTION_DANGLING_PATH='### Ask of record
+
+**09-01-26:** See `.artifacts/the-ask.md` for background; the verbatim ask
+text is captured right here regardless of whether that file exists on disk.'
+
+# The OLD, now-retired one-line pointer style: a bold lead-in with no
+# heading at all. Under the new schema this must FAIL (no heading to find).
+ASK_SECTION_OLD_STYLE='**Ask of record:** `/some/nonexistent/path/the-ask.md`'
+
+# Two distinct "ask of record" heading lines, each with nothing of
+# substance around it -- both malformed/empty.
+ASK_SECTION_DOUBLE_MALFORMED='### Ask of record
+
+### Ask of record
+'
+
+build_plan() {
+  local ask_section="$1" mutation="$2"
+  local syllabus="$SYLLABUS_BLOCK"
+  local phase1="$PHASE1_BLOCK"
 
   case "$mutation" in
     v2_phase_no_subphase)
@@ -232,11 +276,18 @@ This detail block has no matching 1.4 entry in the phase syllabus."
       ;;
   esac
 
-  local body="# Sample Plan
-${preamble_ask}
+  local preamble="# Sample Plan"
+  if [ -n "$ask_section" ]; then
+    preamble="$preamble
+
+$ask_section"
+  fi
+
+  local body="$preamble
+
 $syllabus
 
-$goalscope
+$GOAL_SCOPE_BLOCK
 
 $STACK_BLOCK
 
@@ -251,34 +302,13 @@ $TAIL_BLOCK
 
   if [ "$mutation" = "v1_syllabus_not_first" ]; then
     # Swap Goal & scope ahead of Phase syllabus -- syllabus is no longer the
-    # first ## section.
-    body="# Sample Plan
-${preamble_ask}
-$goalscope
+    # first ## section. The ask section, still ahead of both, stays valid
+    # and in the preamble either way.
+    body="$preamble
+
+$GOAL_SCOPE_BLOCK
 
 $syllabus
-
-$STACK_BLOCK
-
-$CONVENTIONS_BLOCK
-
-$phase1
-
-$PHASE2_BLOCK
-
-$TAIL_BLOCK
-"
-  fi
-
-  if [ "$mutation" = "double_malformed_ask" ]; then
-    body="# Sample Plan
-
-**Ask of record:** first mention, no path and no negative marker
-**Ask of record:** second mention, also neither a path nor a marker
-
-$syllabus
-
-$goalscope
 
 $STACK_BLOCK
 
@@ -303,189 +333,160 @@ write_plan() {
 }
 
 # ===========================================================================
-# C1 -- valid, existing ask path (Form P) -> passes, OK present, no check-6
-# FAIL. (criterion 1)
+# C1 -- a proper Ask of record section (level-3 heading, dated verbatim
+# entry, in the preamble, before Phase syllabus) -> check 6 produces NO
+# FAIL. (criterion 1; also the positive control paired with C2, C3, C6, C8)
 # ===========================================================================
 d=$(new_scratch)
-ask_file="$d/the-ask.md"
-printf 'the ask\n' >"$ask_file"
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** \`$ask_file\`" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" none)")
 run_validate "$plan"
 if [ "$CODE" -eq 0 ] && has_ok && [ "$(fail_count)" -eq 0 ]; then
-  pass "C1: existing Form P ask path -> exit 0, OK present, no FAIL"
+  pass "C1: proper Ask of record section -> exit 0, OK present, no check-6 FAIL"
 else
-  fail "C1: existing Form P ask path -> exit 0, OK present, no FAIL" \
+  fail "C1: proper Ask of record section -> exit 0, OK present, no check-6 FAIL" \
     "code=$CODE combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C2 -- explicit no-durable-ask statement (Form N) -> passes. (criterion 2)
+# C2 -- heading present, nothing but blank lines beneath it before the
+# preamble ends -> exactly one check-6 FAIL. (criterion 2)
 # ===========================================================================
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** no durable ask exists for this run." preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_HEADING_ONLY" none)")
 run_validate "$plan"
-if [ "$CODE" -eq 0 ] && has_ok && [ "$(fail_count)" -eq 0 ]; then
-  pass "C2: explicit no-durable-ask statement (Form N) -> exit 0, OK present, no FAIL"
+c2_fail_count="$(fail_count)"
+c2_fail_line="$(first_fail_line)"
+if [ "$CODE" -ne 0 ] && [ "$c2_fail_count" -eq 1 ] && [ -n "$c2_fail_line" ]; then
+  pass "C2: Ask of record heading present but body empty -> exactly one check-6 FAIL"
 else
-  fail "C2: explicit no-durable-ask statement (Form N) -> exit 0, OK present, no FAIL" \
+  fail "C2: Ask of record heading present but body empty -> exactly one check-6 FAIL" \
     "code=$CODE combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C3 -- no declaration at all -> exactly one check-6 FAIL naming the missing
-# declaration. (criterion 3)
+# C3 -- no Ask of record heading anywhere in the preamble -> exactly one
+# check-6 FAIL, with wording DISTINCT from C2's (the contract requires the
+# two failure shapes -- missing section vs. empty section -- to be told
+# apart). (criterion 3, distinctness vs. criterion 2)
 # ===========================================================================
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "" none)")
 run_validate "$plan"
 c3_fail_count="$(fail_count)"
-c3_fail_line=$(printf '%s\n' "$COMBINED" | grep '^FAIL:' | head -n1)
-if [ "$CODE" -ne 0 ] && [ "$c3_fail_count" -eq 1 ] \
-  && printf '%s\n' "$c3_fail_line" | grep -qiE "ask.{0,2}of.{0,2}record"; then
-  pass "C3: no declaration at all -> exactly one check-6 FAIL naming the missing declaration"
+c3_fail_line="$(first_fail_line)"
+if [ "$CODE" -ne 0 ] && [ "$c3_fail_count" -eq 1 ] && [ -n "$c3_fail_line" ] \
+  && [ "$c3_fail_line" != "$c2_fail_line" ]; then
+  pass "C3: no Ask of record heading anywhere -> exactly one check-6 FAIL, distinct wording from C2"
 else
-  fail "C3: no declaration at all -> exactly one check-6 FAIL naming the missing declaration" \
+  fail "C3: no Ask of record heading anywhere -> exactly one check-6 FAIL, distinct wording from C2" \
+    "code=$CODE c2=[$c2_fail_line] c3=[$c3_fail_line] combined=[$COMBINED]"
+fi
+
+# ===========================================================================
+# C4 -- the section's body text mentions a path to a file that does not
+# exist on disk -> NO check-6 FAIL. Proves "no filesystem resolution at
+# all" is real, not just claimed in a comment. (criterion 4)
+# ===========================================================================
+d=$(new_scratch)
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_DANGLING_PATH" none)")
+run_validate "$plan"
+if [ "$CODE" -eq 0 ] && has_ok && [ "$(fail_count)" -eq 0 ] \
+  && [ ! -e "$d/.artifacts/the-ask.md" ]; then
+  pass "C4: Ask of record body mentions a nonexistent file path -> no check-6 FAIL (no filesystem resolution)"
+else
+  fail "C4: Ask of record body mentions a nonexistent file path -> no check-6 FAIL (no filesystem resolution)" \
     "code=$CODE combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C4 -- ask path does not exist -> FAIL distinguishable from C3. (criterion 4)
+# C5 -- an ARCHIVED-state simulation: the section present and non-empty, but
+# no run dir, no .artifacts/ tree, nothing on disk beyond the plan file
+# itself -> still passes with NO check-6 FAIL. (criterion 5 -- a plan
+# properly written under the NEW scheme; NOT about the five pre-existing
+# archived plans under project-plans/completed/, which are out of scope
+# per contract section 0.2 and are expected to keep failing.)
 # ===========================================================================
 d=$(new_scratch)
-missing_ask="$d/does-not-exist/the-ask.md"
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** \`$missing_ask\`" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" none)")
+scratch_listing="$(ls -A "$d")"
 run_validate "$plan"
-c4_fail_count="$(fail_count)"
-c4_fail_line=$(printf '%s\n' "$COMBINED" | grep '^FAIL:' | head -n1)
-if [ "$CODE" -ne 0 ] && [ "$c4_fail_count" -eq 1 ] \
-  && [ -n "$c4_fail_line" ] && [ "$c4_fail_line" != "$c3_fail_line" ]; then
-  pass "C4: dangling ask path -> exactly one check-6 FAIL, distinct message from C3"
+if [ "$CODE" -eq 0 ] && has_ok && [ "$(fail_count)" -eq 0 ] \
+  && [ "$scratch_listing" = "plan.md" ]; then
+  pass "C5: archived-state simulation (plan file alone, nothing else on disk) -> still passes check 6"
 else
-  fail "C4: dangling ask path -> exactly one check-6 FAIL, distinct message from C3" \
-    "code=$CODE c3=[$c3_fail_line] c4=[$c4_fail_line]"
-fi
-c4_fail_line_saved="$c4_fail_line"
-
-# ===========================================================================
-# C5 -- at least two of section 0's three markups accepted; cover all three.
-# (criterion 5)
-# ===========================================================================
-d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** no durable ask exists for this run." preamble none)")
-run_validate "$plan"
-if [ "$CODE" -eq 0 ] && [ "$(fail_count)" -eq 0 ]; then
-  pass "C5a: bold lead-in markup (**Ask of record:**) accepted"
-else
-  fail "C5a: bold lead-in markup (**Ask of record:**) accepted" "code=$CODE combined=[$COMBINED]"
-fi
-
-# NOTE on placement: a level-2 "## Ask of record" heading cannot occur in
-# the preamble (a "## " line there becomes the first ## section itself, per
-# section 0's own "Where" definition of preamble as "before the first ## "),
-# and it cannot occur inside "## Goal & scope" either (that section's window
-# runs only "to the next ^## ", so a second level-2 heading would itself end
-# the window before covering it) -- so a level-2 heading declaration cannot
-# satisfy both the Markup list and the Where rule simultaneously; see the
-# contract-ambiguity note in the final report. A level-3..6 heading nested
-# *inside* "## Goal & scope" is unambiguously placeable (its window ends
-# only at the next literal "^## ", not "^### "), so that is what this case
-# exercises -- it still exercises the "markdown heading" markup family.
-d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "### Ask of record: no durable ask exists for this run." goalscope none)")
-run_validate "$plan"
-if [ "$CODE" -eq 0 ] && [ "$(fail_count)" -eq 0 ]; then
-  pass "C5b: markdown heading markup (### Ask of record: ..., nested in Goal & scope) accepted"
-else
-  fail "C5b: markdown heading markup (### Ask of record: ..., nested in Goal & scope) accepted" "code=$CODE combined=[$COMBINED]"
-fi
-
-d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "- Ask of record: no durable ask exists for this run." preamble none)")
-run_validate "$plan"
-if [ "$CODE" -eq 0 ] && [ "$(fail_count)" -eq 0 ]; then
-  pass "C5c: list bullet markup (- Ask of record: ...) accepted"
-else
-  fail "C5c: list bullet markup (- Ask of record: ...) accepted" "code=$CODE combined=[$COMBINED]"
+  fail "C5: archived-state simulation (plan file alone, nothing else on disk) -> still passes check 6" \
+    "code=$CODE listing=[$scratch_listing] combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C6 -- declaration accepted in the preamble, and inside ## Goal & scope.
+# C6 -- two different "ask of record" heading lines, both malformed/empty
+# -> still exactly one check-6 FAIL, never two (no cascade). (criterion 6)
 # ===========================================================================
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** no durable ask exists for this run." preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_DOUBLE_MALFORMED" none)")
 run_validate "$plan"
-if [ "$CODE" -eq 0 ] && [ "$(fail_count)" -eq 0 ]; then
-  pass "C6a: declaration in the preamble accepted"
+if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -eq 1 ]; then
+  pass "C6: two malformed/empty Ask of record headings -> still exactly one check-6 FAIL, no cascade"
 else
-  fail "C6a: declaration in the preamble accepted" "code=$CODE combined=[$COMBINED]"
-fi
-
-d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** no durable ask exists for this run." goalscope none)")
-run_validate "$plan"
-if [ "$CODE" -eq 0 ] && [ "$(fail_count)" -eq 0 ]; then
-  pass "C6b: declaration inside ## Goal & scope accepted"
-else
-  fail "C6b: declaration inside ## Goal & scope accepted" "code=$CODE combined=[$COMBINED]"
+  fail "C6: two malformed/empty Ask of record headings -> still exactly one check-6 FAIL, no cascade" \
+    "code=$CODE fail_count=$(fail_count) combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C7 -- story.md-shaped path accepted as an ordinary Form P path.
+# C7 -- heading level tolerance across the whole 3-6 range: level 3 is
+# already proven accepted by C1; this proves the other end, level 6, is
+# accepted too. (criterion 7)
 # ===========================================================================
 d=$(new_scratch)
-mkdir -p "$d/run-dir"
-story="$d/run-dir/story.md"
-printf 'Original Ask (verbatim)\n...\n' >"$story"
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** \`$story\`" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L6" none)")
 run_validate "$plan"
 if [ "$CODE" -eq 0 ] && has_ok && [ "$(fail_count)" -eq 0 ]; then
-  pass "C7: story.md-shaped existing path accepted as Form P"
+  pass "C7: level-6 heading (###### Ask of record) accepted, alongside level 3 proven in C1"
 else
-  fail "C7: story.md-shaped existing path accepted as Form P" \
+  fail "C7: level-6 heading (###### Ask of record) accepted, alongside level 3 proven in C1" \
     "code=$CODE combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C8 -- malformed declaration: phrase present, neither a path nor a negative
-# marker -> FAIL distinct from C3 and C4.
+# C8 -- the OLD Form P/Form N one-line-declaration style ONLY (bold
+# lead-in, no heading, nothing beneath it) -> now FAILS check 6. This is
+# the deliberate breaking change the migration accepts: it proves check 6
+# actually moved to the new schema instead of silently still accepting the
+# old one. Positive counterpart: C1 (the same intent, expressed as a
+# heading instead of a bold lead-in, passes). (criterion 8)
 # ===========================================================================
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "**Ask of record:** somewhere, still to be decided" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_OLD_STYLE" none)")
 run_validate "$plan"
-c8_fail_count="$(fail_count)"
-c8_fail_line=$(printf '%s\n' "$COMBINED" | grep '^FAIL:' | head -n1)
-if [ "$CODE" -ne 0 ] && [ "$c8_fail_count" -eq 1 ] \
-  && [ -n "$c8_fail_line" ] \
-  && [ "$c8_fail_line" != "$c3_fail_line" ] \
-  && [ "$c8_fail_line" != "$c4_fail_line_saved" ]; then
-  pass "C8: malformed declaration -> exactly one check-6 FAIL, distinct from C3 and C4"
+if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -eq 1 ]; then
+  pass "C8: old-style bold lead-in declaration (no heading) -> now FAILS check 6 (positive counterpart: C1)"
 else
-  fail "C8: malformed declaration -> exactly one check-6 FAIL, distinct from C3 and C4" \
-    "code=$CODE c3=[$c3_fail_line] c4=[$c4_fail_line_saved] c8=[$c8_fail_line]"
+  fail "C8: old-style bold lead-in declaration (no heading) -> now FAILS check 6 (positive counterpart: C1)" \
+    "code=$CODE combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C9 -- regression on the five pre-existing checks: each fires in isolation,
-# each is silent on a fully conforming fixture. Every fixture below carries a
-# valid Form N ask declaration, so any FAIL it produces is attributable to
-# the one structural mutation under test, not to check 6.
+# C9 -- regression on the five pre-existing checks (1-5): each fires in
+# isolation, each is silent on a fully conforming fixture. Every fixture
+# below carries a valid new-style Ask of record section, so any FAIL it
+# produces is attributable to the one structural mutation under test, not
+# to check 6. (criterion 9)
 # ===========================================================================
-valid_ask_line="**Ask of record:** no durable ask exists for this run."
 
 # --- conforming control: zero FAIL lines, OK present ------------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" none)")
 run_validate "$plan"
 if [ "$CODE" -eq 0 ] && has_ok && [ "$(fail_count)" -eq 0 ]; then
-  pass "C9-control: fully conforming plan -> zero FAIL lines, OK present"
+  pass "C9-control: fully conforming plan (new-style ask section) -> zero FAIL lines, OK present"
 else
-  fail "C9-control: fully conforming plan -> zero FAIL lines, OK present" \
+  fail "C9-control: fully conforming plan (new-style ask section) -> zero FAIL lines, OK present" \
     "code=$CODE combined=[$COMBINED]"
 fi
 
 # --- v1: syllabus is not the first section ----------------------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble v1_syllabus_not_first)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" v1_syllabus_not_first)")
 run_validate "$plan"
 if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -ge 1 ]; then
   pass "C9-v1: syllabus not first section -> at least one FAIL"
@@ -496,7 +497,7 @@ fi
 
 # --- v2: a phase bullet with no nested subphase checkbox --------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble v2_phase_no_subphase)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" v2_phase_no_subphase)")
 run_validate "$plan"
 if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -ge 1 ]; then
   pass "C9-v2: phase with no subphase checkbox -> at least one FAIL"
@@ -507,7 +508,7 @@ fi
 
 # --- v3: a syllabus checkbox with no matching detail block ------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble v3_checkbox_no_detail)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" v3_checkbox_no_detail)")
 run_validate "$plan"
 if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -ge 1 ]; then
   pass "C9-v3: syllabus checkbox with no detail block -> at least one FAIL"
@@ -518,7 +519,7 @@ fi
 
 # --- v4: a detail block with no matching syllabus checkbox ------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble v4_detail_no_checkbox)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" v4_detail_no_checkbox)")
 run_validate "$plan"
 if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -ge 1 ]; then
   pass "C9-v4: detail block with no syllabus checkbox -> at least one FAIL"
@@ -529,7 +530,7 @@ fi
 
 # --- v5: (after:) names a subphase id that does not exist -------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble v5_after_nonexistent)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" v5_after_nonexistent)")
 run_validate "$plan"
 if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -ge 1 ]; then
   pass "C9-v5: (after:) names a nonexistent id -> at least one FAIL"
@@ -540,7 +541,7 @@ fi
 
 # --- v6: a two-node dependency cycle ----------------------------------------
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble v6_cycle)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" v6_cycle)")
 run_validate "$plan"
 if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -ge 1 ]; then
   pass "C9-v6: two-node dependency cycle -> at least one FAIL"
@@ -551,10 +552,14 @@ fi
 
 # ===========================================================================
 # C10 -- a fully conforming plan: exit-0 path, OK present, and the EXISTING
-# lane-disjointness INFO line present byte-identical.
+# lane-disjointness INFO line present byte-identical (unchanged wording).
+# Plus a bonus check that a passing plan carries at least two INFO: lines
+# -- the existing lane-disjointness one plus the ask-vs-plan faithfulness
+# companion note, both stated by the contract to be unchanged.
+# (criterion 11)
 # ===========================================================================
 d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "$valid_ask_line" preamble none)")
+plan=$(write_plan "$d" "$(build_plan "$ASK_SECTION_L3" none)")
 run_validate "$plan"
 if [ "$CODE" -eq 0 ] && has_ok \
   && printf '%s\n' "$COMBINED" | grep -qF \
@@ -565,18 +570,16 @@ else
     "code=$CODE combined=[$COMBINED]"
 fi
 
-# Bonus (not a numbered C-case, but directly required by B-1's "Output
-# additions"): a passing plan carries at least two INFO: lines -- the
-# existing lane-disjointness one plus the new ask-vs-plan companion note.
 if [ "$(info_count)" -ge 2 ]; then
-  pass "C10-bonus: passing plan carries the new ask-vs-plan companion INFO line alongside the existing one"
+  pass "C10-bonus: passing plan carries the ask-vs-plan faithfulness INFO line alongside the lane-disjointness one"
 else
-  fail "C10-bonus: passing plan carries the new ask-vs-plan companion INFO line alongside the existing one" \
+  fail "C10-bonus: passing plan carries the ask-vs-plan faithfulness INFO line alongside the lane-disjointness one" \
     "info_count=$(info_count) combined=[$COMBINED]"
 fi
 
 # ===========================================================================
-# C11 -- usage errors byte-identical.
+# C11 -- usage errors byte-identical (no argument; missing plan file). Not
+# about the ask schema at all -- unchanged in substance. (criterion 10)
 # ===========================================================================
 run_validate
 if [ "$CODE" -ne 0 ] \
@@ -596,21 +599,6 @@ if [ "$CODE" -ne 0 ] \
 else
   fail "C11b: missing plan file -> FAIL: plan file not found: <path>" \
     "code=$CODE combined=[$COMBINED]"
-fi
-
-# ===========================================================================
-# C12 -- only one check-6 FAIL line is ever emitted per plan, never a
-# cascade -- even when two candidate declaration lines are present (first
-# match in document order wins per section 0; later ones are ignored).
-# ===========================================================================
-d=$(new_scratch)
-plan=$(write_plan "$d" "$(build_plan "" preamble double_malformed_ask)")
-run_validate "$plan"
-if [ "$CODE" -ne 0 ] && [ "$(fail_count)" -eq 1 ]; then
-  pass "C12: two malformed ask-of-record lines -> still exactly one check-6 FAIL, no cascade"
-else
-  fail "C12: two malformed ask-of-record lines -> still exactly one check-6 FAIL, no cascade" \
-    "code=$CODE fail_count=$(fail_count) combined=[$COMBINED]"
 fi
 
 # ---------------------------------------------------------------------------

@@ -30,11 +30,14 @@ agentic/
 │   ├── skills/                #   dae (/dae), orchestrate (/orchestrate),
 │   │                          #   explore, init-workspace, review-*, document-local, push-pr
 │   ├── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
-│   │                          #   contract-tester.md, committee.md
+│   │                          #   documenter.md, contract-tester.md, committee.md
 │   ├── hooks/                 #   workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
 │   │                          #   sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
 │   │                          #   smart-lint.sh, smart-test.sh, … (wired via settings.json)
-│   └── settings/              #   settings.json — versioned source of ~/.claude/settings.json
+├── agent-specific/            # bound to ONE agent tool               (never a skill/rule install)
+│   ├── claude/                #   settings.json — versioned source of ~/.claude/settings.json
+│   │                          #   (MERGED into the install, never copied over it)
+│   └── antigravity/           #   hooks.json, rules/, skills/ — the Antigravity port
 ├── tool-based/                # bound to ONE technology              (domain: <tech>)
 │   └── <tech>/                #   svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
@@ -76,8 +79,10 @@ child worktree and merges back into the run's parent branch. Details:
 - **Rules** — always-on constraints. Short, no procedure. If it must hold even
   when nothing was invoked, it's a rule.
 - **Hooks** — deterministic mechanical enforcement (shell, no model judgment).
-  Skill-scoped hooks wire via a skill's `hooks:` frontmatter; global quality
-  hooks wire via `settings.json`.
+  Agent-scoped hooks wire via an agent's `hooks:` frontmatter (never a skill's
+  — Claude Code has no such feature for skills); global hooks wire via
+  `settings.json`, including self-scoped ones like `workflow-diff-check.sh`
+  that stay inert outside a dae run.
 
 Litmus: *"must always hold"* → rule. *"how to do a job"* → skill. *"must happen
 every time, mechanically"* → hook.

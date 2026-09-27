@@ -5,10 +5,8 @@
 #   mark-syllabus.sh <plan-file> <subphase-id> <state>
 #
 # DESCRIPTION
-#   Invoked by the dae orchestrator's dispatch loop (build-dispatch.md), NOT
-#   a hook. Scripting the tick is what lets the orchestrator's write scope
-#   shrink to run artifacts: the plan file is mutated only through this
-#   script. <state> is one of:
+#   Invoked by the `documenter` agent at Record, NOT the orchestrator (whose
+#   write scope excludes plan.md entirely) and NOT a hook. <state> is one of:
 #     x        - [ ] -> [x]        (subphase finished as planned)
 #     done     - [ ] -> [done]     (closed, shipped differently than planned)
 #     dropped  - [ ] -> [dropped]  (closed without shipping)

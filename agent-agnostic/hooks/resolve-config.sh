@@ -16,7 +16,9 @@
 #     1. <root>/.agents/settings.local.json (or .claude/)    env.<VAR_NAME>
 #     2. <root>/.agents/settings.json (or .claude/)          env.<VAR_NAME>
 #     3. ~/.claude/settings.json (or ~/.gemini/config/)      env.<VAR_NAME>
-#     4. --default <value>, or (--base-branch-default) 'dev' globally.
+#     4. --default <value>, or (--base-branch-default) a git heuristic: the
+#        local 'main' branch if it exists, else the short name of
+#        origin/HEAD, else fail.
 #
 #   No jq dependency, matching this repo's other hooks (record-changed.sh,
 #   test-changed.sh, workflow-diff-check.sh) — the `env` block is Claude
@@ -111,8 +113,21 @@ done
 
 if [ -z "$resolved" ]; then
   if [ "$base_branch_mode" = 1 ]; then
-    resolved="dev"
-    source="global default (dev)"
+    if ! git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      err "cannot resolve a base branch: '$root' is not a git repository"
+    fi
+    if git -C "$root" rev-parse --verify -q refs/heads/main >/dev/null 2>&1; then
+      resolved="main"
+      source="git heuristic (main)"
+    else
+      origin_head=$(git -C "$root" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || origin_head=""
+      if [ -n "$origin_head" ]; then
+        resolved="$origin_head"
+        source="git heuristic (origin/HEAD: $origin_head)"
+      else
+        err "cannot resolve a base branch in '$root': no local 'main' branch and no 'origin/HEAD' set"
+      fi
+    fi
   elif [ "$have_default" = 1 ]; then
     resolved="$default"
     source="supplied default"

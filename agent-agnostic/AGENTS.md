@@ -21,7 +21,7 @@ installed to the same `~/.claude/` locations.
 |---|---|---|---|
 | **Main-session orchestrator** | the user | the conversation | `dae`, `orchestrate` |
 | **Worker agent** | its orchestrator (messages) | own, **warm** — survives revision loops | `planner`, `builder` (+ its `coder`/`contract-tester` sub-agents) |
-| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `review-pr`, `document-local`, `init-workspace`, `push-pr`, `comment-pr`, `cleanup-merged` |
+| **Cold fork / gate** | nobody — returns one envelope | own, isolated, un-anchorable | `explore`, `review-plan`, `review-code`, `review-pr`, `init-workspace`, `push-pr`, `comment-pr`, `cleanup-merged` |
 
 **Principles** (each with its enforcement point):
 
@@ -73,7 +73,9 @@ request — which is why each description names the pipeline it belongs to and
 who invokes it (the guard that stops a single-word name like `explore`
 auto-firing on an incidental keyword match). All are cold forks: isolated
 context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
-`blockers[]` — see the conventions doc). The old build-loop trio
+`blockers[]` — see the conventions doc) — except `document-local`, which runs
+inline inside the `documenter` agent's own turn (see that agent's row in
+`agents/` below for where the real dispatch/isolation now lives). The old build-loop trio
 (`code`/`debug`/`test`) and the `plan` skill are gone — absorbed into the
 `builder` and `planner` workers in `agents/` (below).
 
@@ -85,7 +87,7 @@ context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
 | `review-code` | Cold gate before any docs. Verdict round written to the plan dir's `code-review.md` record; the envelope `next` carries the kickback reason code (`impl-wrong` \| `plan-wrong` \| `map-wrong` \| `needs-input`) the dae router routes on. |
 | `review-pr` | The mandatory PR gate before `finalize` (and standalone on published PRs), run on a PR already open as a draft: the ENTIRE branch-vs-base diff against the plan or Jira ticket; script-enforced `ready \| tentative \| rejected` verdict in the plan dir's `pr-review.md` record. Never posts. |
 | `comment-pr` | Post the plan dir's `pr-review.md` verdict to GitHub: `scripts/render-pr-comment.sh` renders the last round, `gh` posts it with confirmation. Never reviews. |
-| `document-local` | Record stage when the docs target is a local path: write into the docs root, the single source of truth; optional changelog commit (never a push). |
+| `document-local` | The Record stage of EVERY run: write into the docs root, the single source of truth; optional changelog commit (never a push). The docs root is always a local path (`CLAUDE_DOCS_DIR` is `--expect path`-enforced), so there is no other-target branch; publishing beyond the repo is a CI job on merge, never a run stage. |
 | `push-pr` | The staged publisher, called with `--stage open-draft` \| `update` \| `finalize`: `open-draft` opens the draft PR right after plan approval, `update` pushes the branch after every lane merge-back and the record commit, `finalize` pushes final stragglers and flips the PR from draft to ready. Leaves the worktree standing — teardown is `cleanup-merged`'s, post-merge. `open-draft` and `finalize` each hold one conversational confirmation; `update` asks nothing. |
 | `cleanup-merged` | Post-merge closeout: verified-merged branch deleted local+remote, worktrees pruned, run dir removed, only `plan.md` archived to `completed/` (its records removed with the rest of the dir), optional Jira transition. Safe deletes only. |
 
@@ -93,7 +95,7 @@ context, inputs via args, one envelope back (`status`, `artifacts[]`, `next`,
 
 | Skill | Invoke | What it drives |
 |---|---|---|
-| **`dae`** | `/dae [--type\|-t <t>]` | The router: resolves the request to ONE of twelve types — build (`feature\|bugfix\|rework\|migration\|hotfix`), `live` (alias `adhoc` — an ad-hoc conversational build), `diagnose` (aliases `debug`, `triage` — breaking: these used to reach `bugfix`), `sync`, `map`, `analyze` (`map`'s own type, no longer a `document` alias), `document` (alias `doc`), `prove` (alias `disprove` — states a claim, gathers evidence, then dispatches a cold pass that must try to refute it) — whose `pipeline` axis selects the middle file it follows. Shared setup/ship stages, gate caps, kickback reason-code routing. Carries the `Stop`→`workflow-diff-check.sh` hook. |
+| **`dae`** | `/dae [--type\|-t <t>]` | The router: resolves the request to ONE of twelve types — build (`feature\|bugfix\|rework\|migration\|hotfix`), `live` (alias `adhoc` — an ad-hoc conversational build), `diagnose` (aliases `debug`, `triage` — breaking: these used to reach `bugfix`), `sync`, `map`, `analyze` (`map`'s own type, no longer a `document` alias), `document` (alias `doc`), `prove` (alias `disprove` — states a claim, gathers evidence, then dispatches a cold pass that must try to refute it) — whose `pipeline` axis selects the middle file it follows. Shared setup/ship stages, gate caps, kickback reason-code routing. |
 | **`orchestrate`** | `/orchestrate` | Generic task coordinator: decompose any multi-part task, delegate to subagents, verify and synthesize. Not tied to the dae pipeline. |
 
 ## `agents/` — worker agents
@@ -107,6 +109,7 @@ hold their own warm context; return the shared envelope (`docs/conventions.md`).
 | **`builder`** | sonnet | Per-lane mini-orchestrator of the packet model. Owns its child worktree, the contract, dispatch, debug mediation, and the e2e exit. Writes no implementation and no contract tests. |
 | **`coder`** | sonnet | One packet (≤~5 coupled files) against its contract slice. Never reads or writes tests. |
 | **`contract-tester`** | sonnet | Tests for one contract slice from the contract alone. Never reads the implementation — the blindness is its identity. |
+| **`documenter`** | sonnet | Record-stage dispatch wrapper: invokes `document-local` with the inputs its caller hands it and returns its report untouched. Exists so the docs-root write happens under a real agent identity (`agent_type`) the write-scope hooks can recognize, since the orchestrator's own role is structurally denied the docs root. |
 | **`committee`** | opus | Generic fan-out wrapper: runs N cold copies of a wrapped skill and consolidates their claims into one artifact, at `rigor: med\|high` only — never loaded at `rigor: low`. Owns structure (fan-out, matching, consolidation) only; the wrapped skill supplies substance. |
 
 **Considered and rejected:** a standalone `investigate` skill (single consumer —
@@ -133,18 +136,25 @@ split that used to separate "global quality" hooks from "pipeline-scoped"
 ones bought nothing once both source dirs installed to the same place, which
 is exactly why they now share one directory and one list.
 
-**Wired** — fire automatically via `settings.json` or a skill/agent's `hooks:`
-frontmatter, never invoked by name: `smart-lint.sh` and `smart-test.sh`
+**Wired** — fire automatically via `settings.json` or an agent's `hooks:`
+frontmatter (never a skill's — Claude Code has no such feature for skills), never invoked by name: `smart-lint.sh` and `smart-test.sh`
 (language-aware, blocking on failure, apply to every session), `ntfy-notifier.sh`,
-the `record-changed.sh`/`test-changed.sh` pair, `worktree-reminder.sh` (a
+`claude-install-drift.sh` (`PostToolUse` on `Write|Edit|MultiEdit`, same
+matcher as `smart-lint.sh`/`smart-test.sh`; warns when the `~/.claude` install
+has drifted from this repo's own source), `worktree-reminder.sh` (a
 `SessionStart` hook that reminds ANY session — not just an orchestrator-driven
 one — to isolate file changes in a worktree and route pushes/PR reviews
 through `push-pr`/`review-pr` instead of raw `git`/`gh` commands),
-`workflow-diff-check.sh` (`Stop`, on `dae` only — builders check per lane
-instead), `scope-writes.sh` (`PreToolUse` on `Write|Edit|MultiEdit|NotebookEdit`,
-denying orchestrator writes outside the run's `.artifacts/`, the resolved
-plans dir, and the resolved docs dir, self-configured from a parent-worktree
-marker — `.artifacts/progress-log.md` — with no env var), `parent-tree-guard.sh`
+`workflow-diff-check.sh` (`Stop`, wired globally in `settings.json`;
+self-scoped to a dae run's own parent worktree via the same `.artifacts/progress-log.md` marker
+walk as its neighbors below — inert everywhere else, including inside a lane child, so builders
+check per lane instead), `scope-writes.sh` (`PreToolUse` on `Write|Edit|MultiEdit|NotebookEdit`;
+per-role write-scope guard — the orchestrator is denied everywhere except
+this run's own gate reports (`*-review.md`/`sync-report.md`) under the
+plans root, its own run dir's `explore-map-*.md`, and a committee's own
+`claims-c<n>.md`/`accepted.md`/`reverify.md`; nothing under the docs root
+at all — self-configured from a parent-worktree marker —
+`.artifacts/progress-log.md` — with no env var), `parent-tree-guard.sh`
 (`PostToolUse` on `Bash` and on `Stop` — the Bash-side backstop, checking the
 worktree's actual git state via `git status --porcelain` since a `PreToolUse`
 hook can't see inside a Bash command), `allow-workflow-cleanup.sh`
@@ -161,6 +171,16 @@ the base is what establishes the branch landed), and `branch-squash-guard.sh`
 dev/main squash-only branch policy per `push-policy`; mode is detected per
 invocation from the target repo, never a static toggle). Configured by
 `CLAUDE_HOOKS_*` env vars — see [`hooks/README.md`](hooks/README.md).
+
+The `record-changed.sh`/`test-changed.sh` pair is present in this directory
+but is NOT wired: no `settings.json` this repo has ever tracked references
+either script by name, and no other file in the repo invokes them. They form
+a session-wide PostToolUse-recorder + Stop-gate pair — record files a session
+wrote, then test them on Stop — and `workflow-diff-check.sh`'s own header
+comment has called itself a "simplified replacement for the record-changed.sh
++ test-changed.sh pair" since its own earliest tracked version, which is the
+likely reason they went unwired for the dae-worktree case. This is a finding
+to flag for a removal decision, not something resolved here.
 
 **Helpers** — invoked explicitly, never wired: `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
@@ -179,7 +199,10 @@ blocking), `report-verdict.sh` (the ONLY writer of a verdict round — enforces
 — `archive` refuses a plan that didn't ship), `resolve-scratch.sh` (the
 `ship: chat` scratch-dir resolver; delegates the configured rung to
 `resolve-config.sh`), and `sync-install.sh` (repo→`~/.claude` install sync,
-deletions included — this repo's `push-main` runs it).
+deletions included — this repo's `push-main` runs it directly for a full
+sync after every landing; it is also wired via a `SessionStart` hook in
+`settings.json`, which runs it in `--check` mode as a passive drift warning
+on every session start).
 
 ## The dae pipeline (build type)
 

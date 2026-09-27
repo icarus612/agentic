@@ -6,12 +6,8 @@
 # straight from git diff (committed since base + staged + unstaged) — no
 # per-session state, no locking, no PostToolUse recorder.
 #
-# Wired via a frontmatter hook on the dev skill (Stop) only, so it runs
-# while the dae workflow is active. Deliberately NOT wired on the builder
-# agent: builders run in parallel lanes sharing one worktree, so a
-# whole-worktree diff at one builder's stop would see siblings' in-flight
-# changes and block on failures that aren't its own. The dae orchestrator
-# runs the project's checks per wave and at integration instead.
+# Wired globally (Stop hook in settings.json), self-scoped to a dae run by
+# the marker walk below (`find_parent_worktree`) — inert on a builder lane.
 #
 # EXIT CODES
 #   0 - checks passed, nothing changed, or nothing runnable (never blocks
@@ -34,11 +30,28 @@ bfield() { # flat "name":true|false -> the bool token
     | head -1 | grep -oE "(true|false)"
 }
 
+# find_parent_worktree <start-path>
+# Prints the marked parent worktree's path, or returns 1 (dirname ascent).
+find_parent_worktree() {
+  local dir
+  dir=$(realpath -m -- "$1" 2>/dev/null) || dir="$1"
+  while [ -n "$dir" ]; do
+    if [ -f "$dir/.artifacts/progress-log.md" ]; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    [ "$dir" = "/" ] && break
+    dir=$(dirname -- "$dir")
+  done
+  return 1
+}
+
 # Avoid the Stop-hook loop cap: if we already blocked once, let the stop proceed.
 [ "$(bfield stop_hook_active)" = "true" ] && exit 0
 
 cwd=$(sfield cwd)
 { [ -n "$cwd" ] && [ -d "$cwd" ]; } || cwd="$PWD"
+find_parent_worktree "$cwd" >/dev/null || exit 0
 cd "$cwd" || exit 0
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 cd "$root"

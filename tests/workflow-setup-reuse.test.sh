@@ -579,6 +579,363 @@ case10() {
 case10
 
 # ---------------------------------------------------------------------------
+# Cases 11-18: contracts/l1.md Packet 1 ("workflow-setup.sh + build-dispatch.md",
+# subphases 1.1 / 1.2-support / 2.1) -- progress-log.md + dae-role seeding on
+# parent creation, --reuse idempotency for both marker files, --parent (child)
+# getting neither file, and the new --set-role CLI mode. Written from the
+# contract's "### Tests" list alone; never reads workflow-setup.sh's source.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Invocation helper for the new `--set-role` mode. Unlike run_setup, this
+# mode is documented to operate purely against an explicit `--root <path>`
+# (the router always calls it from inside an already-cd'd-into parent
+# worktree, but tests pass --root explicitly so the case doesn't depend on
+# cwd). HOME is still pinned to an empty scratch dir per this file's
+# existing convention; reuses the same OUT/ERR/CODE globals as run_setup.
+# ---------------------------------------------------------------------------
+run_setrole() {
+  local home="$1"
+  shift
+  local out_f err_f
+  out_f=$(mktemp)
+  err_f=$(mktemp)
+  ( HOME="$home" "$SCRIPT" "$@" ) </dev/null >"$out_f" 2>"$err_f"
+  CODE=$?
+  OUT=$(cat "$out_f")
+  ERR=$(cat "$err_f")
+  rm -f "$out_f" "$err_f"
+}
+
+# ---------------------------------------------------------------------------
+# Case 11: fresh parent worktree creation -> progress-log.md exists and is
+# non-empty, immediately after the script returns 0.
+# ---------------------------------------------------------------------------
+case11() {
+  local label="11: fresh parent creation -> progress-log.md exists, non-empty"
+  local repo home rundir
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case11 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+  if [ -z "$rundir" ] || [ ! -f "$rundir/progress-log.md" ] || [ ! -s "$rundir/progress-log.md" ]; then
+    fail "$label" "rundir=[$rundir] present=$( [ -f "$rundir/progress-log.md" ] && echo yes || echo no ) size=$(wc -c <"$rundir/progress-log.md" 2>/dev/null)"
+    return
+  fi
+  pass "$label"
+}
+case11
+
+# ---------------------------------------------------------------------------
+# Case 12: fresh parent worktree creation -> dae-role exists, content exactly
+# "orchestrator" (trailing whitespace/newline trimmed before comparing).
+# ---------------------------------------------------------------------------
+case12() {
+  local label="12: fresh parent creation -> dae-role exists, content exactly 'orchestrator'"
+  local repo home rundir role
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case12 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+  if [ ! -f "$rundir/dae-role" ]; then
+    fail "$label -> dae-role file exists" "rundir=[$rundir]"
+    return
+  fi
+  role=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role" != "orchestrator" ]; then
+    fail "$label -> content exactly 'orchestrator'" "role=[$role]"
+    return
+  fi
+  pass "$label"
+}
+case12
+
+# ---------------------------------------------------------------------------
+# Case 13: --reuse on a worktree whose progress-log.md already has custom
+# content -> preserved byte-for-byte. Branch AND worktree both survive
+# (adoption path, like case05) because .artifacts is gitignored and would
+# not otherwise carry across a worktree recreation.
+# ---------------------------------------------------------------------------
+case13() {
+  local label="13: --reuse preserves custom progress-log.md content byte-for-byte"
+  local repo home path rundir custom content_before content_after
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case13 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (prereq: fresh create)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  path=$(get_field "$OUT" "WORKTREE: ")
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+
+  custom="custom progress content for case13
+second line, deliberately not the default seed shape"
+  printf '%s\n' "$custom" >"$rundir/progress-log.md"
+  content_before=$(cat "$rundir/progress-log.md")
+
+  # Deliberately do NOT remove the worktree -- crash simulation, adoption path.
+  run_setup "$repo" "$home" --name case13 --base main --reuse
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> --reuse exits 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  if ! has_exact_line "$OUT" "REUSED: yes"; then
+    fail "$label -> REUSED: yes" "out=[$OUT]"
+    return
+  fi
+  content_after=$(cat "$rundir/progress-log.md" 2>/dev/null || echo "MISSING")
+  if [ "$content_after" != "$content_before" ]; then
+    fail "$label -> progress-log.md preserved byte-for-byte" "before=[$content_before] after=[$content_after]"
+    return
+  fi
+  pass "$label"
+}
+case13
+
+# ---------------------------------------------------------------------------
+# Case 14: --reuse on a worktree whose dae-role is already "planner"
+# (simulating an in-flight run resumed mid-planner-spawn) -> preserved, NOT
+# reset to "orchestrator".
+# ---------------------------------------------------------------------------
+case14() {
+  local label="14: --reuse preserves a non-default dae-role (planner), never resets to orchestrator"
+  local repo home path rundir role_after
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case14 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (prereq: fresh create)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  path=$(get_field "$OUT" "WORKTREE: ")
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+
+  printf 'planner\n' >"$rundir/dae-role"
+
+  # Deliberately do NOT remove the worktree -- adoption path, same as case13.
+  run_setup "$repo" "$home" --name case14 --base main --reuse
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> --reuse exits 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  if ! has_exact_line "$OUT" "REUSED: yes"; then
+    fail "$label -> REUSED: yes" "out=[$OUT]"
+    return
+  fi
+  role_after=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role_after" != "planner" ]; then
+    fail "$label -> dae-role preserved as planner, not reset to orchestrator" "role_after=[$role_after]"
+    return
+  fi
+  pass "$label"
+}
+case14
+
+# ---------------------------------------------------------------------------
+# Case 15: --parent <branch> (child worktree) -> NO .artifacts directory at
+# all (not even empty). Positive control, run FIRST on the same repo: the
+# plain parent worktree DOES get .artifacts, so a bug that always skips
+# .artifacts creation cannot pass this case by accident.
+# ---------------------------------------------------------------------------
+case15() {
+  local label="15: --parent child gets no .artifacts at all (positive control: plain parent does)"
+  local repo home path child_path
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case15 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (prereq: fresh parent create)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  path=$(get_field "$OUT" "WORKTREE: ")
+  if [ ! -d "$path/.artifacts" ]; then
+    fail "$label -> positive control: plain parent worktree has .artifacts" "path=[$path]"
+    return
+  fi
+
+  run_setup "$repo" "$home" --name case15-child --parent feature/case15
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> child --parent create exits 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  child_path=$(get_field "$OUT" "WORKTREE: ")
+  if [ -e "$child_path/.artifacts" ]; then
+    fail "$label -> child worktree has NO .artifacts (not even empty)" "child_path=[$child_path]"
+    return
+  fi
+  pass "$label -> positive control: parent has .artifacts; sibling child worktree gets none at all"
+}
+case15
+
+# ---------------------------------------------------------------------------
+# Case 16: --set-role planner against a real parent worktree fixture ->
+# dae-role becomes exactly "planner"; run again with --set-role orchestrator
+# -> becomes "orchestrator". Content is read directly from the file each
+# time rather than trusting exit code alone.
+# ---------------------------------------------------------------------------
+case16() {
+  local label="16: --set-role planner then orchestrator against a real parent worktree"
+  local repo home path rundir role1 role2
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case16 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (prereq: fresh create)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  path=$(get_field "$OUT" "WORKTREE: ")
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+
+  run_setrole "$home" --set-role planner --root "$path"
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> --set-role planner exits 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  role1=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role1" != "planner" ]; then
+    fail "$label -> dae-role becomes exactly planner" "role1=[$role1]"
+    return
+  fi
+
+  run_setrole "$home" --set-role orchestrator --root "$path"
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> --set-role orchestrator exits 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  role2=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role2" != "orchestrator" ]; then
+    fail "$label -> dae-role becomes exactly orchestrator" "role2=[$role2]"
+    return
+  fi
+  pass "$label -> dae-role flips planner then orchestrator, read directly from the file each time"
+}
+case16
+
+# ---------------------------------------------------------------------------
+# Case 17: --set-role builder against a directory with NO
+# .artifacts/progress-log.md -> exit 1, no file created, stderr names the
+# problem. Positive control, run FIRST on a real fixture: the same command
+# actually succeeds against a genuinely marked parent worktree.
+# ---------------------------------------------------------------------------
+case17() {
+  local label="17: --set-role against an unmarked dir fails (positive control: succeeds on a real parent)"
+  local repo home path rundir dir role
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case17ok --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (prereq: fresh create)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  path=$(get_field "$OUT" "WORKTREE: ")
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+  run_setrole "$home" --set-role builder --root "$path"
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> positive control: --set-role builder exits 0 on a real parent" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  role=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role" != "builder" ]; then
+    fail "$label -> positive control: dae-role becomes builder" "role=[$role]"
+    return
+  fi
+
+  dir=$(new_scratch)
+  run_setrole "$home" --set-role builder --root "$dir"
+  if [ "$CODE" -ne 1 ]; then
+    fail "$label -> exit 1 against an unmarked directory" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  if ! printf '%s\n' "$ERR" | grep -qF -- "$dir"; then
+    fail "$label -> stderr names the offending path" "dir=[$dir] err=[$ERR]"
+    return
+  fi
+  if ! printf '%s\n' "$ERR" | grep -q "no run dir at"; then
+    fail "$label -> stderr names the problem ('no run dir at')" "err=[$ERR]"
+    return
+  fi
+  if [ -e "$dir/.artifacts" ]; then
+    fail "$label -> no .artifacts created for the unmarked directory" "dir=[$dir]"
+    return
+  fi
+  pass "$label -> positive control succeeds on a real parent; unmarked dir fails exit 1, named stderr, nothing created"
+}
+case17
+
+# ---------------------------------------------------------------------------
+# Case 18: --set-role with a bogus token against a valid parent worktree ->
+# exit 1, dae-role UNCHANGED from before the call. Positive control on the
+# SAME fixture, run first: a real token actually flips the file, so the
+# "unchanged" assertion below proves rejection, not a broken write path.
+# ---------------------------------------------------------------------------
+case18() {
+  local label="18: --set-role bogus-token leaves dae-role unchanged (positive control: a real token flips it first)"
+  local repo home path rundir role_before role_after
+  repo=$(new_scratch)
+  home=$(new_scratch)
+  init_repo "$repo" || { fail "$label" "$CURRENT_SETUP_ERR"; return; }
+
+  run_setup "$repo" "$home" --name case18 --base main
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (prereq: fresh create)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  path=$(get_field "$OUT" "WORKTREE: ")
+  rundir=$(get_field "$OUT" "RUNDIR: ")
+
+  run_setrole "$home" --set-role builder --root "$path"
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> positive control: --set-role builder exits 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  role_before=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role_before" != "builder" ]; then
+    fail "$label -> positive control: dae-role becomes builder" "role_before=[$role_before]"
+    return
+  fi
+
+  run_setrole "$home" --set-role bogus-token --root "$path"
+  if [ "$CODE" -ne 1 ]; then
+    fail "$label -> exit 1 for a bogus token" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  if [ -z "$ERR" ]; then
+    fail "$label -> stderr non-empty for the usage error" "err=[$ERR]"
+    return
+  fi
+  role_after=$(cat "$rundir/dae-role" 2>/dev/null | tr -d '[:space:]')
+  if [ "$role_after" != "$role_before" ]; then
+    fail "$label -> dae-role unchanged after the rejected bogus token" "before=[$role_before] after=[$role_after]"
+    return
+  fi
+  pass "$label -> positive control flips the role; bogus token exits 1 with stderr, file left unchanged"
+}
+case18
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"

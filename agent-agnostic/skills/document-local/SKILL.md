@@ -1,8 +1,7 @@
 ---
 name: document-local
-description: Write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit. Part of the dae workflow — the record stage of every run, invoked by the dae orchestrator whether or not a publish target is configured; publishing the docs tree beyond the repo is a CI job on merge, never this skill.
+description: Write all docs into the root /docs single source of truth, mirror project structure, and optionally record a changelog via git commit. Part of the dae workflow — the record stage of every run, invoked by the dae workflow's `documenter` agent whether or not a publish target is configured; publishing the docs tree beyond the repo is a CI job on merge, never this skill.
 domain: universal
-context: fork
 rules: [verify-dont-assume, push-policy, artifact-locations, doc-format]
 model: sonnet
 model-fallback: [gemini-pro]
@@ -16,7 +15,7 @@ You are the documentation phase of the workflow. After the work passes the `revi
 
 - After the `review-code` skill has accepted the changes and the loop has settled.
 - When the user explicitly asks to document, write docs, or update the changelog.
-- As the record stage the `dae` orchestrator invokes once implementation is complete (or a map-/reconciliation-driven run invokes with its exemption stated).
+- As the record stage the dae workflow's `documenter` agent invokes once implementation is complete (or a map-/reconciliation-driven run invokes with its exemption stated).
 - When the dae document workflow hands you a fresh explore map (by path) to bootstrap or refresh docs with no code change — a **map-driven** run.
 - When the dae sync workflow hands you a plan and a reconciliation report comparing already-shipped work against that plan/ticket — a **reconciliation-driven** run, standing in for a fresh `review-code` pass.
 
@@ -24,9 +23,9 @@ When documenting a **change**, don't start cold: documentation must reflect what
 
 ## Inputs
 
-You run as an isolated fork with no access to the conversation history — everything you need arrives via the invocation args. Expect one of three shapes:
+You run inline as a continuation of the `documenter` agent's own turn, not as a separate fork — everything you need arrives via the invocation args. Expect one of three shapes:
 
-- **Change-driven** (from the `dae` orchestrator or a direct invocation after review): the plan path (`<plans-dir>/<slug>-MM-DD-YY/plan.md`) and a summary of what was built and the `review-code` outcome.
+- **Change-driven** (from the dae workflow's `documenter` agent, or a direct invocation after review): the plan path (`<plans-dir>/<slug>-MM-DD-YY/plan.md`), the run dir (`<workflows-dir>/<name>/.artifacts/`, so you can read `reports/<lane-id>-exit.md` for every lane that merged), and a summary of what was built and the `review-code` outcome.
 - **Map-driven** (from the dae document workflow): the path to the `explore` skill's map file on disk (stack with MAJOR versions, structure, dependency graph, patterns, conventions), standing in for plan and diff — read it from that path.
 - **Reconciliation-driven** (from the dae sync workflow): the plan dir's `plan.md`, and its `sync-report.md` (same dir) — its classification of each plan-syllabus item as done/partial/dropped/diverged, backed by the actual diff against the base branch. This stands in for the change-driven build/review-code summary; do not require a fresh `review-code` pass for this shape.
 
@@ -36,7 +35,7 @@ All three shapes also carry whether to record a changelog (commit, `docs/changel
 
 1. **Re-read the source-of-truth layout.** Open `docs/AGENTS.md` (or root `AGENTS.md`) and the existing `/docs` tree to learn the conventions already in use: naming, headings, how monorepo apps are split. Match the existing style instead of inventing one.
 
-2. **Confirm what changed, then mark the plan.** Check the plan (the plan dir's `plan.md`), the `review-code` outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during the build loop, document what shipped. Then update the plan itself: in the syllabus check off (`- [x]`) the subphases now complete and annotate abandoned ones as `- [dropped]`, and annotate any subphase that was dropped or changed in the phase sections — the syllabus must reflect reality just like the docs do. In a map-driven run there is no plan or diff — the explore map file is your ground truth; reconcile the existing `/docs` tree against it and add, update, or delete accordingly. In a **reconciliation-driven** run there is no fresh diff or build summary from this session — use the reconciliation report as the record of what's done, partial, dropped, or diverged, and check off/annotate the plan syllabus exactly per that classification (`- [x]` for done, `- [dropped]` for dropped, a short annotation in the phase section for partial/diverged items noting how reality differs from the plan). Get these ticks right: `plan-lifecycle.sh archive`'s completeness guard reads exactly this syllabus state and refuses to archive a plan with any subphase still `- [ ]`, or with every subphase `- [dropped]` and none `- [x]`/`- [done]` — so an accurate syllabus here is what makes the plan archivable at all, not a cosmetic record-keeping step.
+2. **Confirm what changed, then mark the plan.** Check the plan (the plan dir's `plan.md`), the `review-code` outcome, and the actual diff (`git diff`, `git status`). Document the real, final state of the code, never an aspiration. If something in the plan was dropped or changed during the build loop, document what shipped. Then update the plan itself with `mark-syllabus.sh <plan> <id> <x|done|dropped>` per subphase, plus a direct edit for phase-section annotations — **this is the one place in the whole run the syllabus is ticked**; no builder and no orchestrator writes it at any earlier stage, precisely so the write happens under an identity (yours) the write-scope hooks can recognize. Source each tick from the run dir's own exit reports, not from re-deriving completion off the diff after the fact: read every `<run-dir>/reports/<lane-id>-exit.md` for a lane that merged, and use its fenced header's `subphases:` line and body as the authority for what that lane finished, shipped differently, or dropped — a report immediately checked against the real diff at merge-back (`verify-scope.sh`), and so more trustworthy than a second-hand reconstruction. A `subphases:` line naming literal syllabus IDs (e.g. `6.1, 6.2, 6.3`) maps directly to syllabus checkboxes: check off (`- [x]`) each one finished as planned, mark `- [dropped]` one abandoned, and annotate in the phase section one shipped differently. A `subphases:` line naming the LANE instead of syllabus IDs (a gate-kickback rework lane fixing a defect the code gate found, e.g. `l6 (impl-wrong kickback...)`) corresponds to no new syllabus item — annotate the relevant phase section with what it fixed, and tick nothing new for it. Cross-check against the actual diff and the `review-code` outcome for sanity, but an exit report's own claim is authoritative over a diff re-read after the fact. In a map-driven run there is no plan, diff, or exit report — the explore map file is your ground truth; reconcile the existing `/docs` tree against it and add, update, or delete accordingly. In a **reconciliation-driven** run there is no fresh diff, exit report, or build summary from this session — use the reconciliation report as the record of what's done, partial, dropped, or diverged, and check off/annotate the plan syllabus exactly per that classification (`- [x]` for done, `- [dropped]` for dropped, a short annotation in the phase section for partial/diverged items noting how reality differs from the plan). Get these ticks right: `plan-lifecycle.sh archive`'s completeness guard reads exactly this syllabus state and refuses to archive a plan with any subphase still `- [ ]`, or with every subphase `- [dropped]` and none `- [x]`/`- [done]` — so an accurate syllabus here is what makes the plan archivable at all, not a cosmetic record-keeping step.
 
 3. **Mirror the project structure inside `/docs`.** The docs tree reflects the source tree:
    - Single project: write into `/docs` directly (e.g. `docs/README.md`, `docs/architecture.md`, topic files).
@@ -54,15 +53,15 @@ All three shapes also carry whether to record a changelog (commit, `docs/changel
    - **git commit** — `git add` the relevant files then `git commit` with a clear message. **NEVER push.** If on the default branch and the workflow created a feature branch, commit there; otherwise follow the project's branching convention.
    - **`docs/changelog`** — append a dated entry describing what changed and why.
    - **both** — commit and a `docs/changelog` entry.
-   Use the preference given in the invocation args or established by the conventions; you run in an isolated fork and cannot ask the user mid-run, so if it isn't established, default to none and flag the open changelog question in your final report for the caller to raise with the user.
+   Use the preference given in the invocation args or established by the conventions; you run inline within `documenter`'s own turn and cannot ask the user mid-run, so if it isn't established, default to none and flag the open changelog question in your final report for the caller to raise with the user.
 
 7. **Verify.** Confirm `/docs` reflects reality, symlinks resolve, and any changelog/commit landed. Run the project's docs/format checks if they exist.
 
 ## Hand-off / next
 
-The document phase is the last content step of the workflow. Report a concise summary of what was documented (paths under `/docs`), which plan syllabus items were checked off or annotated, any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to the orchestrator (the `dae` skill) or the user. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to the `review-code` gate or a redispatched `builder` lane — rather than papering over it in prose.
+The document phase is the last content step of the workflow. Report a concise summary of what was documented (paths under `/docs`), which plan syllabus items were checked off or annotated, any symlinks created or repaired, and whether a changelog entry or commit was made. Hand control back to your caller — the `documenter` agent when dispatched through the dae workflow, or the user for a direct invocation. If while documenting you find the code and docs can't be reconciled (the implementation is wrong or incomplete), stop and loop back — typically to the `review-code` gate or a redispatched `builder` lane — rather than papering over it in prose.
 
-Return contract: as a fork your final report IS the hand-off — return exactly what was written and committed (docs paths, symlinks, changelog/commit outcome) to the caller (the `dae` orchestrator or the main conversation); any loop-back is a recommendation in that report, not a phase you invoke yourself.
+Return contract: your final report IS the hand-off — return exactly what was written and committed (docs paths, symlinks, changelog/commit outcome) to the caller (the `documenter` agent, or the main conversation for a direct invocation); any loop-back is a recommendation in that report, not a phase you invoke yourself.
 
 ## Notes
 

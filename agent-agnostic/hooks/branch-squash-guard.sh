@@ -35,10 +35,11 @@
 #
 # MODE DETECTION
 #   The integration branch is resolved via resolve-config.sh's
-#   CLAUDE_BASE_BRANCH chain (--base-branch-default: dev if it exists
-#   —local branch or origin/dev—, else main, else origin/HEAD's short
-#   name), rooted at the MAIN repo (via --git-common-dir, so this behaves
-#   the same whether invoked from the main checkout or a linked worktree).
+#   CLAUDE_BASE_BRANCH chain (--base-branch-default: main if it exists,
+#   else the short name of origin/HEAD, else resolution fails rather
+#   than inventing a branch), rooted at the MAIN repo (via
+#   --git-common-dir, so this behaves the same whether invoked from the
+#   main checkout or a linked worktree).
 #   Mode A is then simply: the resolved integration branch is NOT literally
 #   "main", AND a branch actually named "main" exists in this repo (local
 #   or origin/main) — i.e., main exists as a DISTINCT, separately-protected

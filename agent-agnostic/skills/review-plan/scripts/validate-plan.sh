@@ -16,11 +16,18 @@
 #        plan-format fixes the ID, not the markup around it, so both count.
 #     4. Every '(after: ...)' reference names a real subphase ID.
 #     5. The (after:) dependency graph is acyclic.
-#     6. The plan carries a well-formed ask-of-record declaration, in its
-#        preamble or its '## Goal & scope' section: a path-shaped backticked
-#        token that resolves to a real file (Form P), or an explicit
-#        no-durable-ask statement (Form N). Schema only — whether the plan is
-#        actually FAITHFUL to that ask is the reviewer's judgement, not this
+#     6. The plan carries an Ask of record section: a markdown heading
+#        (level 3 through 6) whose text contains "ask of record"
+#        (case-insensitive), living strictly in the plan's PREAMBLE (before
+#        the first '## ' heading), with at least one non-blank, non-heading
+#        line of content between it and the next heading of the same or
+#        shallower level (or the end of the preamble, whichever comes
+#        first) — a heading with no body beneath it, including a second
+#        "ask of record" heading, is markup, not verbatim ask text, and
+#        does not by itself satisfy non-emptiness. No filesystem resolution
+#        of any kind — a path mentioned inside the section's text is never
+#        opened or stat'd. Schema only — whether the plan is actually
+#        FAITHFUL to that ask is the reviewer's judgement, not this
 #        script's.
 #   Lane file-scope disjointness is NOT machine-checked (scopes are prose in
 #   the detail blocks) — that stays with the reviewer, flagged as INFO.
@@ -125,62 +132,47 @@ if [ -n "$edges" ]; then
   fi
 fi
 
-# --- 6. ask-of-record declaration (schema only) -----------------------------
-# Search region: the union of the preamble (lines before the first '## '
-# heading) and the '## Goal & scope' section (that heading to the next
-# '## '). Both locations are conforming per plan-format; the union preserves
-# document order since the preamble always precedes any '## ' section.
+# --- 6. Ask of record section (schema only) ---------------------------------
+# Search region: the plan's PREAMBLE only (everything before the first '## '
+# heading) — same one-liner check 1's syllabus lookup already relies on in
+# spirit. The old '## Goal & scope' search window and all filesystem
+# resolution are retired entirely: the ask lives in the plan now, not at a
+# path, so nothing here ever opens or stats anything.
 preamble=$(awk '/^## /{exit} {print}' "$plan")
-goal_scope=$(awk '/^## Goal & scope/{f=1;next} /^## /{if(f)exit} f' "$plan")
-ask_region=$(printf '%s\n%s\n' "$preamble" "$goal_scope")
 
-# A declaration line carries the phrase 'ask of record' (case-insensitive) in
-# one of three markups: a bold lead-in ('**The ask of record:** ...' /
-# '**Ask of record:** ...'), a markdown heading ('### Ask of record' ..
-# '###### Ask of record', levels 3-6 only), or a list bullet
-# ('- Ask of record: ...' / '- **Ask of record:** ...' /
-# '  - Ask of record — ...'). Matching only one markup would fail every plan
-# written in another — the same tolerance detail_open/detail_close already
-# applies above. Level 2 is excluded on purpose: a '## Ask of record' heading
-# would itself be a top-level section, colliding with the syllabus-first
-# check and unreachable by either search window above.
-ask_decl_regex='^(\*\*[^*]*ask of record[^*]*\*\*|#{3,6}[[:space:]]+.*ask of record|[[:space:]]*-[[:space:]]+.*ask of record)'
-ask_decl_line=$(echo "$ask_region" | grep -im1 -E "$ask_decl_regex" || true)
+# The section opens with a markdown heading, level 3 through 6, whose text
+# contains 'ask of record' case-insensitive. Nothing else opens it (no bold
+# lead-in, no list bullet — those were tolerated for the old one-line
+# declaration; this is a multi-entry section and a heading is the only sane
+# container for that). Line-numbered search (not exit-status-only) so the
+# body can be sliced from the line after it — this repo's grep may be ugrep,
+# so assert on captured content.
+ask_heading_match=$(printf '%s\n' "$preamble" | grep -inE '^#{3,6}[[:space:]]+.*ask of record' | head -1 || true)
 
-if [ -z "$ask_decl_line" ]; then
-  say_fail "no ask-of-record declaration found — the preamble or '## Goal & scope' must carry one (see plan-format)"
+if [ -z "$ask_heading_match" ]; then
+  say_fail "no Ask of record section found — a heading (### through ######) containing \"ask of record\" must appear in the plan's preamble, before '## Phase syllabus' (see plan-format)"
 else
-  # Form P precedence: the first path-shaped backticked token (contains '/'
-  # or ends '.md') wins even if a negative marker also appears on the line.
-  ask_path=""
-  while IFS= read -r tok; do
-    tok="${tok#\`}"; tok="${tok%\`}"
-    case "$tok" in
-      */*|*.md) ask_path="$tok"; break ;;
-    esac
-  done < <(echo "$ask_decl_line" | grep -oE '`[^`]+`')
+  ask_heading_lineno="${ask_heading_match%%:*}"
+  ask_heading_text="${ask_heading_match#*:}"
+  ask_heading_level=$(printf '%s\n' "$ask_heading_text" | grep -oE '^#{3,6}' | awk '{print length}')
 
-  if [ -n "$ask_path" ]; then
-    # Path resolution: as given if absolute; else relative to the plan
-    # file's own directory; else relative to the cwd. First hit wins.
-    case "$ask_path" in
-      /*) ask_resolved="$ask_path" ;;
-      *)
-        plan_dir=$(dirname -- "$plan")
-        if [ -f "$plan_dir/$ask_path" ]; then
-          ask_resolved="$plan_dir/$ask_path"
-        else
-          ask_resolved="$ask_path"
-        fi
-        ;;
-    esac
-    [ -f "$ask_resolved" ] \
-      || say_fail "ask-of-record declaration points to a path that does not exist: $ask_path"
-  elif echo "$ask_decl_line" | grep -qiE 'no durable ask|no ask of record|not captured|conversation context|\bnone\b'; then
-    : # Form N: an explicit no-durable-ask statement.
-  else
-    say_fail "ask-of-record declaration is malformed — the path or no-durable-ask statement must be on the declaration line itself, not a following line: $ask_decl_line"
-  fi
+  # The section's body runs from the line after the heading to the first
+  # following line that is ITSELF a heading of level <= the ask heading's
+  # own level (a sibling or shallower section starting — including a SECOND
+  # "ask of record" heading at the same level) — or to the end of the
+  # preamble, whichever comes first. Within that bounded region, real
+  # content is any line that is neither blank nor itself a heading: a
+  # heading with no body beneath it is markup, not verbatim ask text, and
+  # must not satisfy non-emptiness on its own (this is what makes two
+  # empty "ask of record" headings fail exactly once, not zero times).
+  ask_body=$(printf '%s\n' "$preamble" | awk -v start="$ask_heading_lineno" -v lvl="$ask_heading_level" '
+    NR <= start { next }
+    match($0, /^#+[[:space:]]/) { if ((RLENGTH - 1) <= lvl) exit; next }
+    /^[[:space:]]*$/ { next }
+    { print }
+  ')
+  [ -n "$ask_body" ] \
+    || say_fail "Ask of record section is empty — it must carry the verbatim ask text (see plan-format)"
 fi
 
 echo "INFO: lane file-scope disjointness is not machine-checked — verify scopes in the detail blocks."

@@ -16,8 +16,8 @@ exactly one **type**, whose `pipeline` axis selects a middle file, then drives
 two **worker agents** (`planner`, `builder`) through **cold gates** to a PR —
 or, for `map` (`pipeline: report`, `ship: chat`), answers the question in
 chat instead; `analyze` runs the same middle but publishes. Nothing in the
-pipeline is bound to a technology: the record stage is `document-local` in
-every configuration.
+pipeline is bound to a technology: the record stage always dispatches the
+`documenter` agent, which runs `document-local`, in every configuration.
 
 ```
                     ┌─ pipeline: report, ship: chat (map) ─▶ explore ─▶ fill
@@ -96,7 +96,7 @@ the other mode with `--ship`. `bugfix` vs `diagnose`: known cause
 |---|---|---|
 | Orchestrator | `dae`, `orchestrate` | the conversation; holds every human gate |
 | Workers | `planner` (opus, warm — revisions via SendMessage), `builder` (sonnet, one per lane) + its `coder`/`contract-tester` sub-agents | own contexts |
-| Cold forks | `explore`, `review-plan`, `review-code`, `review-pr`, `init-workspace`, `document-local`, `push-pr`, `comment-pr`, `cleanup-merged` (+ `committee`, wrapping a gate at `rigor: med\|high`) | isolated; envelope return |
+| Cold forks | `explore`, `review-plan`, `review-code`, `review-pr`, `init-workspace`, `push-pr`, `comment-pr`, `cleanup-merged` (+ `committee`, wrapping a gate at `rigor: med\|high`) | isolated; envelope return |
 
 Every worker and fork returns the **shared envelope** — `status`,
 `artifacts[]`, `next`, `blockers[]` (defined once in
@@ -117,11 +117,14 @@ context.
 Each builder works in its own **child worktree** (`workflow-setup.sh --parent`)
 with its own `init-workspace`; on report, `dae` verifies the lane
 (`verify-scope.sh`), merges the child branch into the parent (a conflict IS a
-scope violation), ticks the syllabus (`mark-syllabus.sh`), updates the
-progress log, and pushes the parent (`push-pr --stage update` — no
-confirmation) BEFORE removing the lane's worktree/branch — cleanup waits for
-the push because the child is the only place a lane's work exists outside the
-parent's local history. A failed or declined push defers that lane's cleanup
+scope violation), updates the progress log with the lane's subphase outcomes,
+and pushes the parent (`push-pr --stage update` — no confirmation) BEFORE
+removing the lane's worktree/branch — cleanup waits for the push because the
+child is the only place a lane's work exists outside the parent's local
+history. The plan file itself is never touched at this event: `dae` writes
+nothing to `plan.md`, ever — the syllabus is ticked exactly once, at Record,
+by the `documenter` agent reading every merged lane's own exit report
+(`mark-syllabus.sh` is its script, not the router's). A failed or declined push defers that lane's cleanup
 (worktree and branch kept, recorded in the progress log, retried after a later
 successful push) without blocking the schedule; a run with no remote or PR
 tooling at all cleans up normally, since there's nothing to wait for. `dae`
@@ -158,7 +161,8 @@ rebuild / leave the PR as a draft (+ `comment-pr` posting the report),
 ## Documentation dispatch
 
 Per `artifact-locations`, setup resolves `CLAUDE_DOCS_DIR` — always a local
-path — and the ship stage always records through **`document-local`**
+path — and the ship stage always records by dispatching the
+**`documenter`** agent, which runs **`document-local`**
 (mirror/symlink rules per `doc-format`). The optional `CLAUDE_DOCS_PUBLISH`
 names a separate publish target; publishing is a **CI job on merge**, never a
 run stage. When `CLAUDE_DOCS_PUBLISH` is set, `confluence-mode.md` governs
@@ -189,10 +193,19 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   verdict round), `validate-report.sh` (caller-side report schema check),
   `resolve-scratch.sh` (the `ship: chat` scratch-dir resolver; delegates the
   configured rung to `resolve-config.sh`),
-  `sync-install.sh` (this repo → `~/.claude`, deletions included).
-- Wired: `workflow-diff-check.sh` (`Stop` on `dae`), `scope-writes.sh`
-  (`PreToolUse`; denies orchestrator writes outside the run's `.artifacts/`,
-  the resolved plans dir, and the resolved docs dir, self-configured from a
+  `sync-install.sh` (this repo → `~/.claude`, deletions included;
+  `push-main` invokes it directly for a full sync after every landing — but
+  it is also wired via a `SessionStart` hook in `settings.json`, which runs
+  it in `--check` mode as a passive drift warning on every session start).
+- Wired: `workflow-diff-check.sh` (`Stop`, global via `settings.json`;
+  self-scoped to a dae run's own parent worktree via the same parent-worktree
+  marker walk as its two neighbors below — inert everywhere else, including
+  inside a lane child), `scope-writes.sh`
+  (`PreToolUse`; per-role write-scope guard — the orchestrator is denied
+  everywhere except this run's own gate reports (`*-review.md`/
+  `sync-report.md`) under the resolved plans dir, its own run dir's
+  `explore-map-*.md`, and a committee's own `claims-c<n>.md`/`accepted.md`/
+  `reverify.md`; nothing under the docs root, self-configured from a
   parent-worktree marker — no env var), `parent-tree-guard.sh`
   (`PostToolUse` on `Bash` and on `Stop`; catches Bash-side product writes a
   `PreToolUse` hook can't see), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
@@ -204,4 +217,4 @@ Bash, applying to a **consuming** project, not to `agentic` (except
 The orchestrator gets the shortest name (`/dae`); the old entry points (`/dev`,
 `/map`, `/sync-status`, `/diagnose`) are deleted — `/dae --type` covers them. Forks keep
 guarded generic names (`explore`) or verbose collision-free ones
-(`init-workspace`, `review-code`, `document-local`, `push-pr`, `review-pr`).
+(`init-workspace`, `review-code`, `push-pr`, `review-pr`).

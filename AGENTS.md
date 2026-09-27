@@ -11,11 +11,13 @@ agentic/
 │   ├── skills/                dae (/dae — router + workflow siblings), orchestrate (/orchestrate),
 │   │                          explore, init-workspace, review-*, document-local, push-pr
 │   ├── agents/                planner.md (+ planner/plan-*.md modules), builder.md,
-│   │                          coder.md, contract-tester.md, committee.md
+│   │                          coder.md, documenter.md, contract-tester.md, committee.md
 │   ├── hooks/                 workflow-setup.sh, workflow-diff-check.sh, resolve-config.sh,
 │   │                          sync-install.sh, scope-writes.sh, mark-syllabus.sh, verify-scope.sh,
 │   │                          smart-lint.sh, smart-test.sh, … (wired via settings.json)
-│   └── settings/              settings.json — versioned source of ~/.claude/settings.json
+├── agent-specific/            ← bound to ONE agent tool (never installs to ~/.claude as skills/rules)
+│   ├── claude/                settings.json — versioned source of ~/.claude/settings.json (MERGED, not copied)
+│   └── antigravity/           hooks.json, rules/, skills/ — the Antigravity port
 ├── tool-based/                ← bound to ONE technology or service
 │   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
 │       ├── rules/
@@ -76,9 +78,13 @@ to bindings by `domain:`.
   rules are on whenever that tech is in play. Skills name what they need in
   `rules:` frontmatter.
 - **Hooks** — deterministic mechanical enforcement (shell, no model judgment).
-  Skill-scoped hooks wire via a skill's/agent's `hooks:` frontmatter and run
-  only while that skill is active (`workflow-diff-check.sh`); global quality
-  hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
+  Agent-scoped hooks wire via an AGENT's `hooks:` frontmatter and run only
+  while that agent is active — never a skill's: Claude Code has no such
+  feature for skills, only for agent definitions and settings files. Global
+  hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`,
+  `workflow-diff-check.sh` — the last self-scopes to a dae run's own parent
+  worktree via a marker walk, so it stays inert everywhere else despite being
+  wired globally). Helper
   scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
   the `~/.claude/hooks/` (or `~/.gemini/config/hooks/`) install path but are invoked explicitly, never wired.
 

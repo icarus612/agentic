@@ -91,9 +91,13 @@ See [`pipeline.md`](pipeline.md) for the dae pipeline and
 > warm contexts, and return the shared envelope (`conventions.md`).
 >
 > **Hooks are deterministic, mechanical enforcement — shell, no judgment.**
-> Skill-scoped hooks wire via a skill's/agent's `hooks:` frontmatter and run
-> only while that skill is active (`workflow-diff-check.sh`); global quality
-> hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`). Helper
+> Agent-scoped hooks wire via an AGENT's `hooks:` frontmatter and run only
+> while that agent is active — never a skill's: Claude Code has no such
+> feature for skills, only for agent definitions and settings files. Global
+> hooks wire via `settings.json` (`smart-lint.sh`, `smart-test.sh`,
+> `workflow-diff-check.sh` — the last self-scopes to a dae run's own parent
+> worktree via a marker walk, so it stays inert everywhere else despite being
+> wired globally). Helper
 > scripts (`workflow-setup.sh`, `resolve-config.sh`) sit in hook dirs to share
 > the `~/.claude/hooks/` install path but are invoked explicitly, never wired.
 >

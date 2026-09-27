@@ -73,8 +73,15 @@ description conventions are load-bearing:
   so they need no guard.
 
 Optional frontmatter: `context: fork` (runs in an isolated subagent; inputs
-arrive via invocation args only), `agent:` (a specific agent type for the fork),
-`hooks:` (skill-scoped hook wiring, e.g. the `Stop` hook on `dae`). A skill may also carry sibling detail files and a `scripts/` dir next to its SKILL.md — siblings load only when the router activates them; scripts are run, never loaded.
+arrive via invocation args only), `agent:` (a specific agent type for the
+fork — either a built-in agent type or any custom subagent from
+`.claude/agents/`).
+A skill has no `hooks:` frontmatter of its own — Claude Code has no such
+feature — so a skill cannot wire a hook directly; hooks wire only through an
+agent definition's own `hooks:` frontmatter, or a settings file, per
+`agent-agnostic/AGENTS.md`'s `hooks/` section. A skill may also carry sibling
+detail files and a `scripts/` dir next to its SKILL.md — siblings load only
+when the router activates them; scripts are run, never loaded.
 
 ## Rule file format
 

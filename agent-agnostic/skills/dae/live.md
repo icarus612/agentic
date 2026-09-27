@@ -19,17 +19,24 @@ row is fixed to `publish`.
 
 **2. Capture the ask, then plan.** Every ask is written to a durable file BEFORE the planner is
 messaged: `<run-dir>/asks/<n>.md`, numbered from 1 in arrival order, holding the user's words
-verbatim. This is not bookkeeping — a live plan has no single up-front brief, so the `asks/`
-DIRECTORY is what its plan's `plan-format` ask-of-record pointer names, and `review-plan`'s
-ask-vs-plan diff (step 7, "Diff the plan against the ask of record") reads the numbered file for
-the phase under review. An ask reaching the planner only through conversation context is a
-defect in this loop.
+verbatim. This is not bookkeeping — a live plan has no single up-front brief, so each numbered
+file is what the planner opens and copies VERBATIM, dated, into the plan's own **Ask of record**
+section (`plan-format` owns that section's shape — reference it, never restate it), and
+`review-plan`'s ask-vs-plan diff (step 7, "Diff the plan against the ask of record") reads that
+section for the phase under review. An ask reaching the planner only through conversation context
+is a defect in this loop.
 Then spawn the warm `planner` agent with module `plan-live`, the ask FILE path (never pasted
-content), the parent worktree path, and the resolved axes. It writes `Phase 1` with `1.1..1.k`
-subphases annotated `(lane 1)` to `<plans-dir>/proposals/<slug>-MM-DD-YY.md`. Run
+content), the parent worktree path, and the resolved axes. Bracket this spawn —
+`workflow-setup.sh --set-role planner --root <parent-worktree>` before,
+`workflow-setup.sh --set-role orchestrator --root <parent-worktree>` the instant it returns — per
+the router's shared **Planner role flip** step (`SKILL.md`); every later re-entry in stage 3's
+conversational loop (a user ask, a builder report needing a plan amendment) re-brackets the same
+way. It writes `Phase 1` with `1.1..1.k` subphases annotated `(lane 1)` to
+`<plans-dir>/proposals/<slug>-MM-DD-YY.md`. Run
 `validate-plan.sh` ALWAYS — it ships inside the `review-plan` skill at `<review-plan skill
 dir>/scripts/validate-plan.sh`, NOT as an installed hook. Invoke `review-plan` ONLY when
-`RIGOR_PLAN` is `med` or `high`; at `low` the plan goes straight to the user for approval. Then
+`RIGOR_PLAN` is `med` or `high`; at `low`, skip straight to the router's shared **Open a proposal
+for human review** step (`SKILL.md`) for the plan gate. Then
 `plan-lifecycle.sh promote`, then the shared **Open the draft PR** step. `init-workspace` runs in
 parallel, joined before dispatch.
 
@@ -46,9 +53,12 @@ parallel, joined before dispatch.
 
 **4. Per-lane merge.** `build-dispatch.md`'s merge-back sequence, by name: `verify-scope.sh`
 against the exit report's file list → merge the child branch into the parent →
-`mark-syllabus.sh` per subphase → `push-pr --stage update`, no conversational confirmation per D1
-→ lane cleanup branching on the push outcome. One addition beyond `build-dispatch.md`: SendMessage
-the planner to annotate that phase's detail blocks with what actually shipped. Then an **offer** —
+progress-log update (lane event + each subphase's outcome, per `build-dispatch.md`'s note — the
+plan file itself is untouched here) → `push-pr --stage update`, no conversational confirmation per
+D1 → lane cleanup branching on the push outcome. One addition beyond `build-dispatch.md`:
+SendMessage the planner to annotate that phase's detail blocks with what actually shipped — a
+prose annotation, never a syllabus tick; the syllabus itself stays unticked until stage 5's Record,
+same as `build.md`. Then an **offer** —
 explicitly dismissable, never a stage; a declined or ignored offer changes nothing about the run:
 - open the parent worktree in the user's editor (`$VISUAL`, else `code <path>`) — offered
   unconditionally;

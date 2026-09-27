@@ -121,6 +121,39 @@ scratchdir="$base_dir/$slug-$runid"
 
 mkdir -p "$scratchdir" || err "could not create scratch dir: $scratchdir"
 
+# --- chat-run marker: progress-log.md only, never dae-role -----------------
+# In-repo resolutions (rung 1-configured-in-repo, or rung 2) additionally
+# seed <repo_root>/.artifacts/progress-log.md, only if absent, so
+# scope-writes.sh/parent-tree-guard.sh's find_parent_worktree sees this repo
+# root as marked and land the run on the "absent role" fallback -- today's
+# permissive 3-root allow (artifacts_root/plans_root/docs_root) -- which
+# correctly covers this run's own writes under
+# $repo_root/.artifacts/reports/<slug>-<runid>/. Idempotent by design: never
+# overwrite, so concurrent/sequential chat runs against the same repo never
+# stomp each other's log, and a repo root that happens to already be a real
+# dae parent worktree never has its genuine progress log clobbered.
+# Deliberately does NOT write .artifacts/dae-role: an "orchestrator" marker
+# would, per scope-writes.sh's role table, restrict writes to ONLY
+# *-review.md/sync-report.md under plans_root -- which would wrongly block
+# this run's own scratch-dir writes. Leaving dae-role unset is correct, not
+# an oversight. Rung 3 (outside any git repo) gets no marker at all -- there
+# is no product tree to protect there. Failure to seed the marker is a
+# courtesy miss, never fatal -- this script's job (resolving/creating
+# scratchdir) is already done above.
+if [ "$in_repo" = 1 ]; then
+  marker_dir="$repo_root/.artifacts"
+  marker_log="$marker_dir/progress-log.md"
+  if [ ! -e "$marker_log" ]; then
+    mkdir -p "$marker_dir" 2>/dev/null && {
+      printf '%s\n' \
+        "# Chat/report scratch marker" \
+        "" \
+        "(not a dae run; see .artifacts/reports/)" \
+        > "$marker_log" 2>/dev/null
+    } || true
+  fi
+fi
+
 echo "SCRATCHDIR: $scratchdir"
 echo "RUNID: $runid"
 echo "resolve-scratch: resolved via $source_phrase" >&2
