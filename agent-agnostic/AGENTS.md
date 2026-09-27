@@ -172,16 +172,6 @@ dev/main squash-only branch policy per `push-policy`; mode is detected per
 invocation from the target repo, never a static toggle). Configured by
 `CLAUDE_HOOKS_*` env vars — see [`hooks/README.md`](hooks/README.md).
 
-The `record-changed.sh`/`test-changed.sh` pair is present in this directory
-but is NOT wired: no `settings.json` this repo has ever tracked references
-either script by name, and no other file in the repo invokes them. They form
-a session-wide PostToolUse-recorder + Stop-gate pair — record files a session
-wrote, then test them on Stop — and `workflow-diff-check.sh`'s own header
-comment has called itself a "simplified replacement for the record-changed.sh
-+ test-changed.sh pair" since its own earliest tracked version, which is the
-likely reason they went unwired for the dae-worktree case. This is a finding
-to flag for a removal decision, not something resolved here.
-
 **Helpers** — invoked explicitly, never wired: `workflow-setup.sh` (worktrees:
 `--type feature|bug|hotfix|docs|sync`, `--parent` for builder child worktrees,
 `--reuse` for crash-resume), `resolve-config.sh` (`CLAUDE_*` settings chain),

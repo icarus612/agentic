@@ -20,8 +20,8 @@
 #        local 'main' branch if it exists, else the short name of
 #        origin/HEAD, else fail.
 #
-#   No jq dependency, matching this repo's other hooks (record-changed.sh,
-#   test-changed.sh, workflow-diff-check.sh) — the `env` block is Claude
+#   No jq dependency, matching this repo's other hooks (workflow-diff-check.sh)
+#   — the `env` block is Claude
 #   Code's documented flat "KEY": "value" string-pair schema, so grep/sed
 #   is enough without a JSON parser.
 #
