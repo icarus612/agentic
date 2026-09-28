@@ -888,6 +888,31 @@ otherwise contend for — `agent-specific/claude/settings.json`, `agent-specific
     `sync-report.md` under the plans root, which would make a `mark-syllabus.sh` edit of `plan.md`
     an offender. 1.4 settles which is true before any lane assumes either.
 
+13. **Open question — three guards now match on command TEXT rather than on the EFFECT a command
+    has, which makes them evadable and false-positive-prone at the same time.**
+    New finding, observed first-hand 09-27-26. `agent-agnostic/hooks/branch-squash-guard.sh` denies
+    a tool-level `Write`/`Edit` to a tracked file whose repo's HEAD is on the integration branch
+    (`:179-199`, which resolves the branch from the TARGET path). Its Bash arm (`:302-438`) only
+    pattern-matches git subcommands in the command string — `push`, `commit`, `merge`, branch
+    creation, `gh pr merge` — so it has no notion that a Bash-invoked script just modified a tracked
+    file on that branch. *Reproduction, minutes apart, same file, same branch, `main` HEAD:*
+    `mark-syllabus.sh <plan> <id> x` invoked through Bash **wrote to `plan.md` freely**; a
+    tool-level `Edit` on that same `plan.md` was **denied** — *"branch-squash-guard: DENIED — file
+    write to '.../plan.md' while its repo's HEAD is on the integration branch 'main'"*. The tool
+    route is fenced; the shell route is not.
+    **This is the third instance of one root cause, not a third isolated nuisance.** The other two:
+    3.3's `pr-ready-hygiene-guard.sh`, which blocked a read-only `grep` because a `|` inside its
+    QUOTED regex satisfied the guard's `[;&|]` command-position alternative; and
+    `no-attribution-guard.sh`, which blocked a read-only verification command whose grep pattern
+    spelled the forbidden markers. That last one is already fixed, and the fix's own source
+    comment states the class outright (`no-attribution-guard.sh:29-31`): *"Matching the bare word
+    anywhere blocks read-only verification (a grep FOR these markers is not publishing them)."*
+    Note it is recorded only there — nowhere in this plan. A pattern narrow enough not to fire on
+    innocent prose is narrow enough to miss the same action taken through a script; a pattern wide
+    enough to catch the script fires on the prose. Recorded as a finding only: whether this theme
+    is this plan's work or a successor's is the gate's call, and it bears directly on the ask's
+    *"ONLY the things that need them. dont over gate things"*.
+
 ## Lanes
 
 | Lane | Phases | File scope (exclusive) |

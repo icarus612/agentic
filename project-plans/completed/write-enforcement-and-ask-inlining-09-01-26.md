@@ -50,43 +50,43 @@ continuing to edit directly as the orchestrator.)
 
 ## Phase syllabus
 - [ ] Phase 1: Make the marker exist
-  - [ ] 1.1: `workflow-setup.sh` seeds `progress-log.md`                      (lane 1)
-  - [ ] 1.2: Contract test — a fresh parent worktree is gated from setup       (lane 1, after: 1.1)
+  - [x] 1.1: `workflow-setup.sh` seeds `progress-log.md`                      (lane 1)
+  - [x] 1.2: Contract test — a fresh parent worktree is gated from setup       (lane 1, after: 1.1)
 - [ ] Phase 2: Give the hooks a role to key off
-  - [ ] 2.1: The role marker — written by setup/dispatch, unwritable by the agent (lane 1, after: 1.1)
-  - [ ] 2.2: `scope-writes.sh` — per-role allowed-root table                   (lane 1, after: 2.1)
-  - [ ] 2.3: `parent-tree-guard.sh` — the same table, mirrored byte-identically (lane 1, after: 2.2)
-  - [ ] 2.4: Contract tests for all three roles, positive and negative         (lane 1, after: 2.3)
+  - [x] 2.1: The role marker — written by setup/dispatch, unwritable by the agent (lane 1, after: 1.1)
+  - [x] 2.2: `scope-writes.sh` — per-role allowed-root table                   (lane 1, after: 2.1)
+  - [x] 2.3: `parent-tree-guard.sh` — the same table, mirrored byte-identically (lane 1, after: 2.2)
+  - [x] 2.4: Contract tests for all three roles, positive and negative         (lane 1, after: 2.3)
 - [ ] Phase 3: Stop the isolation breach
-  - [ ] 3.1: `smart-test.sh` exits 0 for `coder` and `contract-tester`         (lane 1, after: 2.1)
-  - [ ] 3.2: Contract test — neither role receives suite output                (lane 1, after: 3.1)
+  - [done] 3.1: `smart-test.sh` exits 0 for `coder` and `contract-tester`         (lane 1, after: 2.1)
+  - [done] 3.2: Contract test — neither role receives suite output                (lane 1, after: 3.1)
 - [ ] Phase 4: Shrink the orchestrator to zero writes
-  - [ ] 4.1: `progress-log.sh` — one script owns the progress log             (lane 1, after: 2.2)
-  - [ ] 4.2: Orchestrator's allowed roots become empty                         (lane 1, after: 4.1)
-  - [ ] 4.3: Tests for the script and the empty scope                          (lane 1, after: 4.2)
+  - [x] 4.1: `progress-log.sh` — one script owns the progress log             (lane 1, after: 2.2)
+  - [done] 4.2: Orchestrator's allowed roots become empty                         (lane 1, after: 4.1)
+  - [x] 4.3: Tests for the script and the empty scope                          (lane 1, after: 4.2)
 - [ ] Phase 5: Contain the uncontained runs
-  - [ ] 5.1: `ship: chat` and `--worktree none` runs get a marker              (lane 1, after: 2.2)
-  - [ ] 5.2: Test — a chat run is scoped                                       (lane 1, after: 5.1)
+  - [x] 5.1: `ship: chat` and `--worktree none` runs get a marker              (lane 1, after: 2.2)
+  - [x] 5.2: Test — a chat run is scoped                                       (lane 1, after: 5.1)
 - [ ] Phase 6: The ask moves into the plan
-  - [ ] 6.1: `plan-format` — verbatim ask at the top, append-only             (lane 2)
-  - [ ] 6.2: `validate-plan.sh` check 6 — assert the section, not a path       (lane 2, after: 6.1)
-  - [ ] 6.3: `tests/validate-plan.test.sh` — check-6 cases rewritten           (lane 2, after: 6.2)
-  - [ ] 6.4: `run-artifacts` — drop `the-ask.md` from the run dir              (lane 2, after: 6.1)
-  - [ ] 6.5: `planner.md` + `review-plan` — write it, append it, diff it       (lane 2, after: 6.1)
+  - [x] 6.1: `plan-format` — verbatim ask at the top, append-only             (lane 2)
+  - [x] 6.2: `validate-plan.sh` check 6 — assert the section, not a path       (lane 2, after: 6.1)
+  - [x] 6.3: `tests/validate-plan.test.sh` — check-6 cases rewritten           (lane 2, after: 6.2)
+  - [x] 6.4: `run-artifacts` — drop `the-ask.md` from the run dir              (lane 2, after: 6.1)
+  - [x] 6.5: `planner.md` + `review-plan` — write it, append it, diff it       (lane 2, after: 6.1)
 - [ ] Phase 7: The base branch stops lying
-  - [ ] 7.1: `resolve-config.sh` — implement the documented git heuristic      (lane 3)
-  - [ ] 7.2: `tests/resolve-config-precedence.test.sh` — the heuristic         (lane 3, after: 7.1)
+  - [x] 7.1: `resolve-config.sh` — implement the documented git heuristic      (lane 3)
+  - [x] 7.2: `tests/resolve-config-precedence.test.sh` — the heuristic         (lane 3, after: 7.1)
 - [ ] Phase 8: The plan gate opens the plan
-  - [ ] 8.1: `dae/SKILL.md` — create / OPEN / ask(approve|rework|disapprove)   (lane 4)
-  - [ ] 8.2: `build.md`, `live.md`, `diagnose.md` — reference, don't restate   (lane 4, after: 8.1)
+  - [x] 8.1: `dae/SKILL.md` — create / OPEN / ask(approve|rework|disapprove)   (lane 4)
+  - [x] 8.2: `build.md`, `live.md`, `diagnose.md` — reference, don't restate   (lane 4, after: 8.1)
 - [ ] Phase 9: Docs stop overstating
-  - [ ] 9.1: `SKILL.md` — "machine-auditable", and the skill-scoped Stop hook  (lane 4, after: 8.2)
-  - [ ] 9.2: `artifact-locations` + `workflow-setup.sh` error text vs Phase 7  (lane 4, after: 7.1, 9.1)
+  - [done] 9.1: `SKILL.md` — "machine-auditable", and the skill-scoped Stop hook  (lane 4, after: 8.2)
+  - [x] 9.2: `artifact-locations` + `workflow-setup.sh` error text vs Phase 7  (lane 4, after: 7.1, 9.1)
 - [ ] Phase 11: Close the two gaps the lanes found (amendment, 09-02-26)
-  - [ ] 11.1: `none` mode seeds its markers under `.artifacts/`, like every other mode (lane 5)
-  - [ ] 11.2: Test — a `none`-mode run is detected and role-flippable          (lane 5, after: 11.1)
+  - [x] 11.1: `none` mode seeds its markers under `.artifacts/`, like every other mode (lane 5)
+  - [x] 11.2: Test — a `none`-mode run is detected and role-flippable          (lane 5, after: 11.1)
 - [ ] Phase 10: Verification
-  - [ ] 10.1: Whole suite, `bash -n`, install sync, and the marker drill       (after: 1.2, 2.4, 3.2, 4.3, 5.2, 6.3, 6.5, 7.2, 9.2)
+  - [x] 10.1: Whole suite, `bash -n`, install sync, and the marker drill       (after: 1.2, 2.4, 3.2, 4.3, 5.2, 6.3, 6.5, 7.2, 9.2)
 
 ## Goal & scope
 
@@ -203,6 +203,14 @@ run today.
 - **Criteria:** the measured breach cannot recur — assert the coder fixture's output never contains
   the test file's assertions, and the tester fixture's never contains implementation-derived values.
 
+**[done], not [x] — dormant in production:** 3.1 and 3.2 shipped exactly as specified — the hook
+code and the contract test both exist and pass. But the role marker they key off, `coder` /
+`contract-tester`, is never actually written in production: `--set-role` (the tool that seeds the
+marker) accepts only `orchestrator|planner|builder`. Nothing in the current pipeline ever sets the
+role to `coder` or `contract-tester`, so this fix's guard is correct but unreachable outside its
+own contract test. This is DP-4's own predicted outcome, still open, and is carried forward into
+the successor plan (`agent-identity-write-scope-09-26-26`) rather than fixed here.
+
 ## Phase 4: Shrink the orchestrator to zero writes
 
 ### 4.1 — `progress-log.sh`
@@ -224,6 +232,12 @@ run today.
   (`<slug>-MM-DD-YY/*-review.md`, `sync-report.md`) and nothing else. Every doc line this subphase
   touches must say **"zero outside the run's gate reports"** — a bare "zero writes" claim here would
   be false, and this plan exists because of claims like that.
+
+**[done], not [x] — shipped exactly to the DP-2 exception above:** the orchestrator's allowed
+roots are "zero outside the run's own gate reports" per the NOTE, not literally empty. That is the
+plan's own design, not a shortfall — annotated `[done]` rather than `[x]` only because the phrase
+"orchestrator's allowed roots become empty" in the subphase title is not literally true of what
+shipped.
 
 ### 4.3 — Tests
 
@@ -289,6 +303,13 @@ stays true.
 ### 9.1 — `SKILL.md`: "machine-audited" → machine-*auditable* (`verify-scope.sh` /
   `verify-run-scope.sh` are opt-in scripts, not wired hooks); and the Stop-hook line says
   skill-scoped, matching `docs/pipeline.md:193`.
+
+**[done], not [x] — shipped in two different shapes:** the "machine-audited" → machine-*auditable*
+wording fix shipped exactly as written. The "skill-scoped Stop hook" half did not: skills cannot
+declare hooks (there is no per-skill hook registration mechanism), so a skill-scoped Stop hook was
+infeasible as specified. It shipped instead as a **global** Stop hook in `settings.json`, which
+self-scopes at runtime by checking the active agent's role/identity rather than being registered
+only under one skill.
 ### 9.2 — `artifact-locations` and `workflow-setup.sh`'s error text reconciled with Phase 7's
   actual behaviour.
 
