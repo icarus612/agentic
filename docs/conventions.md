@@ -200,9 +200,12 @@ pre-approval records (`<slug>-MM-DD-YY.plan-review.md`, a
 `confluence-mode.md` run's `<slug>-MM-DD-YY.story.md`) sitting beside it as
 dotted siblings; at approval it is promoted to its own dir
 `<slug>-MM-DD-YY/` as **`plan.md`**, the siblings moving in under bare kind
-names; at post-merge closeout ONLY `plan.md` archives to
-`completed/<slug>-MM-DD-YY.md` — the rest of the dir is removed, git history
-keeps the records. A superseded or abandoned plan never
+names; at `push-pr --stage finalize`, on the branch before the PR goes
+ready, ONLY `plan.md` archives to `completed/<slug>-MM-DD-YY.md` — the rest
+of the dir is removed, git history keeps the records, and the squash merge
+carries the archive, so nothing is committed to the base after a merge. An
+archived plan is closed; follow-ups are a new run, or a plan-less fix branch
+with a changelog entry. A superseded or abandoned plan never
 enters `completed/`: it is deleted, and the successor plan's Goal & scope
 names what it supersedes and why. Every move goes through `plan-lifecycle.sh`
 (`promote | archive | supersede | reopen | locate | check | adopt`), never by

@@ -1,6 +1,6 @@
 ---
 name: push-pr
-description: The staged publisher of the dae workflow — `--stage open-draft` opens a draft PR right after plan approval, `--stage update` pushes the parent branch after every lane merge-back and record commit, and `--stage finalize` pushes the last stragglers and flips the PR from draft to ready. Leaves the worktree standing; teardown is cleanup-merged's job after the PR merges. Never force-pushes, never pushes main. Invoked by the dae orchestrator.
+description: The staged publisher of the dae workflow — `--stage open-draft` opens a draft PR right after plan approval, `--stage update` pushes the parent branch after every lane merge-back and record commit, and `--stage finalize` pushes the last stragglers, archives the plan inside the PR, and flips the PR from draft to ready. Leaves the worktree standing; teardown is cleanup-merged's job after the PR merges. Never force-pushes, never pushes main. Invoked by the dae orchestrator.
 domain: universal
 context: fork
 rules: [verify-dont-assume, artifact-locations, push-policy]
@@ -16,7 +16,7 @@ You are the sole publisher of a workflow run's branch, called repeatedly across 
 
 - `--stage open-draft` — right after plan/run approval promotes the plan, to get a draft PR open and the branch tracked from the start.
 - `--stage update` — after every lane merge-back, and for the record stage's doc commit, to keep the pushed branch current.
-- `--stage finalize` — at the end of the run, after the PR gate, to push the last stragglers and flip the PR from draft to ready.
+- `--stage finalize` — at the end of the run, after the PR gate, to push the last stragglers, archive the plan on the branch, and flip the PR from draft to ready.
 - Standalone, with any stage, to publish a workflow branch whose run reached that point but was left unpushed.
 
 ## Inputs
@@ -26,7 +26,7 @@ You run as an isolated fork with no access to the conversation history — every
 Per-stage needs beyond the above:
 - `open-draft` — the plan path (to commit the promoted plan dir) and a plan-derived summary for the PR title/body.
 - `update` — which stragglers the caller authorizes; never commit files the caller didn't list.
-- `finalize` — the work summary, the `pr-review.md` path — **required**, and it is the stage's precondition (a passing PR gate is what authorizes the draft→ready flip), not only a PR-body link — and the keep-draft decision (whether to leave the PR as a draft instead of flipping it to ready).
+- `finalize` — the work summary, the `pr-review.md` path — **required**, and it is the stage's precondition (a passing PR gate is what authorizes the draft→ready flip), not only a PR-body link — the run's plan dir (`<plans-dir>/<slug>-MM-DD-YY/`) when the run has one, which this stage archives, and the keep-draft decision (whether to leave the PR as a draft instead of flipping it to ready).
 
 ## How it works
 
@@ -71,16 +71,25 @@ check-diff-hygiene.sh --base "$BASE" --pr "$PR_NUMBER"
 
    A violation is a **refusal**, identical in shape to the PR-gate refusal above: stop cold, commit nothing, push nothing, do not flip draft to ready. Report the scan output verbatim and the fix needed. This is belt-and-braces with `pr-ready-hygiene-guard.sh`, which blocks `gh pr ready` at the harness level — the hook is the real enforcement, and it fires whether or not this step was followed. Do not treat a passing scan here as licence to skip the hook, or a blocked hook as a reason to reach for MCP or `gh api`.
 
-2. **Commit last stragglers.** Commit any remaining authorized record stragglers.
+2. **Commit last stragglers.** Commit any remaining authorized record stragglers, the `pr-review.md` round included. Record this commit's SHA — step 5's PR-body link to `pr-review.md` points at it, since step 2b deletes the file from the branch tip.
+2b. **Archive the plan.** A passing PR gate means the plan shipped, so it closes HERE, inside the PR, and the squash merge lands it with the work — never as a separate commit on the base after the merge. Run `plan-lifecycle.sh check <plans-dir>` first; a `FAIL:` line means the layout is already off — refuse, exactly like a gate refusal. Then archive and commit in ONE chained call, so the tree is never left with a staged plan move between calls (the write-scope hooks read the tree after every Bash call):
+
+<!-- plan-archive -->
+```sh
+plan-lifecycle.sh archive "$PLAN_DIR" \
+  && git commit -m "chore(plans): archive $PLAN_SLUG" -- "$PLAN_DIR" "$PLANS_DIR/completed/$PLAN_SLUG.md"
+```
+
+   ONLY `plan.md` moves, to `completed/<slug>-MM-DD-YY.md`; the rest of the dir is removed and git history keeps the records. If `archive` refuses because the syllabus still has unchecked subphases, refuse the stage: Record did not finish, and that goes back to the caller — never `--force-incomplete` from here. A run with no `plan.md` (a plan-less run) skips this step. From this commit on the plan is CLOSED: anything the PR needs afterwards is new work — its own run and PR, or a plan-less fix branch cut from this branch carrying only the change and a changelog entry. Nothing reopens an archived plan.
 3. **Push.** `git push origin <branch>`, before any PR-state change. Never `--force`, never main or the base branch. Report which of the three push outcomes occurred — a successful push here is what clears any lane cleanups deferred earlier in the run.
 4. **Retry a missing PR, if needed.** If `open-draft` was declined or impossible and `update` never got the chance to retry either, open the draft PR now (same action as `open-draft` step 3) — this is the last retry point; no stage blocks on it.
-5. **Flip draft to ready.** Refresh the PR title/body with the final work summary and a pointer to `pr-review.md`, then flip the PR from draft to ready — `gh pr ready`, or the GitHub MCP `update_pull_request` with `draft: false` **only if `gh` is not installed**. A blocked or denied `gh pr ready` is never a reason to switch to MCP, `gh api`, or a GraphQL mutation (see **A denial is not unavailability** below). This is the second outward-facing PR-state change, so hold a conversational confirmation before it ("push and mark the PR ready?") — the push in step 3 already happened by this point, so the confirmation gates only the ready-flip. Unless the caller passes keep-draft, in which case leave the PR as a draft and report why.
+5. **Flip draft to ready.** Refresh the PR title/body with the final work summary and a pointer to `pr-review.md` at the step-2 commit SHA (the file no longer exists at the branch tip), then flip the PR from draft to ready — `gh pr ready`, or the GitHub MCP `update_pull_request` with `draft: false` **only if `gh` is not installed**. A blocked or denied `gh pr ready` is never a reason to switch to MCP, `gh api`, or a GraphQL mutation (see **A denial is not unavailability** below). This is the second outward-facing PR-state change, so hold a conversational confirmation before it ("push and mark the PR ready?") — the push in step 3 already happened by this point, so the confirmation gates only the ready-flip. Unless the caller passes keep-draft, in which case leave the PR as a draft and report why.
    - If the confirmation is declined, leave the PR as a draft, record the exact command to flip it later, and report — a declined PR action is a valid outcome, not an error to route around.
    - If the repo has no remote hosting or no PR tooling is available, say so and report the branch as pushed-only.
 
 ### Leaving the worktree standing (every stage)
 
-Do NOT remove the worktree, at any stage. Per the `run-artifacts` rule the run dir lives at `<worktree>/.artifacts/` — progress log, builder contracts, exit reports — so removing the worktree destroys the run's state while the PR is still open. That state is still needed: `review-pr` runs `verify-run-scope.sh` against the exit reports on a fresh pass, and a `rejected` verdict routes an `impl-wrong` kickback that redispatches a lane from its contract. Teardown belongs to `cleanup-merged`, after the PR has actually merged and the plan is archived. Report the worktree path as still live and say why.
+Do NOT remove the worktree, at any stage. Per the `run-artifacts` rule the run dir lives at `<worktree>/.artifacts/` — progress log, builder contracts, exit reports — so removing the worktree destroys the run's state while the PR is still open. That state is still needed: `review-pr` runs `verify-run-scope.sh` against the exit reports on a fresh pass, and a `rejected` verdict routes an `impl-wrong` kickback that redispatches a lane from its contract. Teardown belongs to `cleanup-merged`, after the PR has actually merged. Report the worktree path as still live and say why.
 
 ### The three push outcomes (every stage)
 
@@ -121,9 +130,9 @@ Each stage returns its own contract. `open-draft` and `update` do not end the wo
 
 - `open-draft` returns: the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible (with the exact push command if failed-or-declined); the PR URL if opened as a draft (or the exact command to open it, if failed-or-declined or publishing impossible); the worktree path, still live.
 - `update` returns: the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible — stated explicitly so the caller can branch on it (amendment A1: `build-dispatch.md` decides whether to clean up the lane's child worktree and branch on exactly this distinction); the PR URL and state if a retried open succeeded; the worktree path, still live; the straggler commits made.
-- `finalize` returns one of four outcomes, distinct from each other: **refused — PR gate not passed** (the `pr-review.md` precondition failed; nothing committed, nothing pushed, the PR left as-is — report which of the three gate conditions missed, the `pr-review.md` path checked, and the `validate-report.sh` output), or, when the gate passed, the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible (a successful push here is what clears any lane cleanups deferred earlier in the run); the PR URL and its final state (ready, or still draft with the reason); the worktree path, still live with its run dir intact for the PR gate and any kickback; any straggler commits made.
+- `finalize` returns one of four outcomes, distinct from each other: **refused — PR gate not passed** (the `pr-review.md` precondition failed; nothing committed, nothing pushed, the PR left as-is — report which of the three gate conditions missed, the `pr-review.md` path checked, and the `validate-report.sh` output), or, when the gate passed, the branch name; the push outcome — succeeded / failed-or-declined / publishing impossible (a successful push here is what clears any lane cleanups deferred earlier in the run); the PR URL and its final state (ready, or still draft with the reason); the worktree path, still live with its run dir intact; any straggler commits made; the plan-archive commit and the `completed/` path (or that the run had no plan). A `plan-lifecycle.sh` refusal at step 2b is a refusal outcome of the same shape as the gate refusal: nothing pushed, the PR left as-is.
 
-Only `finalize`'s return ends the workflow by default — nothing follows automatically. Follow-ups the caller may invoke, never you, once the PR exists (at any verdict, not only after `finalize`): `comment-pr` to post a review report on the PR, `review-pr` for a fresh pass on the published PR, and — once the PR merges — `cleanup-merged` to close out the branch, run dir, and plan archive.
+Only `finalize`'s return ends the workflow by default — nothing follows automatically. Follow-ups the caller may invoke, never you, once the PR exists (at any verdict, not only after `finalize`): `comment-pr` to post a review report on the PR, `review-pr` for a fresh pass on the published PR, and — once the PR merges — `cleanup-merged` to remove the branch, worktree, and run dir (the plan is already archived, by this stage).
 
 ## Notes
 

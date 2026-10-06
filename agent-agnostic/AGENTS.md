@@ -89,7 +89,7 @@ inline inside the `documenter` agent's own turn (see that agent's row in
 | `comment-pr` | Post the plan dir's `pr-review.md` verdict to GitHub: `scripts/render-pr-comment.sh` renders the last round, `gh` posts it with confirmation. Never reviews. |
 | `document-local` | The Record stage of EVERY run: write into the docs root, the single source of truth; optional changelog commit (never a push). The docs root is always a local path (`CLAUDE_DOCS_DIR` is `--expect path`-enforced), so there is no other-target branch; publishing beyond the repo is a CI job on merge, never a run stage. |
 | `push-pr` | The staged publisher, called with `--stage open-draft` \| `update` \| `finalize`: `open-draft` opens the draft PR right after plan approval, `update` pushes the branch after every lane merge-back and the record commit, `finalize` pushes final stragglers and flips the PR from draft to ready. Leaves the worktree standing — teardown is `cleanup-merged`'s, post-merge. `open-draft` and `finalize` each hold one conversational confirmation; `update` asks nothing. |
-| `cleanup-merged` | Post-merge closeout: verified-merged branch deleted local+remote, worktrees pruned, run dir removed, only `plan.md` archived to `completed/` (its records removed with the rest of the dir), optional Jira transition. Safe deletes only. |
+| `cleanup-merged` | Post-merge closeout: verified-merged branch deleted local+remote, worktrees pruned, run dir removed, plan confirmed in `completed/` (archived inside the PR by `push-pr --stage finalize`), optional Jira transition. Safe deletes only; makes no commits. |
 
 ### Entry points
 

@@ -49,7 +49,7 @@ dae (/dae) ─resolve type/pipeline─┤
                      base; ready │ tentative │ rejected → replan / rebuild /
                      leave as draft + comment-pr)
                                                ▼
-                          push-pr --stage finalize (draft → ready)
+                          push-pr --stage finalize (archive plan on branch, draft → ready)
 ```
 
 `live` (`pipeline: live`) follows the SAME `ship: publish` branch through
@@ -132,7 +132,9 @@ then re-scans the `(after:)` frontier and dispatches immediately — no wave
 barriers. At run end the parent is the only worktree/branch remaining IF every
 lane's push succeeded — already published (pushed, PR opened as draft, since
 plan approval and kept current by every lane-merge push) — `finalize`
-completes that publication by flipping draft → ready; any lane still carrying
+archives the plan to `completed/` on the branch, so the squash merge carries
+it and nothing is committed to the base afterwards, then completes that
+publication by flipping draft → ready; any lane still carrying
 a deferred cleanup is surfaced to the user with its worktree path and branch
 name.
 
