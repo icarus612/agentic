@@ -1427,6 +1427,70 @@ case31() {
 }
 case31
 
+WORKFLOW_SETUP="$REPO_ROOT/agent-agnostic/hooks/workflow-setup.sh"
+
+case32() {
+  local label="32: planner's proposal, seen under planner, is not re-judged after the flip to orchestrator -> exit 0"
+  local wt plans
+  wt=$(new_parent_worktree_with_role planner)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/proposals"
+  printf '# proposal\n' >"$plans/proposals/p-01-02-26.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label (planner)" "code=$CODE err=[$ERR]"; return; }
+  printf 'orchestrator\n' >"$wt/.artifacts/dae-role"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  printf '# proposal, edited by the orchestrator\n' >"$plans/proposals/p-01-02-26.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label (later orchestrator edit must deny)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case32
+
+case33() {
+  local label="33: --set-role records the outgoing planner's write with no guard run in between -> orchestrator exit 0"
+  local wt plans
+  wt=$(new_parent_worktree_with_role planner)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/x-01-02-26"
+  printf '# plan\n' >"$plans/x-01-02-26/plan.md"
+  "$WORKFLOW_SETUP" --set-role orchestrator --root "$wt" 2>/dev/null
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case33
+
+case34() {
+  local label="34: a gate report written under the orchestrator is not re-judged under the documenter -> exit 0"
+  local wt plans stdin_json
+  wt=$(new_parent_worktree_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/x-01-02-26"
+  printf 'verdict: ready\n' >"$plans/x-01-02-26/code-review.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator)" "code=$CODE err=[$ERR]"; return; }
+  stdin_json=$(printf '{"cwd": "%s", "tool_name": "Bash", "agent_type": "documenter"}' "$wt")
+  run_guard "$wt" "$stdin_json"
+  [ "$CODE" -eq 0 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case34
+
+case35() {
+  local label="35: positive control -- an unrecorded plans-dir write under the orchestrator still denies"
+  local wt plans
+  wt=$(new_parent_worktree_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/x-01-02-26"
+  printf '# plan\n' >"$plans/x-01-02-26/plan.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case35
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

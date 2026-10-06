@@ -252,7 +252,7 @@ if [ "$is_lane" = 0 ]; then
   fi
 fi
 
-status=$(git -C "$marked" status --porcelain 2>/dev/null) || exit 0
+status=$(git -C "$marked" status --porcelain -uall 2>/dev/null) || exit 0
 [ -n "$status" ] || exit 0
 
 # resolve_root_dir <VAR> <default> <marked-worktree> [--expect path]
@@ -278,6 +278,64 @@ artifacts_root=$(realpath -m -- "$marked/.artifacts" 2>/dev/null || printf '%s/.
 # collect everything that fails classification as an offending change.
 # .artifacts/ needs no special case: it's gitignored in the real repo, so
 # `git status --porcelain` never reports it.
+role_allows() {
+  local abs="$1" base
+  case "$role" in
+    builder)
+      # Inverted: clean everywhere except a plans/docs collision.
+      case "$abs" in
+        "$plans_root" | "$plans_root"/* | "$docs_root" | "$docs_root"/*) return 1 ;;
+      esac
+      return 0
+      ;;
+    planner)
+      case "$abs" in
+        "$plans_root" | "$plans_root"/*) return 0 ;;
+      esac
+      ;;
+    scratch)
+      case "$abs" in
+        "$artifacts_root" | "$artifacts_root"/*) return 0 ;;
+      esac
+      ;;
+    documenter)
+      # Clean under docs_root ($abs is already realpath -m'd through any
+      # symlink), or exactly plan.md under plans_root.
+      case "$abs" in
+        "$docs_root" | "$docs_root"/*) return 0 ;;
+      esac
+      if [[ "$abs" == "$plans_root"/* ]] && [ "$(basename -- "$abs")" = "plan.md" ]; then
+        return 0
+      fi
+      ;;
+    orchestrator|*)
+      # Also covers the (now unreachable in practice, since resolve_role
+      # never returns empty for a marked, non-lane root) empty-role
+      # fallback — one rule, no separate permissive copy.
+      base=$(basename -- "$abs")
+      case "$abs" in
+        "$plans_root" | "$plans_root"/*)
+          case "$base" in
+            *-review.md | sync-report.md) return 0 ;;
+          esac
+          ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
+# Plans-dir verdicts stick to content hash (see docs/pipeline.md); product
+# files never use the ledger.
+ledger="$artifacts_root/plans-ledger"
+content_hash() {
+  if [ -f "$1" ]; then
+    sha256sum <"$1" 2>/dev/null | cut -d' ' -f1
+  else
+    printf 'absent'
+  fi
+}
+
 offenders=()
 while IFS= read -r line; do
   [ -n "$line" ] || continue
@@ -291,48 +349,26 @@ while IFS= read -r line; do
   fi
   [ -n "$path" ] || continue
   abs=$(realpath -m -- "$marked/$path" 2>/dev/null || printf '%s/%s' "$marked" "$path")
-  case "$role" in
-    builder)
-      # Inverted: clean everywhere except a plans/docs collision.
-      case "$abs" in
-        "$plans_root" | "$plans_root"/* | "$docs_root" | "$docs_root"/*) : ;;
-        *) continue ;;
-      esac
-      ;;
-    planner)
-      case "$abs" in
-        "$plans_root" | "$plans_root"/*) continue ;;
-      esac
-      ;;
-    scratch)
-      case "$abs" in
-        "$artifacts_root" | "$artifacts_root"/*) continue ;;
-      esac
-      ;;
-    documenter)
-      # Clean under docs_root ($abs is already realpath -m'd through any
-      # symlink), or exactly plan.md under plans_root.
-      case "$abs" in
-        "$docs_root" | "$docs_root"/*) continue ;;
-      esac
-      if [[ "$abs" == "$plans_root"/* ]] && [ "$(basename -- "$abs")" = "plan.md" ]; then
-        continue
-      fi
-      ;;
-    orchestrator|*)
-      # Also covers the (now unreachable in practice, since resolve_role
-      # never returns empty for a marked, non-lane root) empty-role
-      # fallback — one rule, no separate permissive copy.
-      base=$(basename -- "$abs")
-      case "$abs" in
-        "$plans_root" | "$plans_root"/*)
-          case "$base" in
-            *-review.md | sync-report.md) continue ;;
-          esac
-          ;;
-      esac
-      ;;
-  esac
+  in_plans=0
+  if [ "$is_lane" = 0 ]; then
+    case "$abs" in
+      "$plans_root"/*) in_plans=1 ;;
+    esac
+  fi
+  entry=""
+  if [ "$in_plans" = 1 ]; then
+    entry="$(content_hash "$abs") $abs"
+    if grep -qxF -- "deny $entry" "$ledger" 2>/dev/null; then
+      offenders+=("$abs")
+      continue
+    fi
+    grep -qxF -- "ok $entry" "$ledger" 2>/dev/null && continue
+  fi
+  if role_allows "$abs"; then
+    [ -n "$entry" ] && printf 'ok %s\n' "$entry" >>"$ledger" 2>/dev/null
+    continue
+  fi
+  [ -n "$entry" ] && printf 'deny %s\n' "$entry" >>"$ledger" 2>/dev/null
   offenders+=("$abs")
 done <<< "$status"
 

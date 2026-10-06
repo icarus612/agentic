@@ -82,6 +82,9 @@ if [ "${1:-}" = "--set-role" ]; then
   esac
   [ -f "$set_role_root/.artifacts/progress-log.md" ] \
     || err "no run dir at $set_role_root — --set-role only applies to an existing parent worktree"
+  # Record the outgoing role's plans-dir writes before the flip re-judges them.
+  guard="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/parent-tree-guard.sh"
+  [ -x "$guard" ] && printf '{"cwd": "%s", "tool_name": "Bash"}' "$set_role_root" | "$guard" >/dev/null 2>&1
   printf '%s\n' "$set_role_token" > "$set_role_root/.artifacts/dae-role"
   echo "workflow-setup: role set to '$set_role_token' at $set_role_root/.artifacts/dae-role" >&2
   exit 0

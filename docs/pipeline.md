@@ -210,7 +210,12 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `reverify.md`; nothing under the docs root, self-configured from a
   parent-worktree marker — no env var), `parent-tree-guard.sh`
   (`PostToolUse` on `Bash` and on `Stop`; catches Bash-side product writes a
-  `PreToolUse` hook can't see), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
+  `PreToolUse` hook can't see; a plans-dir file is judged once, by the role
+  active when it appears, and that verdict sticks to its content hash in
+  `.artifacts/plans-ledger` — so a planner's proposal or a gate report is
+  never re-flagged under the next role, and a denied edit is never laundered
+  by a later role; `--set-role` records the outgoing role's writes before it
+  flips), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
   two provably-safe lane-cleanup commands), `branch-squash-guard.sh`
   (`PreToolUse`; enforces the squash-only branch policy per `push-policy`).
 

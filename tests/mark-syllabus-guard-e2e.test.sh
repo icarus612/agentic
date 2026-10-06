@@ -142,10 +142,11 @@ case02() {
 }
 case02
 
-# Case 03: the closed defect, reproduced -- no agent_type, real diff -> denied.
+# Case 03: the closed defect, reproduced -- the orchestrator's own tick -> denied.
 case03() {
-  local label="03: no agent_type (orchestrator), real mark-syllabus.sh diff on plan.md -> exit 2 (denied)"
-  local stdin_json
+  local label="03: no agent_type (orchestrator), its own real mark-syllabus.sh diff on plan.md -> exit 2 (denied)"
+  local stdin_json out
+  out=$("$MARK_SYLLABUS" "$PLAN_FILE" 1.2 x 2>&1) || { fail "$label (script)" "out=[$out]"; return; }
   stdin_json=$(printf '{"cwd": "%s", "tool_name": "Bash"}' "$WT")
   run_guard "$WT" "$stdin_json"
   if [ "$CODE" -ne 2 ]; then
@@ -174,10 +175,17 @@ case04() {
 }
 case04
 
-# Case 05: a second real call (dropped state) -- fix holds for every state.
+# Case 05: a denied orchestrator diff is not laundered by a later documenter
+# check; a documenter's own later diff is attributed to it, not re-judged.
 case05() {
-  local label="05: real mark-syllabus.sh <plan> 1.2 dropped -> exit 0 on disk, then documenter allowed / orchestrator denied"
+  local label="05: documenter cannot launder the orchestrator's denied diff; its own 1.2 dropped diff stays allowed under the orchestrator"
   local out code stdin_json
+  stdin_json=$(printf '{"cwd": "%s", "tool_name": "Bash", "agent_type": "documenter"}' "$WT")
+  run_guard "$WT" "$stdin_json"
+  if [ "$CODE" -ne 2 ]; then
+    fail "$label (denied diff stays denied for documenter)" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
   out=$("$MARK_SYLLABUS" "$PLAN_FILE" 1.2 dropped 2>&1)
   code=$?
   if [ "$code" -ne 0 ]; then
@@ -196,8 +204,8 @@ case05() {
   fi
   stdin_json=$(printf '{"cwd": "%s", "tool_name": "Bash"}' "$WT")
   run_guard "$WT" "$stdin_json"
-  if [ "$CODE" -ne 2 ]; then
-    fail "$label (orchestrator denied)" "code=$CODE out=[$OUT] err=[$ERR]"
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label (documenter's diff not re-judged under orchestrator)" "code=$CODE out=[$OUT] err=[$ERR]"
     return
   fi
   pass "$label"
