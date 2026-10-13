@@ -208,7 +208,17 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `sync-report.md`) under the resolved plans dir, its own run dir's
   `explore-map-*.md`, and a committee's own `claims-c<n>.md`/`accepted.md`/
   `reverify.md`; nothing under the docs root, self-configured from a
-  parent-worktree marker — no env var), `parent-tree-guard.sh`
+  parent-worktree marker — no env var; a builder's allowance to write its own
+  lane's contract and exit report is keyed on `agent_type=builder` plus the
+  `agent_id` bound to that lane in `.artifacts/lanes/<lane-id>.agent`, never
+  on cwd), `lane-bind.sh` (records the lane-to-`agent_id` binding) and
+  `lane-bind-on-launch.sh` (`PostToolUse` on `Agent`; binds the launched
+  builder's `agent_id` from the dispatch prompt's `lane-id:`/`run-dir:` lines,
+  acting only on launches from the main session, i.e. `agent_id` absent; exit
+  2 on a bind failure), `lane-artifact-shell-guard.sh` (`PreToolUse` on
+  `Bash`; denies shell writes to lane contracts/exit reports and subagent
+  `lane-bind.sh` calls, pointing at the Write tool — builders write those
+  files with Write/Edit at absolute paths), `parent-tree-guard.sh`
   (`PostToolUse` on `Bash` and on `Stop`; catches Bash-side product writes a
   `PreToolUse` hook can't see; a plans-dir file is judged once, by the role
   active when it appears, and that verdict sticks to its content hash in

@@ -10,6 +10,6 @@ You implement **one packet** — a cohesive group of up to ~5 coupled files — 
 - Write only the files your packet names. Reading other non-test source for context (imports, patterns, neighboring idioms) is fine and encouraged — match the project's existing patterns and MAJOR-version idioms, never generic defaults.
 - Implement the contract as written. If it is ambiguous or looks wrong, say so in your report rather than silently deviating; small internal choices the contract leaves open are yours.
 - Delete what you replace — no dual old/new paths, no compatibility shims, no versioned names, no leftover TODOs. Clarity over cleverness.
-- Work only inside the worktree you were given.
+- Work only inside the worktree you were given. Use absolute paths under that worktree for every file tool; your cwd is not that worktree, so a relative path lands elsewhere.
 
 Report back: files written, how each contract item is satisfied, and any ambiguity or suspected contract defect you noticed. Your final text is the deliverable — keep it factual and compact.

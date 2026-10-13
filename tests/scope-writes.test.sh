@@ -1334,63 +1334,102 @@ case31() {
 }
 case31
 
-case32() {
-  local label="32 (AC1): agent_type=builder, cwd=l1 child, path=parent's .artifacts/contracts/l1.md -> allow"
-  local pair parent child cwd target payload
-  pair=$(new_lane_root_pair)
-  parent="${pair% *}"
-  child="${pair#* }"
-  cwd="$child"
-  target="$parent/.artifacts/contracts/l1.md"
-  payload=$(printf '{"tool_name": "Write", "file_path": "%s", "agent_type": "builder", "cwd": "%s"}' "$target" "$cwd")
-  run_hook "$payload"
+# Lane-bound builder identity cases
+A1=a1111111111111111
+A2=a2222222222222222
+A9=a9999999999999999
+
+bind_lane() {
+  local parent="$1" lane="$2" id="$3"
+  mkdir -p "$parent/.artifacts/lanes"
+  printf '%s\n' "$id" >"$parent/.artifacts/lanes/$lane.agent"
+}
+
+mk_payload() {
+  local tool="$1" target="$2" agent_type="$3" agent_id="$4" cwd="$5" p
+  p=$(printf '{"tool_name":"%s","file_path":"%s"' "$tool" "$target")
+  [ -n "$agent_type" ] && p="$p$(printf ',"agent_type":"%s"' "$agent_type")"
+  [ -n "$agent_id" ] && p="$p$(printf ',"agent_id":"%s"' "$agent_id")"
+  [ -n "$cwd" ] && p="$p$(printf ',"cwd":"%s"' "$cwd")"
+  printf '%s}' "$p"
+}
+
+expect_allow() {
+  local label="$1"
   if [ "$CODE" -ne 0 ]; then
     fail "$label -> exit 0" "code=$CODE out=[$OUT] err=[$ERR]"
-    return
+    return 1
   fi
   pass "$label -> exit 0"
 }
-case32
 
-case33() {
-  local label="33 (AC2): agent_type=builder, cwd=l1 child, path=parent's .artifacts/reports/l1-exit.md -> allow"
-  local pair parent child cwd target payload
+expect_deny() {
+  local label="$1" target="$2" needle="${3:-}"
+  if [ "$CODE" -ne 2 ]; then
+    fail "$label -> exit 2" "code=$CODE out=[$OUT] err=[$ERR]"
+    return 1
+  fi
+  if ! printf '%s\n' "$ERR" | grep -qF -- "$target"; then
+    fail "$label -> stderr names the offending path" "target=[$target] err=[$ERR]"
+    return 1
+  fi
+  if [ -n "$needle" ] && ! printf '%s\n' "$ERR" | grep -qF -- "$needle"; then
+    fail "$label -> stderr contains [$needle]" "err=[$ERR]"
+    return 1
+  fi
+  pass "$label -> exit 2, stderr names target${needle:+ and [$needle]}"
+}
+
+case32() {
+  local label="32 (AC1): builder bound to l1, path=parent's .artifacts/contracts/l1.md -> allow"
+  local pair parent child target
   pair=$(new_lane_root_pair)
   parent="${pair% *}"
   child="${pair#* }"
-  cwd="$child"
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "$parent")"
+  expect_allow "$label"
+}
+case32
+
+case32b() {
+  local label="32b: same as 32 with cwd an unrelated scratch dir (hook does not use cwd) -> allow"
+  local pair parent other target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  other=$(new_scratch)
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "$other")"
+  expect_allow "$label"
+}
+case32b
+
+case33() {
+  local label="33 (AC2): builder bound to l1, path=parent's .artifacts/reports/l1-exit.md -> allow"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
   target="$parent/.artifacts/reports/l1-exit.md"
-  payload=$(printf '{"tool_name": "Write", "file_path": "%s", "agent_type": "builder", "cwd": "%s"}' "$target" "$cwd")
-  run_hook "$payload"
-  if [ "$CODE" -ne 0 ]; then
-    fail "$label -> exit 0" "code=$CODE out=[$OUT] err=[$ERR]"
-    return
-  fi
-  pass "$label -> exit 0"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "$parent")"
+  expect_allow "$label"
 }
 case33
 
 case34() {
-  local label="34 (AC3): cwd=l1 child, path=SAME parent's .artifacts/contracts/l2.md (another lane) -> deny"
-  local pair parent child other_child cwd target payload
+  local label="34 (AC3): l1 builder identity on contracts/l2.md (l2 bound to another agent) -> deny; l2 identity -> allow"
+  local pair parent target
   pair=$(new_lane_root_pair)
   parent="${pair% *}"
-  child="${pair#* }"
-  other_child="$(dirname "$parent")/$(basename "$parent")-l2"
-  mkdir -p "$other_child"
-  cwd="$child"
+  bind_lane "$parent" l1 "$A1"
+  bind_lane "$parent" l2 "$A2"
   target="$parent/.artifacts/contracts/l2.md"
-  payload=$(printf '{"tool_name": "Write", "file_path": "%s", "cwd": "%s"}' "$target" "$cwd")
-  run_hook "$payload"
-  if [ "$CODE" -ne 2 ]; then
-    fail "$label -> exit 2" "code=$CODE out=[$OUT] err=[$ERR]"
-    return
-  fi
-  if ! printf '%s\n' "$ERR" | grep -qF -- "$target"; then
-    fail "$label -> stderr names the offending path" "target=[$target] err=[$ERR]"
-    return
-  fi
-  pass "$label -> exit 2, stderr names $target"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "$parent")"
+  expect_deny "$label" "$target" "bound to a different agent" || return
+  run_hook "$(mk_payload Write "$target" builder "$A2" "$parent")"
+  expect_allow "$label (control: l2's own identity)"
 }
 case34
 
@@ -1775,6 +1814,139 @@ case54() {
   pass "$label -> exit 2, stderr names $target"
 }
 case54
+
+# Cases 55+: lane binding
+
+case55() {
+  local label="55a: no lanes/l1.agent -> deny 'has no binding'"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_deny "$label" "$target" "has no binding" || return
+  bind_lane "$parent" l1 "$A1"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_allow "55a (control): after binding written, same payload"
+}
+case55
+
+case56() {
+  local label="55b: bound a1.., payload agent_id a9.. -> deny 'bound to a different agent'"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" builder "$A9" "")"
+  expect_deny "$label" "$target" "bound to a different agent" || return
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_allow "55b (control): bound identity"
+}
+case56
+
+case57() {
+  local label="55c: agent_type=coder with the correct bound id -> deny"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" coder "$A1" "")"
+  expect_deny "$label" "$target" || return
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_allow "55c (control): agent_type=builder, same id"
+}
+case57
+
+case58() {
+  local label="55d: agent_type=builder, no agent_id -> deny 'no agent_id'"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" builder "" "")"
+  expect_deny "$label" "$target" "no agent_id" || return
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_allow "55d (control): with agent_id"
+}
+case58
+
+case59() {
+  local label="55e: lane-file path under an unmarked dir -> allow (inert)"
+  local dir target
+  dir=$(new_scratch)
+  target="$dir/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_allow "$label"
+}
+case59
+
+case60() {
+  local label="55f: none-mode main-checkout dae-role=builder, lane-file target, no binding, no agent_id -> allow"
+  local parent target
+  parent=$(new_marked_worktree_main_checkout_with_role builder)
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Write "$target" "" "" "")"
+  expect_allow "$label"
+}
+case60
+
+case61() {
+  local label="55g: binding file with trailing spaces and extra newlines still matches -> allow"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  mkdir -p "$parent/.artifacts/lanes"
+  printf '  %s  \n\n\n' "$A1" >"$parent/.artifacts/lanes/l1.agent"
+  target="$parent/.artifacts/reports/l1-exit.md"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_allow "$label"
+}
+case61
+
+case62() {
+  local label="55h: lookalike paths with a valid bound builder identity -> deny"
+  local pair parent rel target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
+  for rel in contracts/l1.md.bak reports/l1-exit.md/x contracts/lx.md; do
+    target="$parent/.artifacts/$rel"
+    run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+    expect_deny "$label [$rel]" "$target"
+  done
+}
+case62
+
+case63() {
+  local label="55i: Write on lanes/l1.agent -> deny"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/lanes/l1.agent"
+  run_hook "$(mk_payload Write "$target" builder "$A1" "")"
+  expect_deny "$label (builder, bound id)" "$target"
+  run_hook "$(mk_payload Write "$target" orchestrator "" "")"
+  expect_deny "$label (agent_type=orchestrator)" "$target"
+}
+case63
+
+case64() {
+  local label="55j: Edit on bound lane's contract -> allow; foreign agent_id -> deny"
+  local pair parent target
+  pair=$(new_lane_root_pair)
+  parent="${pair% *}"
+  bind_lane "$parent" l1 "$A1"
+  target="$parent/.artifacts/contracts/l1.md"
+  run_hook "$(mk_payload Edit "$target" builder "$A1" "")"
+  expect_allow "$label (correct identity)" || return
+  run_hook "$(mk_payload Edit "$target" builder "$A9" "")"
+  expect_deny "$label (foreign agent_id)" "$target" "bound to a different agent"
+}
+case64
 
 # ---------------------------------------------------------------------------
 # Summary

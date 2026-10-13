@@ -267,17 +267,30 @@ path=$(realpath -m -- "$path" 2>/dev/null || printf '%s' "$path")
 agent_type=$(printf '%s' "$input" | grep -oE '"agent_type"[[:space:]]*:[[:space:]]*"[^"]*"' \
   | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/')
 
-# Fix A: agent_type == "builder" (harness-supplied) gates identity; cwd is
-# only the lane selector once that holds -- cwd alone follows a plain `cd`.
-cwd=$(printf '%s' "$input" | grep -oE '"cwd"[[:space:]]*:[[:space:]]*"[^"]*"' \
+agent_id=$(printf '%s' "$input" | grep -oE '"agent_id"[[:space:]]*:[[:space:]]*"[^"]*"' \
   | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)"/\1/')
-if [ "$agent_type" = "builder" ] && [ -n "$cwd" ] && cwd_lane_root=$(find_lane_root "$cwd"); then
-  cwd_base=$(basename -- "$cwd_lane_root")
-  if [[ "$cwd_base" =~ ^(.+)-l([0-9]+)$ ]]; then
-    lane_id="l${BASH_REMATCH[2]}"
-    lane_parent=$(realpath -m -- "$(dirname -- "$cwd_lane_root")/${BASH_REMATCH[1]}" 2>/dev/null)
-    if [ "$path" = "$lane_parent/.artifacts/contracts/$lane_id.md" ] || \
-       [ "$path" = "$lane_parent/.artifacts/reports/$lane_id-exit.md" ]; then
+
+# A builder may write only its own lane's contract/exit report, and only
+# while lanes/l<n>.agent binds that lane to the harness-supplied agent_id.
+lane_note=""
+lane_dir=$(dirname -- "$path"); lane_base=$(basename -- "$path"); lane_n=""
+if [ "$(basename -- "$lane_dir")" = "contracts" ] && [[ "$lane_base" =~ ^l([0-9]+)\.md$ ]]; then
+  lane_n="${BASH_REMATCH[1]}"
+elif [ "$(basename -- "$lane_dir")" = "reports" ] && [[ "$lane_base" =~ ^l([0-9]+)-exit\.md$ ]]; then
+  lane_n="${BASH_REMATCH[1]}"
+fi
+if [ -n "$lane_n" ]; then
+  lane_run_dir=$(dirname -- "$lane_dir")
+  if [ "$(basename -- "$lane_run_dir")" = ".artifacts" ] && [ -f "$lane_run_dir/progress-log.md" ] \
+     && [ "$agent_type" = "builder" ]; then
+    bound=$(cat "$lane_run_dir/lanes/l$lane_n.agent" 2>/dev/null | tr -d '[:space:]') || bound=""
+    if [ -z "$agent_id" ]; then
+      lane_note="no agent_id in hook input"
+    elif [ -z "$bound" ]; then
+      lane_note="lane l$lane_n has no binding (not recorded yet -- retry after your next step)"
+    elif [ "$bound" != "$agent_id" ]; then
+      lane_note="lane l$lane_n is bound to a different agent"
+    else
       exit 0
     fi
   fi
@@ -388,7 +401,7 @@ case "$role" in
         && { [[ "$base" == *-review.md ]] || [ "$base" = "sync-report.md" ]; }; then
       exit 0
     fi
-    echo "scope-writes: DENIED — $tool to '$path' is outside the orchestrator's allowed write scope (this is the orchestrator write-scope guard). Zero outside this run's own gate reports: '*-review.md' or 'sync-report.md' under '$plans_root'. Use progress-log.sh, plan-lifecycle.sh, or report-verdict.sh for the orchestrator's other artifact mutations instead of a direct write — the plan file's own syllabus is never the orchestrator's to touch, at any stage: that write belongs to the documenter agent at Record, via mark-syllabus.sh." >&2
+    echo "scope-writes: DENIED — $tool to '$path' is outside the orchestrator's allowed write scope (this is the orchestrator write-scope guard). Zero outside this run's own gate reports: '*-review.md' or 'sync-report.md' under '$plans_root'. Use progress-log.sh, plan-lifecycle.sh, or report-verdict.sh for the orchestrator's other artifact mutations instead of a direct write — the plan file's own syllabus is never the orchestrator's to touch, at any stage: that write belongs to the documenter agent at Record, via mark-syllabus.sh.${lane_note:+ Lane-file write refused: $lane_note.}" >&2
     exit 2
     ;;
 esac

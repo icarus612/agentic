@@ -51,6 +51,7 @@ agentic/
 │   ├── hooks/                 #   smart-lint, smart-test, ntfy, … (settings.json-wired),
 │   │                          #   plus workflow-setup.sh, resolve-config.sh, resolve-type.sh,
 │   │                          #   resolve-anchor.sh, sync-install.sh, scope-writes.sh,
+│   │                          #   lane-bind.sh, lane-bind-on-launch.sh, lane-artifact-shell-guard.sh,
 │   │                          #   mark-syllabus.sh, verify-scope.sh, plan-lifecycle.sh, …
 │   ├── agents/                #   planner.md (+ planner/plan-*.md), builder.md, coder.md,
 │   │                          #   contract-tester.md, committee.md

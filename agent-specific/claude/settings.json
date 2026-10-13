@@ -149,6 +149,10 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/branch-squash-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/lane-artifact-shell-guard.sh"
           }
         ]
       },
@@ -190,6 +194,15 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/parent-tree-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/lane-bind-on-launch.sh"
           }
         ]
       }
