@@ -23,6 +23,7 @@ is_subagent = "agent_type" in d
 cmd = re.sub(r"(<<-?\s*[\x27\"]?(\w+)[\x27\"]?[^\n]*\n).*?^\s*\2\s*$", r"\1", cmd,
              flags=re.S | re.M)
 cmd = cmd.replace("\n", " ; ")
+cmd = re.sub(r"\$\([^()]*\)|`[^`]*`", "$X", cmd)
 
 try:
     lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
@@ -38,8 +39,12 @@ REDIRECTS = {">", ">>", ">|", "&>", "&>>", ">&"}
 WRAPPERS = {"sudo", "command", "env", "nohup", "exec", "time"}
 COPIERS = {"cp", "mv", "install", "ln", "rsync"}
 
+VAR_TARGET = re.compile(r"/(contracts/l\d+\.md|reports/l\d+-exit\.md|lanes/.+)$")
+
 def is_target(tok):
-    return bool(TARGET.search(tok))
+    if TARGET.search(tok):
+        return True
+    return bool(re.search(r"[$~]", tok)) and bool(VAR_TARGET.search(tok))
 
 def write_deny(path):
     sys.stderr.write(

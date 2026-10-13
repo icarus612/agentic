@@ -29,7 +29,7 @@ Context (orchestrator's summary of the defect the user is reacting to, not the u
   - [x] 4.4: `run-artifacts.md` — contract and exit report are tool writes   (after: 3.1)
 - [ ] Phase 5: Verify
   - [x] 5.1: Whole suite, `bash -n`, shared-helper diff   (after: 2.3, 3.2, 4.1, 4.2, 4.3, 4.4)
-  - [ ] 5.2: Post-install live drill through a real builder dispatch — orchestrator, after `push-main` + `sync-install.sh`   (after: 5.1)
+  - [x] 5.2: Post-install live drill through a real builder dispatch — orchestrator, after `push-main` + `sync-install.sh`   (after: 5.1)
 
 ## Goal & scope
 
@@ -251,7 +251,7 @@ Context (orchestrator's summary of the defect the user is reacting to, not the u
 
 ### 5.2 — Post-install live drill through a real builder dispatch — orchestrator, after `push-main` + `sync-install.sh`
 
-> Status: pending until after landing (runs after `push-main` + `sync-install.sh`); intentionally unticked in the syllabus.
+> Status: the drill ran 10-12-26 against a08f500; 7 of 8 checks passed. The variable-path shell write got through the shell guard; it was fixed on the follow-up branch bug/shell-guard-var-paths, per 5.2's own failure rule. Results are in the "Drill results (10-12-26)" sub-block below.
 
 - **File scope:** none in the product tree; a throwaway repo and run created by the real `workflow-setup.sh`.
 - **Why after landing:** nothing binds until the installed copies under `~/.claude/hooks/` change (agent-identity proposal Risk 10).
@@ -265,6 +265,37 @@ Context (orchestrator's summary of the defect the user is reacting to, not the u
   
   Record the results as a before/after table in the plan's dir. A contradiction is investigated, not waved through. If the drill fails, the fix goes forward as a new plan-less fix branch (`plan-format`, "Completed").
 - **Test oracle:** `existing implementation`.
+
+#### Drill results (10-12-26)
+
+Ran against the hooks installed from a08f500, in a throwaway repo with a real `workflow-setup.sh` run. 7 of 8 checks passed; one failed.
+
+| Check | Before (pre-fix hook) | After (installed a08f500) | Pass |
+|---|---|---|---|
+| Background builder launch with `lane-id: l1` / `run-dir:` lines binds automatically | no binding mechanism; Write to contracts/l1.md denied (treehouse commerce7-rebuild l1, 10-09-26) | `lanes/l1.agent` = the launch agentId, no manual step | yes |
+| Builder Write contracts/l1.md | denied | allowed | yes |
+| Builder Edit contracts/l1.md | denied | allowed | yes |
+| Builder Write contracts/l2.md (unbound lane) | denied | denied: "lane l2 has no binding (not recorded yet -- retry after your next step)" | yes (no-binding reason, since l2 was never bound) |
+| Builder shell heredoc into reports/l1-exit.md | allowed (unguarded) | **ALLOWED**: command was `R=<abs>; cat > $R/reports/l1-exit.md <<'EOF' ...` | **NO** |
+| Background Explore launch with the same lines writes no binding | n/a | no new binding; l1.agent unchanged | yes |
+| Main-session `lane-bind.sh R l9 ...` | n/a | allowed (exit 0) | yes |
+| Builder Bash `lane-bind.sh R l1 forged-id` | n/a | denied by lane-artifact-shell-guard ("lane-bind.sh called from a subagent") | yes |
+
+**The failure, as found.** `lane-artifact-shell-guard.sh` resolved only literal and relative destinations. Replays against the installed guard (agent_id/agent_type=builder payload):
+
+- `cat > <abs>/reports/l1-exit.md <<'EOF'`: exit 2 (blocked)
+- `cat > ../drill/.artifacts/contracts/l5.md <<'EOF'`: exit 2 (blocked)
+- `echo x > "$R/reports/l1-exit.md"`: exit 0 (MISSED)
+- `echo x > ${R}/contracts/l1.md`: exit 0 (MISSED)
+- `echo x | tee $R/contracts/l1.md`: exit 0 (MISSED)
+- the drill's actual command `R=<abs>; cat > $R/reports/l1-exit.md <<'EOF'` / `shell write` / `EOF`: allowed live
+
+**Fixed on bug/shell-guard-var-paths (plan-less, per 5.2's failure rule).**
+
+- `lane-artifact-shell-guard.sh` now denies a write destination containing `$` or `~` whose literal tail is `/contracts/l<n>.md`, `/reports/l<n>-exit.md` or `/lanes/<x>`; `$(...)` and backticks are normalised first. Tests 10a-10m: red 69 passed / 9 failed before, green 78 / 0 after; full suite 26/26 green.
+- Replay of the drill's exact step-4 command (same payload shape): installed a08f500 guard exit 0 (allowed), fixed guard exit 2 (denied).
+- Live, under the installed a08f500 hooks, the follow-up's own lane-l1 builder was auto-bound (`lanes/l1.agent` = its launch agentId) and wrote its contract and exit report with the Write tool first try, with no shell route and no deny.
+- Post-landing live re-check of step 4 is recorded by the orchestrator after sync.
 
 ## Risks, open questions, decision points
 

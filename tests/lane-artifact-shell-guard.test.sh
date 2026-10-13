@@ -253,6 +253,20 @@ else
   fail "09f missing tool_input -> exit 0, empty stderr" "code=$CODE err=[$ERR]"
 fi
 
+deny "10a quoted var redirect" 'echo x > "$R/reports/l1-exit.md"' 'reports/l1-exit.md'
+deny "10b braced var redirect" 'echo x > ${R}/contracts/l1.md' 'contracts/l1.md'
+deny "10c tee var dest" 'echo x | tee $R/contracts/l1.md' 'contracts/l1.md'
+deny "10d drill heredoc" $'R=/abs/run/.artifacts; cat > $R/reports/l1-exit.md <<\'EOF\'\nbody\nEOF' 'reports/l1-exit.md'
+deny "10e command substitution dest" 'echo x > $(pwd)/contracts/l2.md' 'contracts/l2.md'
+deny "10f backtick dest" 'echo x > `pwd`/reports/l2-exit.md' 'reports/l2-exit.md'
+deny "10g tilde dest" 'echo x > ~/run/lanes/l1.agent' 'lanes/l1.agent'
+deny "10h cp var dest" 'cp /tmp/a $R/contracts/l3.md' 'contracts/l3.md'
+deny "10i dd var dest" 'dd if=/tmp/a of=$R/reports/l3-exit.md' 'reports/l3-exit.md'
+allow "10j scratch report via var" 'echo x > $R/reports/my-slug-abc123/report.md'
+allow "10k .bak via var" 'echo x > $R/reports/l1-exit.md.bak'
+allow "10l git commit mention" 'git commit -m "mention $R/reports/l1-exit.md and ${R}/contracts/l1.md"'
+allow "10m literal non-lane path no var" 'echo x > /tmp/reports/l1-exit.md'
+
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"
 [ "$TOTAL_FAIL" -eq 0 ] || exit 1
 exit 0
