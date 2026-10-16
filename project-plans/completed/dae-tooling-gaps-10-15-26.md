@@ -28,10 +28,10 @@ User decisions this ask rests on (10-15-26, treehouse conversation): "Draft now,
   - [x] 2.3: `lane-artifact-shell-guard.sh` — resolve destinations against a tracked in-command cwd   (lane 2, after: 1.3)
   - [x] 2.4: `verify-run-scope.sh` — docs-root symlinks are harness-owned   (lane 3, after: 1.4)
   - [x] 2.5: `smart-test.sh` — owning-package scope for source edits, and process-group containment   (lane 4, after: 1.5)
-- [ ] Phase 3: Verify, record, drill
+- [x] Phase 3: Verify, record, drill
   - [x] 3.1: Whole suite, `bash -n`, guard replay   (after: 2.1, 2.2, 2.3, 2.4, 2.5)
   - [x] 3.2: Docs-root pages updated at Record by the `documenter`   (after: 3.1)
-  - [ ] 3.3: Post-install drill — orchestrator, after `push-main` and `sync-install.sh`   (after: 3.2)
+  - [x] 3.3: Post-install drill — orchestrator, after `push-main` and `sync-install.sh`   (after: 3.2)
 
 ## Goal & scope
 
@@ -327,6 +327,7 @@ Oracle for all of Phase 2: the paired 1.x suite goes green, plus the **existing 
   - Optional live measurement: count `pgrep -c vitest` before and after a handful of hook-triggering edits in a throwaway JS fixture, confirming no growth.
 - **Acceptance:** all three checks pass. Results go to this run's progress log. Resuming the treehouse finalize is the user's call, made in that run.
 - **Oracle:** existing implementation (installed behavior).
+- **Record note:** passed 10-16-26 against the installed tools after d696b46 — guard denied the l8 and l7 bypass forms (exit 2) and allowed a contract read (exit 0); treehouse verify-run-scope without --allow OK 572/572; the installed finalize predicate accepts the treehouse tentative/proceed pr-review. The optional vitest measurement was not run.
 
 ## Risks, open questions, decision points
 
