@@ -282,6 +282,37 @@ format_test_output() {
     echo "$output"
 }
 
+RUN_CONTAINED_PID=""
+
+kill_contained_group() {
+    if [[ -n "$RUN_CONTAINED_PID" ]]; then
+        kill -TERM -- -"$RUN_CONTAINED_PID" 2>/dev/null || true
+    fi
+}
+
+trap kill_contained_group EXIT
+trap 'kill_contained_group; exit 143' TERM
+trap 'kill_contained_group; exit 130' INT
+trap 'kill_contained_group; exit 129' HUP
+
+# run_contained <outvar> <dir> <cmd...>: run in its own process group, reap
+# leftovers, store combined output in outvar, return the command's exit code.
+run_contained() {
+    local outvar="$1" dir="$2" outfile rc=0
+    shift 2
+    outfile=$(mktemp)
+    set -m
+    ( cd "$dir" && exec "$@" ) </dev/null >"$outfile" 2>&1 &
+    RUN_CONTAINED_PID=$!
+    set +m
+    wait "$RUN_CONTAINED_PID" || rc=$?
+    kill -TERM -- -"$RUN_CONTAINED_PID" 2>/dev/null || true
+    RUN_CONTAINED_PID=""
+    printf -v "$outvar" '%s' "$(cat "$outfile")"
+    rm -f "$outfile"
+    return "$rc"
+}
+
 # ============================================================================
 # TEST RUNNERS BY LANGUAGE
 # ============================================================================
@@ -309,7 +340,7 @@ run_go_tests() {
         if [[ "$target" =~ _test\.go$ ]]; then
             echo -e "${BLUE}🧪 Running test file directly: $target${NC}" >&2
             local test_output
-            if ! test_output=$($GO_TEST_CMD "$target" 2>&1); then
+            if ! run_contained test_output "." $GO_TEST_CMD "$target"; then
                 echo -e "${RED}❌ Tests failed in $target${NC}" >&2
                 echo -e "\n${RED}Failed test output:${NC}" >&2
                 format_test_output "$test_output" "go" >&2
@@ -347,7 +378,7 @@ run_go_tests() {
                         tests_run=$((tests_run + 1))
                         
                         local test_output
-                        if ! test_output=$($GO_TEST_CMD -run "Test.*${base}" "$dir" 2>&1); then
+                        if ! run_contained test_output "." $GO_TEST_CMD -run "Test.*${base}" "$dir"; then
                             failed=1
                             echo -e "${RED}❌ Focused tests failed for $base${NC}" >&2
                             echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -377,7 +408,7 @@ run_go_tests() {
                 fi
                 
                 local test_output
-                if ! test_output=$($GO_TEST_CMD -short "$dir" 2>&1); then
+                if ! run_contained test_output "." $GO_TEST_CMD -short "$dir"; then
                     failed=1
                     echo -e "${RED}❌ Package tests failed in $dir${NC}" >&2
                     echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -396,7 +427,7 @@ run_go_tests() {
                 tests_run=$((tests_run + 1))
                 
                 local test_output
-                if ! test_output=$($GO_TEST_CMD -short "./..." 2>&1); then
+                if ! run_contained test_output "." $GO_TEST_CMD -short "./..."; then
                     failed=1
                     echo -e "${RED}❌ Project tests failed${NC}" >&2
                     echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -412,7 +443,7 @@ run_go_tests() {
                     tests_run=$((tests_run + 1))
                     
                     local test_output
-                    if ! test_output=$($GO_TEST_CMD -tags=integration "$dir" 2>&1); then
+                    if ! run_contained test_output "." $GO_TEST_CMD -tags=integration "$dir"; then
                         failed=1
                         echo -e "${RED}❌ Integration tests failed${NC}" >&2
                         echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -450,16 +481,14 @@ run_python_tests() {
         echo -e "${BLUE}🧪 Running test file directly: $file${NC}" >&2
         local test_output
         if command -v pytest >/dev/null 2>&1; then
-            if ! test_output=$(
-                pytest -xvs "$file" 2>&1); then
+            if ! run_contained test_output "." pytest -xvs "$file"; then
                 echo -e "${RED}❌ Tests failed in $file${NC}" >&2
                 echo -e "\n${RED}Failed test output:${NC}" >&2
                 format_test_output "$test_output" "python" >&2
                 return 1
             fi
         elif command -v python >/dev/null 2>&1; then
-            if ! test_output=$(
-                python -m unittest "$file" 2>&1); then
+            if ! run_contained test_output "." python -m unittest "$file"; then
                 echo -e "${RED}❌ Tests failed in $file${NC}" >&2
                 echo -e "\n${RED}Failed test output:${NC}" >&2
                 format_test_output "$test_output" "python" >&2
@@ -513,8 +542,7 @@ run_python_tests() {
                     
                     local test_output
                     if command -v pytest >/dev/null 2>&1; then
-                        if ! test_output=$(
-                            pytest -xvs "$test_file" -k "$base" 2>&1); then
+                        if ! run_contained test_output "." pytest -xvs "$test_file" -k "$base"; then
                             failed=1
                             echo -e "${RED}❌ Focused tests failed for $base${NC}" >&2
                             echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -522,8 +550,7 @@ run_python_tests() {
                             add_error "Focused tests failed for $base"
                         fi
                     elif command -v python >/dev/null 2>&1; then
-                        if ! test_output=$(
-                            python -m unittest "$test_file" 2>&1); then
+                        if ! run_contained test_output "." python -m unittest "$test_file"; then
                             failed=1
                             echo -e "${RED}❌ Focused tests failed for $base${NC}" >&2
                             echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -545,8 +572,7 @@ run_python_tests() {
                 
                 if command -v pytest >/dev/null 2>&1; then
                     local test_output
-                    if ! test_output=$(
-                        pytest -xvs "$dir" 2>&1); then
+                    if ! run_contained test_output "." pytest -xvs "$dir"; then
                         failed=1
                         echo -e "${RED}❌ Package tests failed in $dir${NC}" >&2
                         echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -570,9 +596,43 @@ run_python_tests() {
     return $failed
 }
 
+# Nearest ancestor of <file> whose package.json has a real (non-orchestrator)
+# test script. A root `turbo test` would parse a file path as a task name.
+find_js_package_dir() {
+    local candidate
+    candidate=$(cd "$(dirname "$1")" 2>/dev/null && pwd) || return 0
+    while [[ -n "$candidate" && "$candidate" != "/" ]]; do
+        if [[ -f "$candidate/package.json" ]] \
+           && jq -e '.scripts.test' "$candidate/package.json" >/dev/null 2>&1; then
+            if ! jq -re '.scripts.test' "$candidate/package.json" \
+                 | grep -qE '(^|[[:space:]/])(turbo|nx|lerna)([[:space:]]|$)'; then
+                printf '%s\n' "$candidate"
+                return 0
+            fi
+        fi
+        candidate=$(dirname "$candidate")
+    done
+    return 0
+}
+
+# Invoke the local runner binary directly: a wrapper script like
+# "pnpm run test:unit -- --run" swallows the file filter through its second `--`.
+select_js_runner() {
+    if [[ -x "$1/node_modules/.bin/vitest" ]]; then
+        printf '%s\n' "node_modules/.bin/vitest run"
+    elif [[ -x "$1/node_modules/.bin/jest" ]]; then
+        printf '%s\n' "node_modules/.bin/jest"
+    fi
+}
+
 run_javascript_tests() {
     local file="$1"
     local dir=$(dirname "$file")
+    local abs_dir
+    if abs_dir=$(cd "$dir" 2>/dev/null && pwd); then
+        dir="$abs_dir"
+        file="$abs_dir/$(basename "$file")"
+    fi
     # Pure parameter expansion, no sed: the old GNU-BRE \? is a literal '?' to
     # BSD sed (extension never stripped on macOS), and the unescaped (test|spec)
     # group never matched under any sed flavor.
@@ -594,52 +654,22 @@ run_javascript_tests() {
         fi
     fi
 
+    local pkg_dir runner="" test_output
+    pkg_dir=$(find_js_package_dir "$file")
+    if [[ -n "$pkg_dir" ]]; then
+        runner=$(select_js_runner "$pkg_dir")
+    fi
+
     # If this IS a test file, run it directly
     if [[ "$file" =~ \.(test|spec)\.[tj]sx?$ ]]; then
         echo -e "${BLUE}🧪 Running test file directly: $file${NC}" >&2
 
-        # Resolve the package that OWNS this file, and refuse to hand a file
-        # path to a workspace task orchestrator. In a monorepo the hook's cwd is
-        # the repo root, whose `test` script is typically `turbo test` (or nx /
-        # lerna). `pnpm test -- <path>` then expands to `turbo test <path>`, and
-        # turbo parses the path as a TASK NAME -- failing with a confusing
-        # "missing task" error on every edit, for every file.
-        local pkg_dir="" candidate
-        candidate=$(cd "$(dirname "$file")" 2>/dev/null && pwd)
-        while [[ -n "$candidate" && "$candidate" != "/" ]]; do
-            if [[ -f "$candidate/package.json" ]] \
-               && jq -e '.scripts.test' "$candidate/package.json" >/dev/null 2>&1; then
-                # Accept only a real runner; skip orchestrator scripts.
-                if ! jq -re '.scripts.test' "$candidate/package.json" \
-                     | grep -qE '(^|[[:space:]/])(turbo|nx|lerna)([[:space:]]|$)'; then
-                    pkg_dir="$candidate"
-                    break
-                fi
-            fi
-            candidate=$(dirname "$candidate")
-        done
-
-        local test_output
         if [[ -n "$pkg_dir" ]]; then
-            # Pass a path relative to the owning package -- vitest/jest resolve
-            # their filters against their own root, not the repo root.
+            # vitest/jest resolve filters against their own root, not the repo root.
             local rel_file="${file#"$pkg_dir"/}"
 
-            # Prefer invoking the runner directly over `<pm> test -- <file>`.
-            # A wrapper script like "test": "pnpm run test:unit -- --run"
-            # swallows the filter through the second `--`, so the whole suite
-            # runs instead of the one file -- correct, but needlessly slow on
-            # every edit. Calling the local binary keeps the filter intact.
-            local runner=""
-            if [[ -x "$pkg_dir/node_modules/.bin/vitest" ]]; then
-                runner="node_modules/.bin/vitest run"
-            elif [[ -x "$pkg_dir/node_modules/.bin/jest" ]]; then
-                runner="node_modules/.bin/jest"
-            fi
-
             if [[ -n "$runner" ]]; then
-                if ! test_output=$(
-                    cd "$pkg_dir" && $runner "$rel_file" 2>&1); then
+                if ! run_contained test_output "$pkg_dir" $runner "$rel_file"; then
                     echo -e "${RED}❌ Tests failed in $file${NC}" >&2
                     echo -e "\n${RED}Failed test output:${NC}" >&2
                     format_test_output "$test_output" "javascript" >&2
@@ -649,16 +679,14 @@ run_javascript_tests() {
                 return 0
             fi
 
-            if ! test_output=$(
-                cd "$pkg_dir" && $pkg_manager test -- "$rel_file" 2>&1); then
+            if ! run_contained test_output "$pkg_dir" $pkg_manager test -- "$rel_file"; then
                 echo -e "${RED}❌ Tests failed in $file${NC}" >&2
                 echo -e "\n${RED}Failed test output:${NC}" >&2
                 format_test_output "$test_output" "javascript" >&2
                 return 1
             fi
         elif command -v jest >/dev/null 2>&1; then
-            if ! test_output=$(
-                jest "$file" 2>&1); then
+            if ! run_contained test_output "." jest "$file"; then
                 echo -e "${RED}❌ Tests failed in $file${NC}" >&2
                 echo -e "\n${RED}Failed test output:${NC}" >&2
                 format_test_output "$test_output" "javascript" >&2
@@ -684,7 +712,7 @@ run_javascript_tests() {
     fi
 
     # Find test file
-    local test_file=""
+    local test_file="" candidate
     local test_candidates=(
         "${dir}/${base}.test.js"
         "${dir}/${base}.spec.js"
@@ -707,8 +735,7 @@ run_javascript_tests() {
     local failed=0
     local tests_run=0
 
-    # Check if package.json has test script
-    if [[ -f "package.json" ]] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then
+    if [[ -n "$pkg_dir" ]]; then
         # Parse test modes
         IFS=',' read -ra TEST_MODES <<< "$CLAUDE_HOOKS_TEST_MODES"
 
@@ -721,9 +748,14 @@ run_javascript_tests() {
                         echo -e "${BLUE}🧪 Running focused tests for $base...${NC}" >&2
                         tests_run=$((tests_run + 1))
 
-                        local test_output
-                        if ! test_output=$(
-                            $pkg_manager test -- "$test_file" 2>&1); then
+                        local rel_test="${test_file#"$pkg_dir"/}"
+                        local focused_ok=true
+                        if [[ -n "$runner" ]]; then
+                            run_contained test_output "$pkg_dir" $runner "$rel_test" || focused_ok=false
+                        else
+                            run_contained test_output "$pkg_dir" $pkg_manager test -- "$rel_test" || focused_ok=false
+                        fi
+                        if [[ "$focused_ok" != "true" ]]; then
                             failed=1
                             echo -e "${RED}❌ Focused tests failed for $base${NC}" >&2
                             echo -e "\n${RED}Failed test output:${NC}" >&2
@@ -742,9 +774,7 @@ run_javascript_tests() {
                     echo -e "${BLUE}📦 Running all tests...${NC}" >&2
                     tests_run=$((tests_run + 1))
 
-                    local test_output
-                    if ! test_output=$(
-                        $pkg_manager test 2>&1); then
+                    if ! run_contained test_output "$pkg_dir" $pkg_manager test; then
                         failed=1
                         echo -e "${RED}❌ Package tests failed${NC}" >&2
                         echo -e "\n${RED}Failed test output:${NC}" >&2

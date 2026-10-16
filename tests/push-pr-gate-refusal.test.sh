@@ -31,9 +31,7 @@
 #   through its documented CLI (`validate-report.sh <report-file>`, exit 0
 #   valid / 1 invalid) — its source is never read.
 #
-#   Cases 06, 08, 09 are mandatory: they catch a finalize predicate that
-#   merely greps the word "ready" somewhere, or scans the whole report
-#   instead of consulting only the LAST round.
+#   Case 06 is the tentative-accept case; 08-11 are last-round guards.
 #
 #   All fixtures live in mktemp -d scratch dirs registered in SCRATCH_DIRS
 #   and removed by the cleanup trap. This suite writes nothing inside the
@@ -301,7 +299,7 @@ build_case05() {
 }
 
 build_case06() {
-  # report-verdict.sh <f> tentative proceed 0 0 — tentative is not ready.
+  # report-verdict.sh <f> tentative proceed 0 0.
   local dir f
   dir=$(new_scratch)
   f="$dir/pr-review.md"
@@ -350,8 +348,34 @@ build_case09() {
   printf '%s' "$f"
 }
 
+build_case10() {
+  local dir f
+  dir=$(new_scratch)
+  f="$dir/pr-review.md"
+  "$REPORT_VERDICT" "$f" tentative proceed 0 0 >/dev/null
+  "$REPORT_VERDICT" "$f" rejected impl-wrong 1 0 >/dev/null
+  {
+    printf '\n### Findings\n'
+    printf '%s\n' "- [blocking] regression introduced after round 1"
+  } >> "$f"
+  printf '%s' "$f"
+}
+
+build_case11() {
+  local dir f
+  dir=$(new_scratch)
+  f="$dir/pr-review.md"
+  "$REPORT_VERDICT" "$f" rejected impl-wrong 1 0 >/dev/null
+  {
+    printf '\n### Findings\n'
+    printf '%s\n' "- [blocking] initial issue, fixed before round 2"
+  } >> "$f"
+  "$REPORT_VERDICT" "$f" tentative proceed 0 0 >/dev/null
+  printf '%s' "$f"
+}
+
 # ---------------------------------------------------------------------------
-# Run all nine fixture cases from the contract's table.
+# Run all fixture cases from the contract's table.
 # ---------------------------------------------------------------------------
 run_case "01" "path that does not exist -> refuse (non-zero)" \
   "$(build_case01)" "refuse"
@@ -368,8 +392,8 @@ run_case "04" "rejected impl-wrong 1 0 + one blocking finding -> refuse" \
 run_case "05" "rejected needs-input 0 0 + non-empty Open questions -> refuse" \
   "$(build_case05)" "refuse"
 
-run_case "06" "tentative proceed 0 0 -> refuse (tentative is not ready)" \
-  "$(build_case06)" "refuse"
+run_case "06" "tentative proceed 0 0 -> proceed (exit 0)" \
+  "$(build_case06)" "proceed"
 
 run_case "07" "ready proceed 0 0 -> proceed (exit 0)" \
   "$(build_case07)" "proceed"
@@ -379,6 +403,12 @@ run_case "08" "round 1 ready, round 2 rejected+blocking -> refuse (last round go
 
 run_case "09" "round 1 rejected+blocking, round 2 ready -> proceed (last round governs)" \
   "$(build_case09)" "proceed"
+
+run_case "10" "round 1 tentative, round 2 rejected+blocking -> refuse (last round governs)" \
+  "$(build_case10)" "refuse"
+
+run_case "11" "round 1 rejected+blocking, round 2 tentative -> proceed (last round governs)" \
+  "$(build_case11)" "proceed"
 
 # ---------------------------------------------------------------------------
 # Textual assertions on SKILL.md itself.
@@ -394,13 +424,13 @@ else
 fi
 
 # text-2: the marker's block, whitespace-normalized, contains the literal
-# 'validate-report.sh' and the literal 'verdict ready, next proceed'.
+# 'validate-report.sh' and the literal 'verdict (ready|tentative), next proceed'.
 normalized_block=$(extract_block | tr -s '[:space:][:cntrl:]' ' ')
 if printf '%s' "$normalized_block" | grep -qF "validate-report.sh" \
-   && printf '%s' "$normalized_block" | grep -qF "verdict ready, next proceed"; then
-  pass "text-2: extracted block (whitespace-normalized) contains literal 'validate-report.sh' and literal 'verdict ready, next proceed'"
+   && printf '%s' "$normalized_block" | grep -qF "verdict (ready|tentative), next proceed"; then
+  pass "text-2: extracted block (whitespace-normalized) contains literal 'validate-report.sh' and literal 'verdict (ready|tentative), next proceed'"
 else
-  fail "text-2: extracted block (whitespace-normalized) contains literal 'validate-report.sh' and literal 'verdict ready, next proceed'" \
+  fail "text-2: extracted block (whitespace-normalized) contains literal 'validate-report.sh' and literal 'verdict (ready|tentative), next proceed'" \
     "normalized=[$normalized_block]"
 fi
 
@@ -411,6 +441,30 @@ if [ -n "$finalize_bullets" ] && printf '%s\n' "$finalize_bullets" | grep -qF "p
 else
   fail "text-3: pr-review.md is named in the finalize inputs bullet" \
     "bullets=[$finalize_bullets]"
+fi
+
+# text-4: finalize step 1 names tentative and drops the ready-only phrase.
+OLD_FINALIZE_PHRASE='must read `verdict: ready` / `next: proceed`'
+norm_finalize=$(printf '%s\n' "$finalize_section" | tr -s '[:space:][:cntrl:]' ' ')
+if printf '%s' "$norm_finalize" | grep -qF "tentative" \
+   && ! printf '%s' "$norm_finalize" | grep -qF "$OLD_FINALIZE_PHRASE"; then
+  pass "text-4: finalize section names tentative and no longer has the ready-only phrase"
+else
+  fail "text-4: finalize section names tentative and no longer has the ready-only phrase" \
+    "section=[$norm_finalize]"
+fi
+
+# text-5: dae/SKILL.md PR-gate sentence accepts tentative.
+DAE_MD="$REPO_ROOT/agent-agnostic/skills/dae/SKILL.md"
+OLD_DAE_PHRASE='`verdict: ready` + `next: proceed`'
+dae_gate_lines=$(grep -F 'last** round' "$DAE_MD" 2>/dev/null)
+if [ -f "$DAE_MD" ] \
+   && ! grep -qF "$OLD_DAE_PHRASE" "$DAE_MD" \
+   && printf '%s\n' "$dae_gate_lines" | grep -qF "tentative"; then
+  pass "text-5: dae SKILL.md drops the ready-only literal and its last-round sentence names tentative"
+else
+  fail "text-5: dae SKILL.md drops the ready-only literal and its last-round sentence names tentative" \
+    "lines=[$dae_gate_lines]"
 fi
 
 # ---------------------------------------------------------------------------

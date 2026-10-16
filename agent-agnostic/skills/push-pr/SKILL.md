@@ -51,16 +51,16 @@ Every stage starts the same way: inside the worktree, confirm the working tree i
 
 ### `--stage finalize`
 
-1. **Refuse without a passing PR gate.** Before any commit, push, or PR-state action, check the run's `pr-review.md` (the path from your args): it must exist, must pass `validate-report.sh` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy), and its **last** round must read `verdict: ready` / `next: proceed`. This holds unconditionally — including when the caller passes keep-draft, which governs only the ready-flip in step 5, never whether this gate runs.
+1. **Refuse without a passing PR gate.** Before any commit, push, or PR-state action, check the run's `pr-review.md` (the path from your args): it must exist, must pass `validate-report.sh` (install `~/.claude/hooks/`, or the project's `.claude/hooks/` copy), and its **last** round must read `verdict: ready` or `verdict: tentative`, with `next: proceed`. This holds unconditionally — including when the caller passes keep-draft, which governs only the ready-flip in step 5, never whether this gate runs.
 
 <!-- pr-gate-check -->
 ```sh
 # exit 0     -> the PR gate passed; finalize may proceed
 # exit non-0 -> refuse: stop the stage, do NOT flip draft -> ready
-validate-report.sh "$PR_REVIEW" | grep -qE 'verdict ready, next proceed'
+validate-report.sh "$PR_REVIEW" | grep -qE 'verdict (ready|tentative), next proceed'
 ```
 
-   If the predicate fails, **refuse**: stop the stage cold — nothing is committed, nothing is pushed, the PR is not flipped from draft to ready. This is a `failed` return, not a silent skip and not an error to route around. Report plainly which of the three conditions missed (missing file, failed `validate-report.sh`, or a last round that isn't ready/proceed), the `pr-review.md` path you checked, and the `validate-report.sh` output. A run whose gate has not passed pushes stragglers through `--stage update`, never through a bypassed `finalize`.
+   If the predicate fails, **refuse**: stop the stage cold — nothing is committed, nothing is pushed, the PR is not flipped from draft to ready. This is a `failed` return, not a silent skip and not an error to route around. Report plainly which of the three conditions missed (missing file, failed `validate-report.sh`, or a last round that isn't ready/proceed or tentative/proceed), the `pr-review.md` path you checked, and the `validate-report.sh` output. A run whose gate has not passed pushes stragglers through `--stage update`, never through a bypassed `finalize`.
 1b. **Refuse on a hygiene violation.** After the PR-gate check and before any commit or push, run the single end-of-lifecycle scan over the whole branch diff:
 
 ```sh

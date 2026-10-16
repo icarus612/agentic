@@ -11,7 +11,8 @@
 #   PR gate: the parent branch's diff against the base, minus every file
 #   claimed by a `reports/*-exit.md` "## Files touched" list, minus the
 #   harness-owned paths (the plans dir and local docs dir, resolved via
-#   resolve-config.sh; .gitignore; plus any --allow prefixes). Whatever
+#   resolve-config.sh; .gitignore; symlinks whose target resolves inside the
+#   docs root (doc-format's mirror links); plus any --allow prefixes). Whatever
 #   remains is an UNCLAIMED product change — code nobody's exit report owns,
 #   which per the dae invariants means someone (usually the orchestrator)
 #   edited the product directly instead of dispatching a builder. The
@@ -130,6 +131,7 @@ allowed="$allowed
 $(norm "$plans")"
 allowed="$allowed
 $(norm "$docs")"
+docs_abs=$(realpath -m -- "$wt/$(norm "$docs")")
 if [ -n "$allow_extra" ]; then
   IFS=':' read -r -a extras <<< "$allow_extra"
   for e in "${extras[@]}"; do [ -n "$e" ] && allowed="$allowed
@@ -162,6 +164,10 @@ while IFS= read -r f; do
     if [ "$f" = "$a" ] || [[ "$f" == "$a"/* ]]; then ok=1; break; fi
   done <<< "$allowed"
   [ "$ok" = 1 ] && continue
+  if [ -L "$wt/$f" ]; then
+    tgt=$(realpath -m -- "$wt/$f")
+    case "$tgt" in "$docs_abs"|"$docs_abs"/*) continue ;; esac
+  fi
   echo "UNCLAIMED: $f"
   fail=1
 done <<< "$changed"

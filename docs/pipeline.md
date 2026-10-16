@@ -189,7 +189,8 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `resolve-anchor.sh` (per-item `--against` anchor resolution to typed
   pointers; all-or-nothing), `mark-syllabus.sh`, `verify-scope.sh`,
   `verify-run-scope.sh` (whole-run diff vs the union of exit reports, at the
-  PR gate), `plan-lifecycle.sh` (every plan move:
+  PR gate; symlinks whose target resolves inside the docs root, doc-format's
+  mirror links, are harness-owned), `plan-lifecycle.sh` (every plan move:
   `promote | archive | supersede | reopen | locate | check | adopt`; `archive`
   refuses a plan that didn't ship), `report-verdict.sh` (the only writer of a
   verdict round), `validate-report.sh` (caller-side report schema check),
@@ -220,8 +221,10 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `lane-bind.sh` calls, pointing at the Write tool — builders write those
   files with Write/Edit at absolute paths; it also denies destinations built
   from variables or expansions (`$R/...`, `~`, `$(...)`, backticks) whose tail
-  is a lane-file shape, while interpreter one-liners remain the accepted
-  gap), `parent-tree-guard.sh`
+  is a lane-file shape, relative destinations are resolved through a
+  tracked in-command cwd (seeded from the payload `cwd`, updated by `cd`/
+  `pushd`, reset by `popd`, `cd -` and `cd ~`, subshell-scoped); interpreter
+  one-liners remain the accepted gap), `parent-tree-guard.sh`
   (`PostToolUse` on `Bash` and on `Stop`; catches Bash-side product writes a
   `PreToolUse` hook can't see; a plans-dir file is judged once, by the role
   active when it appears, and that verdict sticks to its content hash in

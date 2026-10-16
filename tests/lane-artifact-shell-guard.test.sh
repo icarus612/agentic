@@ -44,12 +44,12 @@ run_hook_empty() {
   rm -f "$out_f" "$err_f"
 }
 
-# payload <command> [subagent] -- Bash PreToolUse JSON via python3 json.dumps
+# payload <command> [subagent] -- Bash PreToolUse JSON via python3 json.dumps; cwd from $PAYLOAD_CWD (default /tmp)
 payload() {
   python3 -c '
-import json, sys
+import json, os, sys
 p = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
-     "cwd": "/tmp", "tool_input": {"command": sys.argv[1]}}
+     "cwd": os.environ.get("PAYLOAD_CWD", "/tmp"), "tool_input": {"command": sys.argv[1]}}
 if len(sys.argv) > 2:
     p["agent_id"] = "ab0dc0b94f1af8740"
     p["agent_type"] = "builder"
@@ -58,8 +58,8 @@ print(json.dumps(p))
 }
 
 deny() {
-  local label="$1" cmd="$2" target="$3"
-  run_hook "$(payload "$cmd")"
+  local label="$1" cmd="$2" target="$3" cwd="${4:-/tmp}"
+  run_hook "$(PAYLOAD_CWD="$cwd" payload "$cmd")"
   if [ "$CODE" -ne 2 ]; then
     fail "$label -> exit 2" "code=$CODE out=[$OUT] err=[$ERR]"
     return
@@ -76,8 +76,8 @@ deny() {
 }
 
 allow() {
-  local label="$1" cmd="$2"
-  run_hook "$(payload "$cmd")"
+  local label="$1" cmd="$2" cwd="${3:-/tmp}"
+  run_hook "$(PAYLOAD_CWD="$cwd" payload "$cmd")"
   if [ "$CODE" -ne 0 ]; then
     fail "$label -> exit 0" "code=$CODE out=[$OUT] err=[$ERR]"
     return
@@ -266,6 +266,24 @@ allow "10j scratch report via var" 'echo x > $R/reports/my-slug-abc123/report.md
 allow "10k .bak via var" 'echo x > $R/reports/l1-exit.md.bak'
 allow "10l git commit mention" 'git commit -m "mention $R/reports/l1-exit.md and ${R}/contracts/l1.md"'
 allow "10m literal non-lane path no var" 'echo x > /tmp/reports/l1-exit.md'
+
+RUN="/w/run/.artifacts"
+deny "11a cd contracts && heredoc append" $'cd /w/run/.artifacts/contracts && cat >> l8.md <<\'EOF\'\nbody\nEOF' "/w/run/.artifacts/contracts/l8.md"
+deny "11b cd .artifacts && printf >> contracts/l7.md" "cd $RUN && printf 'x' >> contracts/l7.md" "$RUN/contracts/l7.md"
+deny "11c cd \$RUN/reports && echo > l2-exit.md" 'cd $RUN/reports && echo x > l2-exit.md' 'reports/l2-exit.md'
+deny "11d pushd lanes && echo > l1.agent" "pushd $RUN/lanes && echo a > l1.agent" "$RUN/lanes/l1.agent"
+deny "11e payload cwd contracts, heredoc append" $'cat >> l8.md <<EOF\nbody\nEOF' "$RUN/contracts/l8.md" "$RUN/contracts"
+deny "11f payload cwd .artifacts, cp to contracts/l3.md" 'cp /tmp/x contracts/l3.md' "$RUN/contracts/l3.md" "$RUN"
+deny "11g chained cds then tee" "cd $RUN && cd contracts && tee l4.md" "$RUN/contracts/l4.md"
+deny "11h cd -P then dd of=" "cd -P $RUN/reports && dd if=/tmp/a of=l1-exit.md" "$RUN/reports/l1-exit.md"
+deny "11i quoted var cd, relative tail" 'cd "$R" && cp /tmp/a contracts/l9.md' 'contracts/l9.md'
+deny "11j cd ; sed -i" "cd $RUN/contracts; sed -i s/a/b/ l2.md" "$RUN/contracts/l2.md"
+allow "11k cd contracts && read" "cd $RUN/contracts && cat l8.md"
+allow "11l cd /tmp && lane-shaped basename" 'cd /tmp && echo x > l8.md'
+allow "11m subshell cd does not leak" "(cd $RUN/contracts) ; echo x > l8.md"
+allow "11n cd contracts, absolute /tmp dest" "cd $RUN/contracts && echo x > /tmp/l8.md"
+allow "11o cd .artifacts, progress-log" "cd $RUN && echo x >> progress-log.md"
+allow "11p cd contracts, .bak dest" "cd $RUN/contracts && echo x > l1.md.bak"
 
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"
 [ "$TOTAL_FAIL" -eq 0 ] || exit 1
