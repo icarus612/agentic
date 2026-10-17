@@ -16,6 +16,8 @@
 #   CLAUDE_HOOKS_TEST_ON_EDIT - Enable/disable (default: true)
 #   CLAUDE_HOOKS_TEST_MODES - Comma-separated: focused,package,all,integration
 #   CLAUDE_HOOKS_ENABLE_RACE - Enable race detection (default: true)
+#   CLAUDE_HOOKS_TEST_TIMEOUT - Per-run seconds before TERM then KILL (default: 300, 0 disables)
+#   CLAUDE_HOOKS_TEST_KILL_GRACE - Seconds between TERM and KILL (default: 3)
 
 set -euo pipefail
 
@@ -114,7 +116,17 @@ load_config() {
     export CLAUDE_HOOKS_TEST_MODES="${CLAUDE_HOOKS_TEST_MODES:-focused,package}"
     export CLAUDE_HOOKS_ENABLE_RACE="${CLAUDE_HOOKS_ENABLE_RACE:-true}"
     export CLAUDE_HOOKS_TEST_VERBOSE="${CLAUDE_HOOKS_TEST_VERBOSE:-false}"
-    
+    export CLAUDE_HOOKS_TEST_TIMEOUT="${CLAUDE_HOOKS_TEST_TIMEOUT:-300}"
+    export CLAUDE_HOOKS_TEST_KILL_GRACE="${CLAUDE_HOOKS_TEST_KILL_GRACE:-3}"
+    if [[ ! "$CLAUDE_HOOKS_TEST_TIMEOUT" =~ ^[0-9]+$ ]]; then
+        echo "smart-test: invalid CLAUDE_HOOKS_TEST_TIMEOUT '$CLAUDE_HOOKS_TEST_TIMEOUT', using 300" >&2
+        export CLAUDE_HOOKS_TEST_TIMEOUT=300
+    fi
+    if [[ ! "$CLAUDE_HOOKS_TEST_KILL_GRACE" =~ ^[0-9]+$ ]]; then
+        echo "smart-test: invalid CLAUDE_HOOKS_TEST_KILL_GRACE '$CLAUDE_HOOKS_TEST_KILL_GRACE', using 3" >&2
+        export CLAUDE_HOOKS_TEST_KILL_GRACE=3
+    fi
+
     # Load project config
     load_project_config
     
@@ -283,10 +295,39 @@ format_test_output() {
 }
 
 RUN_CONTAINED_PID=""
+WATCHDOG_PID=""
+RUN_CONTAINED_TMP=""
+
+# kill_group_escalating <pgid>: TERM, wait up to the grace for the group to
+# vanish, then KILL.
+kill_group_escalating() {
+    local pgid="$1" grace="${CLAUDE_HOOKS_TEST_KILL_GRACE:-3}" waited=0
+    kill -TERM -- -"$pgid" 2>/dev/null || return 0
+    while kill -0 -- -"$pgid" 2>/dev/null; do
+        if [[ "$waited" -ge $((grace * 10)) ]]; then
+            kill -KILL -- -"$pgid" 2>/dev/null || true
+            return 0
+        fi
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+}
 
 kill_contained_group() {
+    local pid
+    if [[ -n "$WATCHDOG_PID" ]]; then
+        pid="$WATCHDOG_PID"
+        WATCHDOG_PID=""
+        kill -KILL -- -"$pid" 2>/dev/null || true
+    fi
     if [[ -n "$RUN_CONTAINED_PID" ]]; then
-        kill -TERM -- -"$RUN_CONTAINED_PID" 2>/dev/null || true
+        pid="$RUN_CONTAINED_PID"
+        RUN_CONTAINED_PID=""
+        kill_group_escalating "$pid"
+    fi
+    if [[ -n "$RUN_CONTAINED_TMP" ]]; then
+        rm -f $RUN_CONTAINED_TMP
+        RUN_CONTAINED_TMP=""
     fi
 }
 
@@ -297,19 +338,42 @@ trap 'kill_contained_group; exit 129' HUP
 
 # run_contained <outvar> <dir> <cmd...>: run in its own process group, reap
 # leftovers, store combined output in outvar, return the command's exit code.
+# A watchdog (own process group) escalates TERM->KILL on timeout.
 run_contained() {
-    local outvar="$1" dir="$2" outfile rc=0
+    local outvar="$1" dir="$2" outfile flagfile rc=0 timeout out
+    timeout="${CLAUDE_HOOKS_TEST_TIMEOUT:-300}"
     shift 2
     outfile=$(mktemp)
+    flagfile=$(mktemp)
+    rm -f "$flagfile"
+    RUN_CONTAINED_TMP="$outfile $flagfile"
     set -m
     ( cd "$dir" && exec "$@" ) </dev/null >"$outfile" 2>&1 &
     RUN_CONTAINED_PID=$!
+    if [[ "$timeout" -gt 0 ]]; then
+        (
+            sleep "$timeout"
+            : >"$flagfile"
+            kill_group_escalating "$RUN_CONTAINED_PID"
+        ) </dev/null >/dev/null 2>&1 &
+        WATCHDOG_PID=$!
+    fi
     set +m
     wait "$RUN_CONTAINED_PID" || rc=$?
-    kill -TERM -- -"$RUN_CONTAINED_PID" 2>/dev/null || true
+    if [[ -n "$WATCHDOG_PID" ]]; then
+        kill -KILL -- -"$WATCHDOG_PID" 2>/dev/null || true
+        WATCHDOG_PID=""
+    fi
+    kill_group_escalating "$RUN_CONTAINED_PID"
     RUN_CONTAINED_PID=""
-    printf -v "$outvar" '%s' "$(cat "$outfile")"
-    rm -f "$outfile"
+    out="$(cat "$outfile")"
+    if [[ -e "$flagfile" ]]; then
+        out="smart-test: timed out after ${timeout}s (process group TERM→KILL)"$'\n'"$out"
+        [[ "$rc" -ne 0 ]] || rc=124
+    fi
+    printf -v "$outvar" '%s' "$out"
+    rm -f "$outfile" "$flagfile"
+    RUN_CONTAINED_TMP=""
     return "$rc"
 }
 
@@ -625,6 +689,14 @@ select_js_runner() {
     fi
 }
 
+select_js_related_runner() {
+    if [[ -x "$1/node_modules/.bin/vitest" ]]; then
+        printf '%s\n' "node_modules/.bin/vitest related --run"
+    elif [[ -x "$1/node_modules/.bin/jest" ]]; then
+        printf '%s\n' "node_modules/.bin/jest --findRelatedTests --passWithNoTests"
+    fi
+}
+
 run_javascript_tests() {
     local file="$1"
     local dir=$(dirname "$file")
@@ -771,10 +843,19 @@ run_javascript_tests() {
                     ;;
 
                 "package")
-                    echo -e "${BLUE}📦 Running all tests...${NC}" >&2
+                    local related_cmd=""
+                    related_cmd=$(select_js_related_runner "$pkg_dir")
                     tests_run=$((tests_run + 1))
 
-                    if ! run_contained test_output "$pkg_dir" $pkg_manager test; then
+                    local package_ok=true
+                    if [[ -n "$related_cmd" ]]; then
+                        echo -e "${BLUE}📦 Running tests related to $file...${NC}" >&2
+                        run_contained test_output "$pkg_dir" $related_cmd "$file" || package_ok=false
+                    else
+                        echo -e "${BLUE}📦 Running all package tests...${NC}" >&2
+                        run_contained test_output "$pkg_dir" $pkg_manager test || package_ok=false
+                    fi
+                    if [[ "$package_ok" != "true" ]]; then
                         failed=1
                         echo -e "${RED}❌ Package tests failed${NC}" >&2
                         echo -e "\n${RED}Failed test output:${NC}" >&2

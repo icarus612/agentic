@@ -1491,6 +1491,51 @@ case35() {
 }
 case35
 
+case36() {
+  local label="36: a ledger deny sticks to the content hash across a role flip back to planner and names plans-ledger, not the planner trailer"
+  local wt plans
+  wt=$(new_parent_worktree_linked_with_role planner)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/proposals"
+  printf '# plan\n' >"$plans/proposals/x-01-02-26.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label (planner write)" "code=$CODE err=[$ERR]"; return; }
+  "$WORKFLOW_SETUP" --set-role orchestrator --root "$wt" 2>/dev/null
+  "$REPO_ROOT/agent-agnostic/hooks/plan-lifecycle.sh" promote "$plans/proposals/x-01-02-26.md" --root "$wt" >/dev/null 2>&1
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label (orchestrator promote)" "code=$CODE err=[$ERR]"; return; }
+  printf 'planner\n' >"$wt/.artifacts/dae-role"
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label (planner re-run)" "code=$CODE err=[$ERR]"; return; }
+  case "$ERR" in
+    *plans-ledger*) ;;
+    *) fail "$label" "stderr lacks plans-ledger: [$ERR]"; return ;;
+  esac
+  case "$ERR" in
+    *"the planner writes only the plans dir"*) fail "$label" "planner trailer printed: [$ERR]"; return ;;
+  esac
+  pass "$label"
+}
+case36
+
+case37() {
+  local label="37: control -- a fresh orchestrator product write denies with the orchestrator trailer and no plans-ledger text"
+  local wt
+  wt=$(new_parent_worktree_with_role orchestrator)
+  printf 'echo changed\n' >"$wt/agent-agnostic/hooks/some-file.sh"
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  case "$ERR" in
+    *"the orchestrator writes only this run's own gate reports"*) ;;
+    *) fail "$label" "orchestrator trailer missing: [$ERR]"; return ;;
+  esac
+  case "$ERR" in
+    *plans-ledger*) fail "$label" "unexpected plans-ledger: [$ERR]"; return ;;
+  esac
+  pass "$label"
+}
+case37
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

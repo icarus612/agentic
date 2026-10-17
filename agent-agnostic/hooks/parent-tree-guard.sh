@@ -337,6 +337,7 @@ content_hash() {
 }
 
 offenders=()
+ledger_offenders=()
 while IFS= read -r line; do
   [ -n "$line" ] || continue
   path="${line:3}"
@@ -360,6 +361,7 @@ while IFS= read -r line; do
     entry="$(content_hash "$abs") $abs"
     if grep -qxF -- "deny $entry" "$ledger" 2>/dev/null; then
       offenders+=("$abs")
+      ledger_offenders+=("$abs")
       continue
     fi
     grep -qxF -- "ok $entry" "$ledger" 2>/dev/null && continue
@@ -378,7 +380,10 @@ done <<< "$status"
   for o in "${offenders[@]}"; do
     echo "parent-tree-guard: DENIED — product file changed in the run's parent worktree: $o"
   done
-  case "$role" in
+  if [ "${#ledger_offenders[@]}" -gt 0 ]; then
+    echo "parent-tree-guard: the change(s) above flagged from the plans-ledger ($ledger) were denied when they first appeared, under the role active then; that verdict sticks to the content hash and is not a judgment under the current role. Revert them, or commit them through the owning stage."
+  fi
+  [ "${#offenders[@]}" -gt "${#ledger_offenders[@]}" ] && case "$role" in
     builder)
       echo "parent-tree-guard: a builder writes everywhere except the plans/docs roots (they collide with the real trees on merge-back); revert the change(s) above."
       ;;

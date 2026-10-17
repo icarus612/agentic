@@ -16,8 +16,27 @@ You land finished work in the agentic repo, after it was developed on a workflow
 - Any time changes in THIS repo are ready to land — instead of `push-pr`, which is for other projects' workflow branches.
 - NEVER in any other repo: everywhere else, `push-policy` and `push-pr` apply unchanged.
 
+## Plan lifecycle in this repo
+
+push-main has no open-draft or finalize stage, so here the dae router's post-approval pair ("`plan-lifecycle.sh promote`, then open the draft PR") is replaced by the promote block below, and `update` is a no-op (there is no remote branch). Run it from the parent worktree as ONE chained Bash call: the write-scope hooks read the tree after every Bash call, and a dirty promotion is denied and sticks in the plans-ledger. Inputs: `PROPOSAL`, `PLAN_SLUG`, `PLANS_DIR`, `PLAN_DIR`. The commit pathspec carries the new `$PLAN_DIR` plus every tracked proposal path the move vacated (including a `.plan-review.md` sibling), so `git status --porcelain -- "$PLANS_DIR"` is empty afterwards whether the proposal was tracked or not.
+
+<!-- plan-promote -->
+```sh
+plan-lifecycle.sh promote "$PROPOSAL" \
+  && git add -- "$PLAN_DIR" \
+  && git commit -m "chore(plans): promote $PLAN_SLUG" -- "$PLAN_DIR" $(git diff --cached --no-renames --name-only --diff-filter=D -- "$PLANS_DIR/proposals")
+```
+
 ## How it works
 
+0. **Archive the plan.** When the run has a `plan.md`, in the workflow worktree after Record ticked the syllabus, run `plan-lifecycle.sh check "$PLANS_DIR"` (a `FAIL:` line stops push-main), then archive and commit in ONE chained call:
+
+<!-- plan-archive -->
+```sh
+plan-lifecycle.sh archive "$PLAN_DIR" && git commit -m "chore(plans): archive $PLAN_SLUG" -- "$PLAN_DIR" "$PLANS_DIR/completed/$PLAN_SLUG.md"
+```
+
+   If `archive` refuses because subphases are unchecked, stop push-main — never `--force-incomplete`. The archive commit lands inside the squash. No `plan.md` means skip this step.
 1. **Verify.** A workflow worktree exists for this change, on its `<type>/<name>` branch, clean, with everything committed there (per `workflow-setup.sh`'s standard scheme). The main checkout, in the repo root, is on `main` with a clean tree. Note the pre-merge remote tip: `old=$(git rev-parse origin/main)`.
 2. **Squash-merge locally.** From the main checkout: `git merge --squash <type>/<name>` followed by `git commit`. Squash is the rule, universally, per `push-policy` — one commit per run on `main`, one revert point, and the per-subphase trail stays readable in the run's exit reports and in the branch itself until it is retired. `--no-ff` was this repo's former exception and is no longer permitted; `branch-squash-guard.sh` denies any non-squash merge into the base branch at the tool-call level.
 3. **Refuse on conflict.** If the merge conflicts, `git merge --abort` and stop — never resolve conflicts at the landing stage. Reconcile inside the workflow worktree and re-invoke `push-main`; report the exact state.

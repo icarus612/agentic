@@ -200,6 +200,16 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `push-main` invokes it directly for a full sync after every landing — but
   it is also wired via a `SessionStart` hook in `settings.json`, which runs
   it in `--check` mode as a passive drift warning on every session start).
+  `push-main` also owns plan lifecycle on this repo: it runs
+  `plan-lifecycle.sh promote` and `archive` as chained commits, leaving a
+  parent-tree-guard-clean tree.
+- `smart-test.sh` (`settings.json`) is configured by env:
+  `CLAUDE_HOOKS_TEST_TIMEOUT` (seconds, default 300, `0` disables) kills a
+  hung run's process group with TERM, then KILL after
+  `CLAUDE_HOOKS_TEST_KILL_GRACE`. In JS package mode it runs only related
+  tests (`vitest related --run` or `jest --findRelatedTests`, chosen by
+  `select_js_related_runner`), falling back to the full suite when no runner
+  is found.
 - Wired: `workflow-diff-check.sh` (`Stop`, global via `settings.json`;
   self-scoped to a dae run's own parent worktree via the same parent-worktree
   marker walk as its two neighbors below — inert everywhere else, including
@@ -231,7 +241,8 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `.artifacts/plans-ledger` — so a planner's proposal or a gate report is
   never re-flagged under the next role, and a denied edit is never laundered
   by a later role; `--set-role` records the outgoing role's writes before it
-  flips), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
+  flips; a denial that comes from the ledger says so in its message, naming
+  the plans-ledger, rather than blaming the current role), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
   two provably-safe lane-cleanup commands), `branch-squash-guard.sh`
   (`PreToolUse`; enforces the squash-only branch policy per `push-policy`).
 
