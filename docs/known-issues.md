@@ -59,3 +59,50 @@ to `completed/`), which is why this disclosure needs a home outside it.
 **Status.** No plan and no pointer — this is a closed, one-time disclosure, not a parked proposal. A
 future `verify-run-scope.sh` run against this same branch history will still report these two files
 unclaimed; that is documented and expected, not a gap in the enforcement that shipped in `21518ff`.
+
+## `parent-tree-guard.sh`: a promoted plan gets a sticky `deny`
+
+**Limitation.** The plans-ledger keys every verdict on `(content hash, absolute path)` and judges a
+path the first time it appears, under whatever `dae-role` is active then. The planner's proposal is
+recorded `ok` under role `planner`. `plan-lifecycle.sh promote`, which `build.md` assigns to the
+orchestrator, then moves it unchanged to `<slug>/plan.md`. The hash is the same but the path is new,
+so it is judged under role `orchestrator`, which `role_allows()` limits to `*-review.md` and
+`sync-report.md`. The result is a sticky `deny` that fires on every Bash call and at Stop until the
+plan is committed. `plan-review.md` survives the same move only because of its basename. A pure
+move of already-approved content is flagged as an orchestrator write, which is a false flag.
+`2c8afa8` avoids this for `push-main`, which moves and commits in one call, but the `push-pr` route
+still hits it: promote, then a separate `open-draft` commit.
+
+Observed on mythic-made run `signup-countdown-click` (2026-10-21):
+
+```
+ok   d35d525b… project-plans/proposals/signup-countdown-click-10-20-26.md
+deny d35d525b… project-plans/signup-countdown-click-10-20-26/plan.md
+```
+
+The documenter's Record-stage output is suspected to be the same class but has not been confirmed.
+
+**Source.** `agent-agnostic/hooks/parent-tree-guard.sh:359-373` (the ledger lookup and the write),
+`:281` (`role_allows`).
+
+**Status.** No plan yet. Proposed fix: treat a plans-dir path as clean when its content hash
+already has an `ok` entry at any path under `plans_root`, so a pure move inherits the approval.
+Controls for the fix: a moved `ok` file must pass, and a new orchestrator-written file with a fresh
+hash must still be denied.
+
+## `check-diff-hygiene.sh`: reworded comments count as new comments
+
+**Limitation.** The comment checks (banner and density) count every `+` line in the diff. git shows
+an edited line as a `-`/`+` pair, so a comment that already existed and had one word changed counts
+as newly added commentary. On mythic-made PR #117 (2026-10-22), `signup-section.svelte.test.ts` was
+reported as "7/13 added lines are comments", but 4 of the 7 were existing comments where only a
+component name changed. That instance stayed under the threshold and did not block, but a rename
+that rewords a few existing comment lines can trip `COMMENT DENSITY` or `COMMENT BANNER` and block
+`gh pr ready` through `pr-ready-hygiene-guard.sh`, on code that added no commentary at all.
+
+**Source.** `agent-agnostic/hooks/check-diff-hygiene.sh:103-145` (the added-line collector and the
+banner/density counts).
+
+**Status.** No plan yet. Proposed fix: within a hunk, pair each removed comment line with an added
+comment line and count only the unpaired added ones. Controls for the fix: a pure reword of an
+existing comment block must pass, and a new N-line banner in one hunk must still fail.
