@@ -113,3 +113,62 @@ banner/density counts).
 **Status.** No plan yet. Proposed fix: within a hunk, pair each removed comment line with an added
 comment line and count only the unpaired added ones. Controls for the fix: a pure reword of an
 existing comment block must pass, and a new N-line banner in one hunk must still fail.
+
+## Hook `timeout` fails open, and `if` cannot narrow the write-tool and builder hooks
+
+**Limitation.** Every `PreToolUse`/`PostToolUse`/`Stop` handler in `settings.json` now has an
+explicit `timeout`, but a `PreToolUse` guard that times out fails open: the call proceeds. The
+timeout bounds a hung guard; it does not make it block. Separately, `if` could not be used to
+narrow most hooks. Probed on Claude Code 2.1.318 (2026-11-05):
+
+- `if: "Edit(//**/*.ts)"` fires for `Edit` but not `Write`, so `smart-lint`, `smart-test` and
+  `claude-install-drift` stay unscoped (narrowing would skip every Write).
+- `if: "Agent(builder)"` never matches a builder launch, so `lane-bind-on-launch` stays unscoped.
+- The three Bash guards are unscoped by choice: a hand-copied `if` can drift narrower than the
+  script's own trigger set with nothing detecting it. `parent-tree-guard`, `scope-writes`,
+  `lane-artifact-shell-guard` and all `Stop` hooks are unscoped by design.
+
+Only `allow-workflow-cleanup.sh` carries `if` values. `if` is also best-effort by Claude Code's
+own statement, so a narrowed guard is never relied on to be the only check.
+
+**smart-test coupling.** Its hook `timeout` must exceed modes × (`CLAUDE_HOOKS_TEST_TIMEOUT` +
+`CLAUDE_HOOKS_TEST_KILL_GRACE`); see `pipeline.md`.
+
+**Source.** `agent-specific/claude/settings.json` (`hooks`), `tests/hook-registrations.test.sh`.
+
+**Status.** Follow-ups, no plan yet: (1) an `onFailure: block` option so a timed-out guard denies
+instead of passing; (2) revisit `if` narrowing of the write-tool and builder hooks if Claude Code
+makes `Edit(...)` match `Write` or `Agent(builder)` match a launch.
+
+## Builder sub-agents keep running after the builder hands back
+
+**Limitation.** Observed on agentic run `hook-timeouts-and-if-scoping` (2026-11-05). Lane l1's
+builder handed back after committing `2413f37`. The orchestrator then merged the lane and removed
+its child worktree, per `build-dispatch.md` step 5. The builder kept running until 12:35:53 and
+resumed its contract-tester. With the lane worktree gone, the tester ran
+`sed -i '/^# --- [0-9]/d' tests/hook-registrations.test.sh` in the PARENT worktree (its transcript
+timestamps that call 12:30:15; the file's mtime is 12:35:40). The result was an uncommitted product
+edit outside any lane, claimed by no exit report. The orchestrator caught it with its own
+`git status` before the PR gate, and it was discarded through a corrective lane (`l2`). A hand-back
+envelope is not proof that the builder's tree of sub-agents has stopped. Nothing ties a child
+worktree's removal to the termination of the agents working in it.
+
+**Status.** No plan yet. Possible directions: the builder confirms its packet agents are finished
+before it returns; `scope-writes.sh` denies a lane-bound or packet agent writing outside its own
+child worktree; or the orchestrator re-checks the parent tree after each merge-back.
+
+## `parent-tree-guard.sh` likely inert when the run's repo is not the session's cwd
+
+**Limitation.** In the same run, the stray parent-worktree edit above was never flagged, even
+though the guard exists to deny uncommitted product changes in a marked parent worktree. The
+orchestrating session's cwd was a different repository (mythic-made). Its Bash calls reached the
+agentic worktree only through `git -C` and absolute paths, and its shell cwd reset to the
+mythic-made root after each call. The guard finds its run through a parent-worktree marker walk from
+the cwd, so it most likely never looked at the agentic worktree. This is likely, not confirmed:
+nobody has reproduced it with a controlled test.
+
+**Source.** `agent-agnostic/hooks/parent-tree-guard.sh` (the marker walk and the git-status scan).
+
+**Status.** No plan yet. Confirm first with a positive control: a dirty marked parent, a session cwd
+in another repository, then a Bash call. Possible fix: also resolve the run from paths named in the
+Bash command, or from a session-level registry of active runs.

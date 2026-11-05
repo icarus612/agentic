@@ -130,29 +130,35 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/no-attribution-guard.sh"
+            "command": "~/.claude/hooks/no-attribution-guard.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/pr-ready-hygiene-guard.sh"
+            "command": "~/.claude/hooks/pr-ready-hygiene-guard.sh",
+            "timeout": 120
           },
           {
             "type": "command",
             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
-            "if": "Bash(git branch:*)"
+            "if": "Bash(git branch:*)",
+            "timeout": 30
           },
           {
             "type": "command",
             "command": "~/.claude/hooks/allow-workflow-cleanup.sh",
-            "if": "Bash(git worktree remove:*)"
+            "if": "Bash(git worktree remove:*)",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/branch-squash-guard.sh"
+            "command": "~/.claude/hooks/branch-squash-guard.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/lane-artifact-shell-guard.sh"
+            "command": "~/.claude/hooks/lane-artifact-shell-guard.sh",
+            "timeout": 30
           }
         ]
       },
@@ -161,11 +167,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/branch-squash-guard.sh"
+            "command": "~/.claude/hooks/branch-squash-guard.sh",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/scope-writes.sh"
+            "command": "~/.claude/hooks/scope-writes.sh",
+            "timeout": 30
           }
         ]
       }
@@ -176,15 +184,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/smart-lint.sh"
+            "command": "~/.claude/hooks/smart-lint.sh",
+            "timeout": 300
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/smart-test.sh"
+            "command": "~/.claude/hooks/smart-test.sh",
+            "timeout": 660
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/claude-install-drift.sh"
+            "command": "~/.claude/hooks/claude-install-drift.sh",
+            "timeout": 30
           }
         ]
       },
@@ -193,7 +204,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/parent-tree-guard.sh"
+            "command": "~/.claude/hooks/parent-tree-guard.sh",
+            "timeout": 60
           }
         ]
       },
@@ -202,7 +214,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/lane-bind-on-launch.sh"
+            "command": "~/.claude/hooks/lane-bind-on-launch.sh",
+            "timeout": 30
           }
         ]
       }
@@ -213,15 +226,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/ntfy-notifier.sh notification"
+            "command": "~/.claude/hooks/ntfy-notifier.sh notification",
+            "timeout": 30
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/parent-tree-guard.sh"
+            "command": "~/.claude/hooks/parent-tree-guard.sh",
+            "timeout": 60
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/workflow-diff-check.sh"
+            "command": "~/.claude/hooks/workflow-diff-check.sh",
+            "timeout": 600
           }
         ]
       }

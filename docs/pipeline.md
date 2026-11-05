@@ -209,7 +209,21 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `CLAUDE_HOOKS_TEST_KILL_GRACE`. In JS package mode it runs only related
   tests (`vitest related --run` or `jest --findRelatedTests`, chosen by
   `select_js_related_runner`), falling back to the full suite when no runner
-  is found.
+  is found. Its hook `timeout` in `settings.json` (660) must exceed modes ×
+  (`CLAUDE_HOOKS_TEST_TIMEOUT` + `CLAUDE_HOOKS_TEST_KILL_GRACE`) = 2 × (300 + 3)
+  = 606; raising either default or adding a mode means raising the hook
+  timeout too. `tests/hook-registrations.test.sh` asserts the inequality.
+- Every `PreToolUse`, `PostToolUse` and `Stop` handler in `settings.json`
+  carries an explicit `timeout` (seconds): 30 for the quick guards, 60 for
+  `parent-tree-guard.sh`, 120 for `pr-ready-hygiene-guard.sh`, 300 for
+  `smart-lint.sh`, 660 for `smart-test.sh`, 600 for `workflow-diff-check.sh`.
+  No handler is `if`-narrowed except `allow-workflow-cleanup.sh`
+  (`Bash(git branch:*)`, `Bash(git worktree remove:*)`). The three Bash guards,
+  `scope-writes.sh`, `parent-tree-guard.sh`, `lane-artifact-shell-guard.sh` and
+  every `Stop` hook are unscoped by design (guards must see every call; an `if`
+  on `Stop` stops the hook running); `smart-lint`, `smart-test`,
+  `claude-install-drift` and `lane-bind-on-launch` are unscoped because `if`
+  does not match their calls (see `known-issues.md`). The test pins this.
 - Wired: `workflow-diff-check.sh` (`Stop`, global via `settings.json`;
   self-scoped to a dae run's own parent worktree via the same parent-worktree
   marker walk as its two neighbors below — inert everywhere else, including
