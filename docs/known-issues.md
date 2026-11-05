@@ -80,7 +80,14 @@ ok   d35d525b… project-plans/proposals/signup-countdown-click-10-20-26.md
 deny d35d525b… project-plans/signup-countdown-click-10-20-26/plan.md
 ```
 
-The documenter's Record-stage output is suspected to be the same class but has not been confirmed.
+The documenter's Record-stage output is the same class, confirmed on mythic-made run
+`home-countdown-mobile-taps` (2026-11-02). The documenter's edits to `docs/` (`hero.md`,
+`changelog.md`, `known-issues.md`) were denied as product writes on the orchestrator's next Bash
+call. The Write tool's agent identity lets the documenter write past `scope-writes.sh`, but
+`parent-tree-guard.sh`'s scan of the uncommitted tree judges each path only by the `dae-role`
+marker, which reads `orchestrator` at Record. The deny cleared once `push-pr --stage update`
+committed the docs. The proposed fix below covers the move case only; the documenter case needs
+the guard to credit a write made under a non-orchestrator agent identity.
 
 **Source.** `agent-agnostic/hooks/parent-tree-guard.sh:359-373` (the ledger lookup and the write),
 `:281` (`role_allows`).
