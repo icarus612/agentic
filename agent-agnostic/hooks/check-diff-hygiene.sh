@@ -105,17 +105,42 @@ if scope in ('all', 'comments'):
     # A hunk boundary BREAKS a run. Without this, separate comments in different
     # hunks concatenate into one phantom banner - two lanes reported that false
     # positive independently. None is the break marker.
+    # Only "--- a/" / "--- /dev/null" are headers; a removed "--foo" line is "---foo".
     for ln in diff.splitlines():
-        if ln.startswith('+++ b/'):
+        if ln.startswith('--- a/') or ln.startswith('--- /dev/null'):
+            cur = None
+        elif ln.startswith('+++ b/'):
             cur = ln[6:]; added.setdefault(cur, [])
         elif ln.startswith('@@') and cur is not None:
             added[cur].append(None)
         elif ln.startswith('+') and not ln.startswith('+++') and cur is not None:
-            added[cur].append(ln[1:])
+            added[cur].append(('+', ln[1:]))
+        elif ln.startswith('-') and cur is not None:
+            added[cur].append(('-', ln[1:]))
 
-    for path, lines in sorted(added.items()):
+    for path, entries in sorted(added.items()):
         if not path.endswith(CODE_EXT):
             continue
+        hunks, hunk = [], []
+        for e in entries + [None]:
+            if e is None:
+                hunks.append(hunk); hunk = []
+            else:
+                hunk.append(e)
+        # Reword pairing: each added comment line consumes one removed comment
+        # line from its own hunk and is then ignored for banner and density.
+        lines, tot = [], 0
+        for hunk in hunks:
+            rc = sum(1 for k, t in hunk if k == '-' and is_comment(t, path))
+            for k, t in hunk:
+                if k != '+':
+                    continue
+                if t.strip(): tot += 1
+                if rc and is_comment(t, path):
+                    rc -= 1
+                    continue
+                lines.append(t)
+            lines.append(None)
         runs, run, start = [], 0, 0
         for i, raw in enumerate(lines):
             if raw is None:
@@ -132,7 +157,6 @@ if scope in ('all', 'comments'):
 
         real = [r for r in lines if r is not None]
         ncom = sum(1 for r in real if is_comment(r, path))
-        tot  = len([r for r in real if r.strip()])
         pct  = (ncom * 100 // tot) if tot else 0
 
         for start, length in runs:

@@ -34,6 +34,7 @@ ${PRE_WRITE}${T}${H}/scope-writes.sh${T}30
 ${POST_WRITE}${T}${H}/smart-lint.sh${T}300
 ${POST_WRITE}${T}${H}/smart-test.sh${T}660
 ${POST_WRITE}${T}${H}/claude-install-drift.sh${T}30
+${POST_WRITE}${T}${H}/parent-tree-guard.sh${T}60
 ${POST_BASH}${T}${H}/parent-tree-guard.sh${T}60
 ${POST_AGENT}${T}${H}/lane-bind-on-launch.sh${T}30
 ${STOP}${T}${H}/ntfy-notifier.sh notification${T}30
@@ -44,7 +45,7 @@ ${STOP}${T}${H}/workflow-diff-check.sh${T}600"
 COUNTS="\
 ${PRE_BASH}${T}6
 ${PRE_WRITE}${T}2
-${POST_WRITE}${T}3
+${POST_WRITE}${T}4
 ${POST_BASH}${T}1
 ${POST_AGENT}${T}1
 ${STOP}${T}3"
@@ -140,6 +141,7 @@ unscoped PreToolUse "Write|Edit|MultiEdit|NotebookEdit" "$H/branch-squash-guard.
 unscoped PostToolUse "Write|Edit|MultiEdit" "$H/smart-lint.sh"
 unscoped PostToolUse "Write|Edit|MultiEdit" "$H/smart-test.sh"
 unscoped PostToolUse "Write|Edit|MultiEdit" "$H/claude-install-drift.sh"
+unscoped PostToolUse "Write|Edit|MultiEdit" "$H/parent-tree-guard.sh"
 unscoped PostToolUse Bash "$H/parent-tree-guard.sh"
 unscoped Stop - "$H/parent-tree-guard.sh"
 unscoped PostToolUse Agent "$H/lane-bind-on-launch.sh"

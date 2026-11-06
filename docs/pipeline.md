@@ -224,6 +224,8 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   on `Stop` stops the hook running); `smart-lint`, `smart-test`,
   `claude-install-drift` and `lane-bind-on-launch` are unscoped because `if`
   does not match their calls (see `known-issues.md`). The test pins this.
+- `build-dispatch.md` step 5 runs `git -C <parent> status --porcelain` after each
+  lane-child removal; a non-empty result stops the schedule as an unclaimed write.
 - Wired: `workflow-diff-check.sh` (`Stop`, global via `settings.json`;
   self-scoped to a dae run's own parent worktree via the same parent-worktree
   marker walk as its two neighbors below — inert everywhere else, including
@@ -248,15 +250,22 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   is a lane-file shape, relative destinations are resolved through a
   tracked in-command cwd (seeded from the payload `cwd`, updated by `cd`/
   `pushd`, reset by `popd`, `cd -` and `cd ~`, subshell-scoped); interpreter
-  one-liners remain the accepted gap), `parent-tree-guard.sh`
-  (`PostToolUse` on `Bash` and on `Stop`; catches Bash-side product writes a
+  one-liners remain the accepted gap; it also denies shell writes by
+  `builder`, `coder` and `contract-tester` agents into a marked linked
+  parent worktree), `parent-tree-guard.sh`
+  (`PostToolUse` on `Bash`, on `Stop` and, in credit-only mode, on
+  `Write|Edit|MultiEdit`, timeout 60; the credit mode records an
+  `agent_type` `planner` or `documenter` agent's own writes and never denies;
+  catches Bash-side product writes a
   `PreToolUse` hook can't see; a plans-dir file is judged once, by the role
   active when it appears, and that verdict sticks to its content hash in
   `.artifacts/plans-ledger` — so a planner's proposal or a gate report is
   never re-flagged under the next role, and a denied edit is never laundered
   by a later role; `--set-role` records the outgoing role's writes before it
   flips; a denial that comes from the ledger says so in its message, naming
-  the plans-ledger, rather than blaming the current role), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
+  the plans-ledger, rather than blaming the current role; ledger `src` lines
+  are role-tagged and inherited under `plans_root`, so a moved plan keeps its
+  approval), `allow-workflow-cleanup.sh` (`PreToolUse`; auto-allows the
   two provably-safe lane-cleanup commands), `branch-squash-guard.sh`
   (`PreToolUse`; enforces the squash-only branch policy per `push-policy`).
 

@@ -55,6 +55,9 @@
 #     - `documenter` (from `agent_type`, never a marker): clean under
 #       docs_root, or exactly `plan.md` under plans_root; else an offender.
 #
+#   Plans/docs ledger: verdicts stick to (hash, path); planner/documenter `src`
+#   lines are inherited under plans_root; Write-family payloads only credit it.
+
 #   Cheap and safe to run often: no marker found, or `git status` itself
 #   fails (not a repo, git missing), both fail OPEN (exit 0) rather than
 #   deny — this hook only ever blocks on an actual product-file diff inside
@@ -103,6 +106,7 @@ bfield() { # flat "name":true|false -> the bool token
 cwd=$(sfield cwd)
 [ -n "$cwd" ] || cwd="$PWD"
 agent_type=$(sfield agent_type)
+tool_name=$(sfield tool_name)
 
 # find_parent_worktree <start-path>
 # Prints the marked parent worktree's absolute path and returns 0, or
@@ -228,39 +232,8 @@ resolve_role() {
   esac
 }
 
-marked=""; is_lane=0
-if marked=$(find_parent_worktree "$cwd"); then
-  is_lane=0
-elif marked=$(find_lane_root "$cwd"); then
-  is_lane=1
-else
-  exit 0
-fi
-[ -n "$marked" ] || exit 0
-role=$(resolve_role "$marked" "$is_lane" "$agent_type")
-
-# Tamper detection: a 'builder' token forged directly into a PARENT
-# worktree's own marker is denied outright, independent of whether any
-# OTHER file also changed — .artifacts/ is gitignored, so the git-status
-# offender scan below structurally cannot see a dae-role change on its
-# own. See the header's "Tamper detection" note.
-if [ "$is_lane" = 0 ]; then
-  raw_role=$(cat "$marked/.artifacts/dae-role" 2>/dev/null | tr -d '[:space:]') || raw_role=""
-  if [ "$raw_role" = "builder" ] && [ "$role" != "builder" ]; then
-    echo "parent-tree-guard: DENIED — '$marked/.artifacts/dae-role' contains 'builder', which is not a legitimate role for this worktree. A parent worktree's genuine builder always runs in its own SIBLING lane child worktree, never via this file; 'builder' written directly into a parent's own marker is only ever forgery. This looks like a role-escalation attempt via direct write — revert the marker to its prior value ('orchestrator' or 'planner')." >&2
-    exit 2
-  fi
-fi
-
-status=$(git -C "$marked" status --porcelain -uall 2>/dev/null) || exit 0
-[ -n "$status" ] || exit 0
-
 # resolve_root_dir <VAR> <default> <marked-worktree> [--expect path]
-# Prints an absolute, realpath -m'd path. Never fails the caller: on any
-# resolve-config.sh error (rejected value, missing script, anything) it
-# falls back to <default> joined the same way — fail OPEN, never deny
-# because config resolution had a problem. Copied verbatim from
-# scope-writes.sh.
+# Fails open to <default>. Copied verbatim from scope-writes.sh.
 resolve_root_dir() {
   local var="$1" default="$2" root="$3"; shift 3
   local raw
@@ -269,15 +242,15 @@ resolve_root_dir() {
   realpath -m -- "$root/$raw" 2>/dev/null || printf '%s/%s' "$root" "$raw"
 }
 
-plans_root=$(resolve_root_dir CLAUDE_PROJECT_PLANS_DIR /project-plans/ "$marked")
-docs_root=$(resolve_root_dir CLAUDE_DOCS_DIR /docs "$marked" --expect path)
-artifacts_root=$(realpath -m -- "$marked/.artifacts" 2>/dev/null || printf '%s/.artifacts' "$marked"); artifacts_root="${artifacts_root%/}"
+set_roots() {
+  plans_root=$(resolve_root_dir CLAUDE_PROJECT_PLANS_DIR /project-plans/ "$marked")
+  docs_root=$(resolve_root_dir CLAUDE_DOCS_DIR /docs "$marked" --expect path)
+  artifacts_root=$(realpath -m -- "$marked/.artifacts" 2>/dev/null || printf '%s/.artifacts' "$marked"); artifacts_root="${artifacts_root%/}"
+  ledger="$artifacts_root/plans-ledger"
+}
 
-# Parse porcelain v1 output into a list of changed absolute paths, classify
-# each against the applicable role's rule (see the Role table above), and
-# collect everything that fails classification as an offending change.
-# .artifacts/ needs no special case: it's gitignored in the real repo, so
-# `git status --porcelain` never reports it.
+# Classify a changed absolute path against the active role's rule
+# (see the Role table above).
 role_allows() {
   local abs="$1" base
   case "$role" in
@@ -325,16 +298,102 @@ role_allows() {
   return 1
 }
 
-# Plans-dir verdicts stick to content hash (see docs/pipeline.md); product
-# files never use the ledger.
-ledger="$artifacts_root/plans-ledger"
-content_hash() {
-  if [ -f "$1" ]; then
+
+content_hash() { # <unresolved path>
+  if [ -L "$1" ]; then
+    printf 'link:%s' "$(printf '%s' "$(readlink -- "$1" 2>/dev/null)" | sha256sum | cut -d' ' -f1)"
+  elif [ -f "$1" ]; then
     sha256sum <"$1" 2>/dev/null | cut -d' ' -f1
   else
     printf 'absent'
   fi
 }
+
+in_ledger_scope() {
+  case "$1" in
+    "$plans_root"/* | "$docs_root"/*) return 0 ;;
+  esac
+  return 1
+}
+
+# Prints deny|ok|nothing. A non-absent hash: deny wins. absent: latest line wins.
+ledger_verdict() { # <hash> <abs>
+  if [ "$1" = absent ]; then
+    grep -xF -e "ok $1 $2" -e "deny $1 $2" -- "$ledger" 2>/dev/null | tail -1 | cut -d' ' -f1
+    return 0
+  fi
+  if grep -qxF -- "deny $1 $2" "$ledger" 2>/dev/null; then
+    printf 'deny\n'
+  elif grep -qxF -- "ok $1 $2" "$ledger" 2>/dev/null; then
+    printf 'ok\n'
+  fi
+  return 0
+}
+
+record_ok() { # <hash> <abs>
+  printf 'ok %s %s\n' "$1" "$2" >>"$ledger" 2>/dev/null
+  case "$role" in
+    planner | documenter)
+      [ "$1" != absent ] && printf 'src %s %s\n' "$1" "$2" >>"$ledger" 2>/dev/null
+      ;;
+  esac
+  return 0
+}
+
+inherits_source() { # <hash> <abs>
+  local kind hash path
+  case "$2" in "$plans_root"/*) ;; *) return 1 ;; esac
+  case "$1" in absent | link:*) return 1 ;; esac
+  [ -f "$ledger" ] || return 1
+  while IFS=' ' read -r kind hash path; do
+    [ "$kind" = src ] && [ "$hash" = "$1" ] && [[ "$path" == "$plans_root"/* ]] && return 0
+  done <"$ledger"
+  return 1
+}
+
+case "$tool_name" in
+  Write | Edit | MultiEdit | NotebookEdit)
+    target=$(sfield file_path)
+    [ -n "$target" ] || target=$(sfield notebook_path)
+    [ -n "$target" ] || exit 0
+    [ "${target:0:1}" = "/" ] || target="$cwd/$target"
+    marked=$(find_parent_worktree "$target") || exit 0
+    role=$(resolve_role "$marked" 0 "$agent_type")
+    set_roots
+    abs=$(realpath -m -- "$target" 2>/dev/null) || exit 0
+    if in_ledger_scope "$abs" && role_allows "$abs"; then
+      hash=$(content_hash "$target")
+      [ -z "$(ledger_verdict "$hash" "$abs")" ] && record_ok "$hash" "$abs"
+    fi
+    exit 0
+    ;;
+esac
+
+marked=""; is_lane=0
+if marked=$(find_parent_worktree "$cwd"); then
+  is_lane=0
+elif marked=$(find_lane_root "$cwd"); then
+  is_lane=1
+else
+  exit 0
+fi
+[ -n "$marked" ] || exit 0
+role=$(resolve_role "$marked" "$is_lane" "$agent_type")
+
+# Tamper detection: a forged 'builder' in a parent's dae-role is invisible to
+# git status (.artifacts/ is ignored), so check the raw marker directly.
+if [ "$is_lane" = 0 ]; then
+  raw_role=$(cat "$marked/.artifacts/dae-role" 2>/dev/null | tr -d '[:space:]') || raw_role=""
+  if [ "$raw_role" = "builder" ] && [ "$role" != "builder" ]; then
+    echo "parent-tree-guard: DENIED — '$marked/.artifacts/dae-role' contains 'builder', which is not a legitimate role for this worktree. A parent worktree's genuine builder always runs in its own SIBLING lane child worktree, never via this file; 'builder' written directly into a parent's own marker is only ever forgery. This looks like a role-escalation attempt via direct write — revert the marker to its prior value ('orchestrator' or 'planner')." >&2
+    exit 2
+  fi
+fi
+
+status=$(git -C "$marked" status --porcelain -uall 2>/dev/null) || exit 0
+[ -n "$status" ] || exit 0
+
+set_roots
 
 offenders=()
 ledger_offenders=()
@@ -351,26 +410,34 @@ while IFS= read -r line; do
   [ -n "$path" ] || continue
   abs=$(realpath -m -- "$marked/$path" 2>/dev/null || printf '%s/%s' "$marked" "$path")
   in_plans=0
-  if [ "$is_lane" = 0 ]; then
-    case "$abs" in
-      "$plans_root"/*) in_plans=1 ;;
+  if [ "$is_lane" = 0 ] && in_ledger_scope "$abs"; then
+    in_plans=1
+  fi
+  hash=""
+  if [ "$in_plans" = 1 ]; then
+    hash=$(content_hash "$marked/$path")
+    case "$(ledger_verdict "$hash" "$abs")" in
+      ok) continue ;;
+      deny)
+        if [ "$hash" != absent ] || [ "$role" != documenter ] || ! role_allows "$abs"; then
+          offenders+=("$abs")
+          ledger_offenders+=("$abs")
+          continue
+        fi
+        ;;
+      *)
+        if inherits_source "$hash" "$abs"; then
+          printf 'ok %s %s\n' "$hash" "$abs" >>"$ledger" 2>/dev/null
+          continue
+        fi
+        ;;
     esac
   fi
-  entry=""
-  if [ "$in_plans" = 1 ]; then
-    entry="$(content_hash "$abs") $abs"
-    if grep -qxF -- "deny $entry" "$ledger" 2>/dev/null; then
-      offenders+=("$abs")
-      ledger_offenders+=("$abs")
-      continue
-    fi
-    grep -qxF -- "ok $entry" "$ledger" 2>/dev/null && continue
-  fi
   if role_allows "$abs"; then
-    [ -n "$entry" ] && printf 'ok %s\n' "$entry" >>"$ledger" 2>/dev/null
+    [ "$in_plans" = 1 ] && record_ok "$hash" "$abs"
     continue
   fi
-  [ -n "$entry" ] && printf 'deny %s\n' "$entry" >>"$ledger" 2>/dev/null
+  [ "$in_plans" = 1 ] && printf 'deny %s %s\n' "$hash" "$abs" >>"$ledger" 2>/dev/null
   offenders+=("$abs")
 done <<< "$status"
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Denies shell writes to lane artifacts and subagent lane-bind.sh calls; interpreter one-liners are not inspected.
+# Denies shell writes to lane artifacts and subagent lane-bind.sh calls, and lane agents (builder/coder/contract-tester) writing into a linked parent worktree outside its .artifacts/; interpreter one-liners are not inspected.
 set -uo pipefail
 
 payload=$(cat 2>/dev/null || true)
 [ -n "$payload" ] || exit 0
 
 printf '%s' "$payload" | python3 -c '
-import json, os, posixpath, re, shlex, sys
+import json, os, posixpath, re, shlex, subprocess, sys
 
 try:
     d = json.load(sys.stdin)
@@ -19,6 +19,8 @@ cmd = ti.get("command") if isinstance(ti, dict) else ""
 if not cmd or not isinstance(cmd, str):
     sys.exit(0)
 is_subagent = "agent_type" in d
+agent_type = d.get("agent_type")
+lane_agent = agent_type in ("builder", "coder", "contract-tester")
 payload_cwd = d.get("cwd")
 vcwd = payload_cwd if isinstance(payload_cwd, str) and payload_cwd else None
 
@@ -57,13 +59,58 @@ def write_deny(path, resolved=None):
         "handed; scope-writes.sh checks it against your lane binding.\n")
     sys.exit(2)
 
-def check(tok):
+def git_dir(root, flag):
+    try:
+        r = subprocess.run(["git", "-C", root, "rev-parse", flag],
+                           capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None
+    out = r.stdout.strip()
+    if r.returncode != 0 or not out:
+        return None
+    return os.path.realpath(os.path.join(root, out))
+
+def parent_write_deny(tok, root):
+    sys.stderr.write(
+        "lane-artifact-shell-guard: BLOCKED - shell write to " + tok + " inside " + root + ": "
+        "a lane agent writes only inside its own child worktree; the parent is merged into,\n"
+        "never written by, a lane.\n")
+    sys.exit(2)
+
+def check_parent_scope(tok):
+    if not tok or "$" in tok or tok[0] == "~":
+        return
+    if tok[0] == "/":
+        resolved = posixpath.normpath(tok)
+    elif vcwd is not None:
+        resolved = posixpath.normpath(vcwd + "/" + tok)
+    else:
+        return
+    cur = resolved
+    while True:
+        if os.path.isfile(cur + "/.artifacts/progress-log.md"):
+            break
+        up = posixpath.dirname(cur)
+        if up == cur:
+            return
+        cur = up
+    gd = git_dir(cur, "--git-dir")
+    common = git_dir(cur, "--git-common-dir")
+    if gd is None or common is None or gd == common:
+        return
+    if resolved.startswith(cur.rstrip("/") + "/.artifacts/"):
+        return
+    parent_write_deny(resolved, cur)
+
+def check(tok, parent_scope=True):
     if is_target(tok):
         write_deny(tok)
     if vcwd is not None and tok and tok[0] not in "/~$":
         joined = posixpath.normpath(vcwd + "/" + tok)
         if is_target(joined):
             write_deny(tok, joined)
+    if lane_agent and parent_scope:
+        check_parent_scope(tok)
 
 def cd_target(args):
     ops = [a for a in args if a == "-" or not a.startswith("-")]
@@ -141,8 +188,9 @@ for seg in segments:
             check(operands[-1])
     elif name == "sed":
         if any(a == "--in-place" or a.startswith("--in-place=") or re.match(r"^-[A-Za-z]*i", a) for a in args):
-            for a in operands:
-                check(a)
+            has_script_opt = any(re.match(r"^(-[A-Za-z]*[ef]|--expression|--file)", a) for a in args)
+            for n, a in enumerate(operands):
+                check(a, parent_scope=has_script_opt or n > 0)
     elif name == "perl":
         if any(re.match(r"^-[A-Za-z]*i", a) for a in args):
             for a in operands:

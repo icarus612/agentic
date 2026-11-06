@@ -1492,7 +1492,7 @@ case35() {
 case35
 
 case36() {
-  local label="36: a ledger deny sticks to the content hash across a role flip back to planner and names plans-ledger, not the planner trailer"
+  local label="36: promote of the planner's proposal passes; a later orchestrator edit of the promoted plan denies and the deny sticks across a flip back to planner, naming plans-ledger"
   local wt plans
   wt=$(new_parent_worktree_linked_with_role planner)
   plans=$(resolved_plans_dir "$wt")
@@ -1503,7 +1503,10 @@ case36() {
   "$WORKFLOW_SETUP" --set-role orchestrator --root "$wt" 2>/dev/null
   "$REPO_ROOT/agent-agnostic/hooks/plan-lifecycle.sh" promote "$plans/proposals/x-01-02-26.md" --root "$wt" >/dev/null 2>&1
   run_guard "$wt"
-  [ "$CODE" -eq 2 ] || { fail "$label (orchestrator promote)" "code=$CODE err=[$ERR]"; return; }
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator promote)" "code=$CODE err=[$ERR]"; return; }
+  printf '# plan, edited by the orchestrator\n' >"$plans/x-01-02-26/plan.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label (orchestrator edit of promoted plan)" "code=$CODE err=[$ERR]"; return; }
   printf 'planner\n' >"$wt/.artifacts/dae-role"
   run_guard "$wt"
   [ "$CODE" -eq 2 ] || { fail "$label (planner re-run)" "code=$CODE err=[$ERR]"; return; }
@@ -1535,6 +1538,430 @@ case37() {
   pass "$label"
 }
 case37
+
+hash_of() { sha256sum "$1" | cut -d' ' -f1; }
+abspath() { realpath -m "$1"; }
+ledger_of() { printf '%s' "$1/.artifacts/plans-ledger"; }
+ledger_has() { grep -qxF -- "$2" "$(ledger_of "$1")" 2>/dev/null; }
+ledger_has_link_ok() {
+  awk -v p="$2" '$1=="ok" && $3==p && $2 ~ /^link:[0-9a-f]+$/ && length($2)==69 {f=1} END {exit !f}' "$(ledger_of "$1")" 2>/dev/null
+}
+write_payload() {
+  local cwd="$1" agent="$2" file="$3" ident=""
+  [ -n "$agent" ] && ident=$(printf '"agent_type":"%s","agent_id":"a1",' "$agent")
+  printf '{"cwd":"%s","tool_name":"Write",%s"tool_input":{"file_path":"%s"}}' "$cwd" "$ident" "$file"
+}
+bash_payload() {
+  local cwd="$1" agent="${2-}" ident=""
+  [ -n "$agent" ] && ident=$(printf ',"agent_type":"%s"' "$agent")
+  printf '{"cwd":"%s","tool_name":"Bash"%s}' "$cwd" "$ident"
+}
+
+case38() {
+  local label="38: tracked move of a planner-credited proposal into its plan dir passes under the orchestrator"
+  local wt plans
+  wt=$(new_parent_worktree_linked_with_role planner)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/proposals"
+  printf '# plan\n' >"$plans/proposals/x-01-02-26.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label (planner write)" "code=$CODE err=[$ERR]"; return; }
+  commit_all "$wt" "commit proposal"
+  printf 'orchestrator\n' >"$wt/.artifacts/dae-role"
+  "$REPO_ROOT/agent-agnostic/hooks/plan-lifecycle.sh" promote "$plans/proposals/x-01-02-26.md" --root "$wt" >/dev/null 2>&1
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case38
+
+case39() {
+  local label="39: untracked move of a planner-credited proposal into its plan dir passes under the orchestrator"
+  local wt plans
+  wt=$(new_parent_worktree_linked_with_role planner)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/proposals"
+  printf '# plan\n' >"$plans/proposals/x-01-02-26.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label (planner write)" "code=$CODE err=[$ERR]"; return; }
+  printf 'orchestrator\n' >"$wt/.artifacts/dae-role"
+  mkdir -p "$plans/x-01-02-26"
+  mv "$plans/proposals/x-01-02-26.md" "$plans/x-01-02-26/plan.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case39
+
+case40() {
+  local label="40: orchestrator review file passes without a src line, but a cp of it to plan.md denies (shell path)"
+  local wt plans review hash
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/x-01-02-26"
+  review=$(abspath "$plans/x-01-02-26/foo-review.md")
+  printf 'verdict: ready\n' >"$review"
+  hash=$(hash_of "$review")
+  run_guard "$wt"
+  [ "$CODE" -eq 0 ] || { fail "$label (review file)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has "$wt" "ok $hash $review" || { fail "$label" "ledger lacks ok line for review file"; return; }
+  if grep -q '^src ' "$(ledger_of "$wt")" 2>/dev/null; then
+    fail "$label" "orchestrator content got a src line"
+    return
+  fi
+  cp "$review" "$plans/x-01-02-26/plan.md"
+  run_guard "$wt"
+  [ "$CODE" -eq 2 ] || { fail "$label (cp to plan.md)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case40
+
+case41() {
+  local label="41: orchestrator review file credited by a Write payload, then cp to plan.md denies (credit path)"
+  local wt plans review other
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  other=$(new_scratch)
+  mkdir -p "$plans/x-01-02-26"
+  review=$(abspath "$plans/x-01-02-26/foo-review.md")
+  printf 'verdict: ready\n' >"$review"
+  run_guard "$wt" "$(write_payload "$other" "" "$review")"
+  [ "$CODE" -eq 0 ] || { fail "$label (write payload)" "code=$CODE err=[$ERR]"; return; }
+  cp "$review" "$plans/x-01-02-26/plan.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label (cp to plan.md)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case41
+
+case42() {
+  local label="42: documenter-written plan.md is inheritable: recorded ok+src, and an orchestrator cp of it to another plan passes"
+  local wt plans src other hash
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  other=$(new_scratch)
+  mkdir -p "$plans/s1-01-02-26" "$plans/s2-01-02-26"
+  src=$(abspath "$plans/s1-01-02-26/plan.md")
+  printf '# shared content\n' >"$src"
+  hash=$(hash_of "$src")
+  run_guard "$wt" "$(write_payload "$other" documenter "$src")"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter write)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has "$wt" "ok $hash $src" || { fail "$label" "ledger lacks ok line"; return; }
+  ledger_has "$wt" "src $hash $src" || { fail "$label" "ledger lacks src line"; return; }
+  cp "$src" "$plans/s2-01-02-26/plan.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator cp)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case42
+
+case43() {
+  local label="43: fresh orchestrator plans file with no ok line denies, also when the ledger holds an ok for other content at that path"
+  local wt plans plan
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/x-01-02-26"
+  plan=$(abspath "$plans/x-01-02-26/plan.md")
+  printf '# fresh\n' >"$plan"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label (fresh)" "code=$CODE err=[$ERR]"; return; }
+
+  local wt2 plans2 plan2 otherhash
+  wt2=$(new_parent_worktree_linked_with_role orchestrator)
+  plans2=$(resolved_plans_dir "$wt2")
+  mkdir -p "$plans2/x-01-02-26"
+  plan2=$(abspath "$plans2/x-01-02-26/plan.md")
+  printf '# fresh\n' >"$plan2"
+  otherhash=$(printf 'other content\n' | sha256sum | cut -d' ' -f1)
+  printf 'ok %s %s\n' "$otherhash" "$plan2" >"$(ledger_of "$wt2")"
+  run_guard "$wt2" "$(bash_payload "$wt2")"
+  [ "$CODE" -eq 2 ] || { fail "$label (stale ok for other content)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case43
+
+case44() {
+  local label="44: a src line for a docs file never clears a plans file with the same bytes"
+  local wt plans docs docfile hash
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs" "$plans/x-01-02-26"
+  docfile=$(abspath "$docs/f.md")
+  printf '# same bytes\n' >"$docfile"
+  commit_all "$wt" "docs file"
+  hash=$(hash_of "$docfile")
+  printf 'src %s %s\n' "$hash" "$docfile" >"$(ledger_of "$wt")"
+  printf '# same bytes\n' >"$plans/x-01-02-26/plan.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case44
+
+case45() {
+  local label="45: an ok absent line for one plans path does not clear the deletion of another tracked plans file"
+  local wt plans
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/b-01-02-26"
+  printf '# b\n' >"$plans/b-01-02-26/plan.md"
+  commit_all "$wt" "plan b"
+  printf 'ok absent %s\n' "$(abspath "$plans/a-01-02-26/plan.md")" >"$(ledger_of "$wt")"
+  rm "$plans/b-01-02-26/plan.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case45
+
+case46() {
+  local label="46: documenter Write credit for a docs file lets a later orchestrator pass through"
+  local wt docs docfile other
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  other=$(new_scratch)
+  mkdir -p "$docs"
+  docfile=$(abspath "$docs/topic.md")
+  printf '# topic\n' >"$docfile"
+  run_guard "$wt" "$(write_payload "$other" documenter "$docfile")"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter write)" "code=$CODE err=[$ERR]"; return; }
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator pass)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case46
+
+case47() {
+  local label="47: documenter's symlink to a credited docs file is credited by link text and passes under the orchestrator"
+  local wt docs docfile other
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  other=$(new_scratch)
+  mkdir -p "$docs/apps/x" "$wt/apps/x"
+  printf 'keep\n' >"$wt/apps/x/.keep"
+  docfile=$(abspath "$docs/apps/x/README.md")
+  printf '# x\n' >"$docfile"
+  run_guard "$wt" "$(write_payload "$other" documenter "$docfile")"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter write)" "code=$CODE err=[$ERR]"; return; }
+  commit_all "$wt" "docs and apps/x"
+  ln -s ../../docs/apps/x/README.md "$wt/apps/x/README.md"
+  run_guard "$wt" "$(bash_payload "$wt" documenter)"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter pass)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has_link_ok "$wt" "$docfile" || { fail "$label" "ledger lacks ok link:<hash> line for $docfile: $(cat "$(ledger_of "$wt")" 2>/dev/null)"; return; }
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator pass)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case47
+
+case48() {
+  local label="48: docs credit is per content: an orchestrator edit of a credited docs file denies"
+  local wt docs docfile other
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  other=$(new_scratch)
+  mkdir -p "$docs"
+  docfile=$(abspath "$docs/topic.md")
+  printf '# topic\n' >"$docfile"
+  run_guard "$wt" "$(write_payload "$other" documenter "$docfile")"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter write)" "code=$CODE err=[$ERR]"; return; }
+  printf '# topic, orchestrator edit\n' >"$docfile"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case48
+
+case49() {
+  local label="49: fresh orchestrator docs file denies and stderr names it"
+  local wt docs
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs"
+  printf '# fresh\n' >"$docs/case49-topic.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  case "$ERR" in
+    *case49-topic.md*) ;;
+    *) fail "$label" "stderr lacks docs path: [$ERR]"; return ;;
+  esac
+  pass "$label"
+}
+case49
+
+case50() {
+  local label="50: a Write payload from a non-crediting agent_type records no ok and the docs file still denies"
+  local wt docs docfile other
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  other=$(new_scratch)
+  mkdir -p "$docs"
+  docfile=$(abspath "$docs/topic.md")
+  printf '# topic\n' >"$docfile"
+  run_guard "$wt" "$(write_payload "$other" coder "$docfile")"
+  [ "$CODE" -eq 0 ] || { fail "$label (coder write)" "code=$CODE err=[$ERR]"; return; }
+  if grep -qF " $docfile" "$(ledger_of "$wt")" 2>/dev/null; then
+    fail "$label" "ledger holds an entry for the coder-written docs file"
+    return
+  fi
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label (next bash)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case50
+
+case51() {
+  local label="51: a Write payload whose target has no marker in its ancestry exits 0 and creates no plans-ledger"
+  local dir
+  dir=$(new_scratch)
+  printf 'x\n' >"$dir/file.md"
+  run_guard "$dir" "$(write_payload "$dir" documenter "$dir/file.md")"
+  [ "$CODE" -eq 0 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  if [ -n "$(find "$dir" -name plans-ledger 2>/dev/null)" ]; then
+    fail "$label" "plans-ledger created under $dir"
+    return
+  fi
+  pass "$label"
+}
+case51
+
+case52() {
+  local label="52: documenter deletion of a tracked docs file records ok absent and passes under the orchestrator"
+  local wt docs old
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs"
+  printf '# old\n' >"$docs/old.md"
+  commit_all "$wt" "docs old"
+  old=$(abspath "$docs/old.md")
+  git -C "$wt" rm -q "docs/old.md"
+  run_guard "$wt" "$(bash_payload "$wt" documenter)"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter pass)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has "$wt" "ok absent $old" || { fail "$label" "ledger lacks ok absent line: $(cat "$(ledger_of "$wt")" 2>/dev/null)"; return; }
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator pass)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case52
+
+case53() {
+  local label="53: an ok absent for one docs file does not clear the orchestrator's deletion of a different one"
+  local wt docs
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs"
+  printf '# old\n' >"$docs/old.md"
+  printf '# other\n' >"$docs/other.md"
+  commit_all "$wt" "docs"
+  printf 'ok absent %s\n' "$(abspath "$docs/old.md")" >"$(ledger_of "$wt")"
+  git -C "$wt" rm -q "docs/other.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case53
+
+case54() {
+  local label="54: orchestrator deletion of a tracked docs file denies"
+  local wt docs
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs"
+  printf '# old\n' >"$docs/old.md"
+  commit_all "$wt" "docs"
+  git -C "$wt" rm -q "docs/old.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case54
+
+case55() {
+  local label="55: documenter's untracked directory symlink into docs is credited by link text (not absent) and passes under the orchestrator"
+  local wt docs target
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs/apps/x" "$wt/apps/x"
+  printf '# x\n' >"$docs/apps/x/README.md"
+  printf 'keep\n' >"$wt/apps/x/.keep"
+  commit_all "$wt" "docs and apps/x"
+  target=$(abspath "$docs/apps/x")
+  ln -s ../../docs/apps/x "$wt/apps/x/docs"
+  run_guard "$wt" "$(bash_payload "$wt" documenter)"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter pass)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has_link_ok "$wt" "$target" || { fail "$label" "ledger lacks ok link:<hash> line for $target: $(cat "$(ledger_of "$wt")" 2>/dev/null)"; return; }
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator pass)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case55
+
+case56() {
+  local label="56: control -- an orchestrator directory symlink into docs with different link text than the credited one denies"
+  local wt docs
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs/apps/x" "$docs/apps/y" "$wt/apps/x" "$wt/apps/y"
+  printf '# x\n' >"$docs/apps/x/README.md"
+  printf '# y\n' >"$docs/apps/y/README.md"
+  printf 'keep\n' >"$wt/apps/x/.keep"
+  printf 'keep\n' >"$wt/apps/y/.keep"
+  commit_all "$wt" "docs and apps"
+  ln -s ../../docs/apps/x "$wt/apps/x/docs"
+  run_guard "$wt" "$(bash_payload "$wt" documenter)"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter pass)" "code=$CODE err=[$ERR]"; return; }
+  ln -s ../../docs/apps/y "$wt/apps/y/docs"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case56
+
+case57() {
+  local label="57: deny is recorded first -- a documenter pass over an orchestrator-denied plan still denies and adds no src line"
+  local wt plans plan hash
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  plans=$(resolved_plans_dir "$wt")
+  mkdir -p "$plans/z-01-02-26"
+  plan=$(abspath "$plans/z-01-02-26/plan.md")
+  printf '# z\n' >"$plan"
+  hash=$(hash_of "$plan")
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label (orchestrator)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has "$wt" "deny $hash $plan" || { fail "$label" "ledger lacks deny line"; return; }
+  run_guard "$wt" "$(bash_payload "$wt" documenter)"
+  [ "$CODE" -eq 2 ] || { fail "$label (documenter)" "code=$CODE err=[$ERR]"; return; }
+  if grep -q "^src $hash " "$(ledger_of "$wt")" 2>/dev/null; then
+    fail "$label" "denied content gained a src line"
+    return
+  fi
+  pass "$label"
+}
+case57
+
+case58() {
+  local label="58: documenter deletion supersedes a prior deny absent on the same restored-then-removed docs file"
+  local wt docs path
+  wt=$(new_parent_worktree_linked_with_role orchestrator)
+  docs=$(resolved_docs_dir "$wt")
+  mkdir -p "$docs"
+  printf '# e\n' >"$docs/e.md"
+  commit_all "$wt" "docs e"
+  path=$(abspath "$docs/e.md")
+  git -C "$wt" rm -q "docs/e.md"
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 2 ] || { fail "$label (orchestrator rm)" "code=$CODE err=[$ERR]"; return; }
+  ledger_has "$wt" "deny absent $path" || { fail "$label" "ledger lacks deny absent line"; return; }
+  git -C "$wt" checkout -q HEAD -- "docs/e.md"
+  git -C "$wt" rm -q "docs/e.md"
+  run_guard "$wt" "$(bash_payload "$wt" documenter)"
+  [ "$CODE" -eq 0 ] || { fail "$label (documenter rm)" "code=$CODE err=[$ERR]"; return; }
+  run_guard "$wt" "$(bash_payload "$wt")"
+  [ "$CODE" -eq 0 ] || { fail "$label (orchestrator pass)" "code=$CODE err=[$ERR]"; return; }
+  pass "$label"
+}
+case58
 
 # ---------------------------------------------------------------------------
 # Summary

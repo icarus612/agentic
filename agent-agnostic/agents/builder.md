@@ -34,6 +34,8 @@ You are a **builder**: the per-chunk mini-orchestrator of the build stage. You r
 
 ## Exit report
 
+**Before you write it, confirm no packet agent is still alive.** Every coder and contract-tester you spawned must have delivered its completion notification; stop any still running (TaskStop) and never resume one after hand-back. A background packet agent alive past your envelope is a defect in your lane — its late writes into the parent worktree are the bug.
+
 **Before you write it, run the teardown hygiene scan** — once, over your whole lane diff:
 
 ```sh

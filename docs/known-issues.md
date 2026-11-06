@@ -89,13 +89,9 @@ marker, which reads `orchestrator` at Record. The deny cleared once `push-pr --s
 committed the docs. The proposed fix below covers the move case only; the documenter case needs
 the guard to credit a write made under a non-orchestrator agent identity.
 
-**Source.** `agent-agnostic/hooks/parent-tree-guard.sh:359-373` (the ledger lookup and the write),
-`:281` (`role_allows`).
+**Source.** `agent-agnostic/hooks/parent-tree-guard.sh` (the ledger lookup and the write; `role_allows`).
 
-**Status.** No plan yet. Proposed fix: treat a plans-dir path as clean when its content hash
-already has an `ok` entry at any path under `plans_root`, so a pure move inherits the approval.
-Controls for the fix: a moved `ok` file must pass, and a new orchestrator-written file with a fresh
-hash must still be denied.
+**Status.** Resolved (agentic run `agentic-guard-fixes`, 2026-11-05). Ledger `src` lines are role-tagged and inherited under `plans_root`, so a pure move keeps its approval while a fresh-hash orchestrator write is still denied. A credit-only `PostToolUse` Write-family mode keyed on `agent_type` (`planner`, `documenter`) credits those agents' own writes, including the documenter's docs-root edits.
 
 ## `check-diff-hygiene.sh`: reworded comments count as new comments
 
@@ -107,12 +103,9 @@ component name changed. That instance stayed under the threshold and did not blo
 that rewords a few existing comment lines can trip `COMMENT DENSITY` or `COMMENT BANNER` and block
 `gh pr ready` through `pr-ready-hygiene-guard.sh`, on code that added no commentary at all.
 
-**Source.** `agent-agnostic/hooks/check-diff-hygiene.sh:103-145` (the added-line collector and the
-banner/density counts).
+**Source.** `agent-agnostic/hooks/check-diff-hygiene.sh` (the added-line collector and the banner/density counts).
 
-**Status.** No plan yet. Proposed fix: within a hunk, pair each removed comment line with an added
-comment line and count only the unpaired added ones. Controls for the fix: a pure reword of an
-existing comment block must pass, and a new N-line banner in one hunk must still fail.
+**Status.** Resolved (agentic run `agentic-guard-fixes`, 2026-11-05). Within a hunk, reworded comment lines are paired with the removed ones and only unpaired added comment lines count. A pure reword passes; a new banner in one hunk still fails.
 
 ## Hook `timeout` fails open, and `if` cannot narrow the write-tool and builder hooks
 
@@ -153,22 +146,16 @@ edit outside any lane, claimed by no exit report. The orchestrator caught it wit
 envelope is not proof that the builder's tree of sub-agents has stopped. Nothing ties a child
 worktree's removal to the termination of the agents working in it.
 
-**Status.** No plan yet. Possible directions: the builder confirms its packet agents are finished
-before it returns; `scope-writes.sh` denies a lane-bound or packet agent writing outside its own
-child worktree; or the orchestrator re-checks the parent tree after each merge-back.
+**Status.** Mitigated, not resolved (plan DP-4): nothing yet terminates a builder's sub-agents. Mitigation from `agentic-guard-fixes` (2026-11-05), three parts:
+
+- `lane-artifact-shell-guard.sh` denies builder, coder and contract-tester shell writes into a marked linked parent.
+- `builder.md` requires waiting for or stopping packet agents before hand-back.
+- `build-dispatch.md` step 5 re-checks the parent with `git status --porcelain` after each lane removal.
 
 ## `parent-tree-guard.sh` likely inert when the run's repo is not the session's cwd
 
-**Limitation.** In the same run, the stray parent-worktree edit above was never flagged, even
-though the guard exists to deny uncommitted product changes in a marked parent worktree. The
-orchestrating session's cwd was a different repository (mythic-made). Its Bash calls reached the
-agentic worktree only through `git -C` and absolute paths, and its shell cwd reset to the
-mythic-made root after each call. The guard finds its run through a parent-worktree marker walk from
-the cwd, so it most likely never looked at the agentic worktree. This is likely, not confirmed:
-nobody has reproduced it with a controlled test.
+**Limitation.** Refuted. In run `hook-timeouts-and-if-scoping` the stray parent-worktree edit was never flagged while the session cwd was another repository. The hypothesis was that the guard's marker walk never looked at the agentic worktree. Plan `agentic-guard-fixes` 1.4 found that the hook payload `cwd` follows `cd` for the main session and for subagents, so the guard does fire cross-repo. Why it missed the original stray edit remains unexplained.
 
 **Source.** `agent-agnostic/hooks/parent-tree-guard.sh` (the marker walk and the git-status scan).
 
-**Status.** No plan yet. Confirm first with a positive control: a dirty marked parent, a session cwd
-in another repository, then a Bash call. Possible fix: also resolve the run from paths named in the
-Bash command, or from a session-level registry of active runs.
+**Status.** Fixed and awaiting removal; no code change shipped (2.2 dropped). Remove once the unexplained miss is no longer worth tracking.

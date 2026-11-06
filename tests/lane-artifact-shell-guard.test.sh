@@ -285,6 +285,96 @@ allow "11n cd contracts, absolute /tmp dest" "cd $RUN/contracts && echo x > /tmp
 allow "11o cd .artifacts, progress-log" "cd $RUN && echo x >> progress-log.md"
 allow "11p cd contracts, .bak dest" "cd $RUN/contracts && echo x > l1.md.bak"
 
+# --- lane agents write only inside their own child worktree ---
+PHRASE="a lane agent writes only inside its own child worktree"
+FX=$(cd "$(mktemp -d)" && pwd -P)
+trap 'rm -rf "$FX"' EXIT
+MAIN="$FX/main"
+P="$FX/parent"
+CH="$FX/parent-l1"
+CORRUPT="$FX/corrupt"
+mkdir -p "$MAIN"
+git -C "$MAIN" init -q -b main
+git -C "$MAIN" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+git -C "$MAIN" worktree add -q -b parent "$P"
+git -C "$MAIN" worktree add -q -b parent-l1 "$CH"
+mkdir -p "$P/.artifacts" "$MAIN/.artifacts" "$CORRUPT/.artifacts"
+: >"$P/.artifacts/progress-log.md"
+: >"$MAIN/.artifacts/progress-log.md"
+: >"$CORRUPT/.artifacts/progress-log.md"
+echo "gitdir: /nonexistent" >"$CORRUPT/.git"
+
+# payload_as <command> <agent_type|""> -- like payload() but agent_type is explicit; empty omits it
+payload_as() {
+  python3 -c '
+import json, os, sys
+p = {"hook_event_name": "PreToolUse", "tool_name": "Bash",
+     "cwd": os.environ.get("PAYLOAD_CWD", "/tmp"), "tool_input": {"command": sys.argv[1]}}
+if sys.argv[2]:
+    p["agent_id"] = "ab0dc0b94f1af8740"
+    p["agent_type"] = sys.argv[2]
+print(json.dumps(p))
+' "$1" "$2"
+}
+
+# lane_deny <label> <cmd> <agent> <target> <root> [cwd]
+lane_deny() {
+  local label="$1" cmd="$2" agent="$3" target="$4" root="$5" cwd="${6:-/tmp}"
+  run_hook "$(PAYLOAD_CWD="$cwd" payload_as "$cmd" "$agent")"
+  if [ "$CODE" -ne 2 ]; then
+    fail "$label -> exit 2" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  local needle
+  for needle in "$target" "$root" "$PHRASE"; do
+    if ! printf '%s\n' "$ERR" | grep -qF -- "$needle"; then
+      fail "$label -> stderr contains [$needle]" "err=[$ERR]"
+      return
+    fi
+  done
+  pass "$label -> exit 2, stderr names target, marked root and phrase"
+}
+
+# lane_allow <label> <cmd> <agent> [cwd]
+lane_allow() {
+  local label="$1" cmd="$2" agent="$3" cwd="${4:-/tmp}"
+  run_hook "$(PAYLOAD_CWD="$cwd" payload_as "$cmd" "$agent")"
+  if [ "$CODE" -ne 0 ]; then
+    fail "$label -> exit 0" "code=$CODE out=[$OUT] err=[$ERR]"
+    return
+  fi
+  pass "$label -> exit 0"
+}
+
+lane_deny "12a contract-tester cd parent && sed -i" "cd $P && sed -i 's/a/b/' tests/x.sh" contract-tester "$P/tests/x.sh" "$P"
+for agent in coder builder; do
+  lane_deny "12b $agent redirect into parent" "echo x > $P/src/y" "$agent" "$P/src/y" "$P"
+  lane_deny "12c $agent tee into parent" "echo x | tee $P/src/y" "$agent" "$P/src/y" "$P"
+  lane_deny "12d $agent cp into parent" "cp a $P/z" "$agent" "$P/z" "$P"
+done
+lane_deny "12e builder relative redirect via payload cwd" "echo x > src/y" builder "$P/src/y" "$P" "$P"
+
+lane_allow "13a coder redirect into child" "echo x > $CH/src/y" coder
+lane_allow "13b builder tee into child" "echo x | tee $CH/src/y" builder
+lane_allow "13c builder cp into child" "cp a $CH/z" builder
+lane_allow "13d contract-tester cd child && sed -i" "cd $CH && sed -i 's/a/b/' tests/x.sh" contract-tester
+lane_allow "13e builder writes parent .artifacts/tmp/probe" "mkdir -p $P/.artifacts/tmp; echo x > $P/.artifacts/tmp/probe" builder
+lane_allow "13f no agent_type, redirect into parent" "echo x > $P/src/y" ""
+lane_allow "13g no agent_type, tee into parent" "echo x | tee $P/src/y" ""
+lane_allow "13h builder, marked root is main checkout" "echo x > $MAIN/src/y" builder
+lane_allow "13i builder cat parent" "cat $P/src/y" builder
+lane_allow "13j builder git -C parent log" "git -C $P log" builder
+lane_allow "13k builder ls parent" "ls $P" builder
+for agent in documenter planner Explore; do
+  lane_allow "13l $agent writes into parent" "echo x > $P/src/y" "$agent"
+done
+
+lane_allow "14a contract-tester sed -i '/^# --- [0-9]/d' on child" "sed -i '/^# --- [0-9]/d' $CH/tests/x.sh" contract-tester
+lane_deny "14b contract-tester sed -i '/^# --- [0-9]/d' on parent" "sed -i '/^# --- [0-9]/d' $P/tests/x.sh" contract-tester "$P/tests/x.sh" "$P"
+
+lane_allow "15a fail open: corrupt .git marked root, builder write" "echo x > $CORRUPT/src/y" builder
+lane_allow "15b fail open: corrupt .git marked root, coder tee" "echo x | tee $CORRUPT/src/y" coder
+
 echo "$TOTAL_PASS passed, $TOTAL_FAIL failed"
 [ "$TOTAL_FAIL" -eq 0 ] || exit 1
 exit 0
