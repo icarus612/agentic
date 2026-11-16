@@ -110,7 +110,7 @@ else
   m_def=$(grep -o 'CLAUDE_HOOKS_TEST_MODES:-[A-Za-z,_-]*' "$SMART_TEST" | head -1 | sed 's/.*:-//')
   check "3 smart-test default TEST_TIMEOUT found" "$t_def" "300"
   check "3 smart-test default KILL_GRACE found" "$g_def" "3"
-  check "3 smart-test default MODES found" "$m_def" "focused,package"
+  check "3 smart-test default MODES found" "$m_def" "focused"
   if [ -n "$t_def" ] && [ -n "$g_def" ] && [ -n "$m_def" ]; then
     modes=$(awk -F, '{print NF}' <<<"$m_def")
     need=$((modes * (t_def + g_def)))
