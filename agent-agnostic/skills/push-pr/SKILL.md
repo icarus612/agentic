@@ -61,6 +61,16 @@ validate-report.sh "$PR_REVIEW" | grep -qE 'verdict (ready|tentative), next proc
 ```
 
    If the predicate fails, **refuse**: stop the stage cold — nothing is committed, nothing is pushed, the PR is not flipped from draft to ready. This is a `failed` return, not a silent skip and not an error to route around. Report plainly which of the three conditions missed (missing file, failed `validate-report.sh`, or a last round that isn't ready/proceed or tentative/proceed), the `pr-review.md` path you checked, and the `validate-report.sh` output. A run whose gate has not passed pushes stragglers through `--stage update`, never through a bypassed `finalize`.
+1a. **Refuse when the branch is behind its base.** Fetch the base and require it to be an ancestor of the branch, and the PR to be conflict-free, before any commit or push:
+
+```sh
+# exit 0     -> base is merged in; finalize may proceed
+# exit non-0 -> refuse: the base moved (or a stacked parent squash-merged) and the branch was never re-synced
+git fetch origin "$BASE" && git merge-base --is-ancestor "origin/$BASE" HEAD \
+  && [ "$(gh pr view "$PR_NUMBER" --json mergeable -q .mergeable)" != "CONFLICTING" ]
+```
+
+   On refusal, report that a base sync is needed; the orchestrator runs it as a base-sync builder lane (never a merge by the orchestrator or by this fork), re-runs the integration gates and the PR gate, then re-invokes `finalize`.
 1b. **Refuse on a hygiene violation.** After the PR-gate check and before any commit or push, run the single end-of-lifecycle scan over the whole branch diff:
 
 ```sh
