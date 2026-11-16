@@ -19,7 +19,7 @@ agentic/
 │   ├── claude/                settings.json — versioned source of ~/.claude/settings.json (MERGED, not copied)
 │   └── antigravity/           hooks.json, rules/, skills/ — the Antigravity port
 ├── tool-based/                ← bound to ONE technology or service
-│   └── <tech>/                svelte, tailwind, typescript, django, godot, confluence, …
+│   └── <tech>/                svelte, tailwind, typescript, vitest, django, godot, confluence, …
 │       ├── rules/
 │       └── skills/
 ├── tests/                     ← plan-lifecycle.sh's fixture test (repo-root, D4)
