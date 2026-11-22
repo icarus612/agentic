@@ -764,6 +764,100 @@ else
   fi
 fi
 
+# Case sets 21-28: env parser (Packet A) -- raw JSON fixtures
+write_raw_settings() {
+  mkdir -p "$(dirname "$1")"
+  printf '%s' "$2" >"$1"
+}
+
+expect_val() {
+  local label="$1" want="$2"
+  if [ "$CODE" -eq 0 ] && [ "$OUT" = "$want" ]; then
+    pass "$label"
+  else
+    fail "$label" "code=$CODE out=[$OUT] want=[$want] err=[$ERR]"
+  fi
+}
+
+c21_home=$(new_home)
+c21_root=$(new_root)
+write_raw_settings "$c21_home/.claude/settings.json" \
+  '{"env":{"CLAUDE_DEV_SERVER_CMD":"serve --port {port}","OTHER":"x"}}'
+run_resolve "$c21_home" CLAUDE_DEV_SERVER_CMD --root "$c21_root"
+expect_val "21a: value with braces and spaces resolves" "serve --port {port}"
+run_resolve "$c21_home" OTHER --root "$c21_root"
+expect_val "21b: sibling key after brace-bearing value resolves" "x"
+
+c22_home=$(new_home)
+c22_root=$(new_root)
+write_raw_settings "$c22_home/.claude/settings.json" \
+  '{"env":{"A":"a {b {c}} d","B":"2","C":"3"}}'
+run_resolve "$c22_home" A --root "$c22_root"
+expect_val "22a: nested braces inside string value kept exactly" "a {b {c}} d"
+run_resolve "$c22_home" B --root "$c22_root"
+expect_val "22b: key after nested-brace value resolves" "2"
+run_resolve "$c22_home" C --root "$c22_root"
+expect_val "22c: last key after nested-brace value resolves" "3"
+
+c23_home=$(new_home)
+c23_root=$(new_root)
+write_raw_settings "$c23_home/.claude/settings.json" \
+  '{"env":{"Q":"say \"hi\" \\ ok"}}'
+run_resolve "$c23_home" Q --root "$c23_root"
+expect_val "23: JSON escapes \\\" and \\\\ are unescaped" 'say "hi" \ ok'
+
+c24_home=$(new_home)
+c24_root=$(new_root)
+write_raw_settings "$c24_home/.claude/settings.json" \
+  '{"permissions":{"allow":["Bash(x:*)"]},"hooks":{"PostToolUse":[{"hooks":[{"type":"command","command":"echo } \"env\": {\"K\":\"wrong\"} {"}]}]},"env":{"K":"right"}}'
+run_resolve "$c24_home" K --root "$c24_root"
+expect_val "24: env after permissions/hooks with braces and \"env\" in strings resolves top-level value" "right"
+
+c25_home=$(new_home)
+c25_root=$(new_root)
+write_raw_settings "$c25_home/.claude/settings.json" \
+  '{"hooks":{"env":{"NESTED":"bad"}},"other":{"x":{"env":{"NESTED":"worse"}}}}'
+run_resolve "$c25_home" NESTED --root "$c25_root"
+if [ "$CODE" -eq 1 ] && [ -z "$OUT" ]; then
+  pass "25: nested env objects are never matched, no top-level env -> exit 1"
+else
+  fail "25: nested env objects are never matched, no top-level env -> exit 1" \
+    "code=$CODE out=[$OUT] err=[$ERR]"
+fi
+
+c26_home=$(new_home)
+c26_root=$(new_root)
+write_raw_settings "$c26_home/.claude/settings.json" \
+  '{"env":{"N": 1, "T": true, "Z": null, "O": {"a":"b"}, "L": ["x","y"], "S": "after"}}'
+run_resolve "$c26_home" S --root "$c26_root"
+expect_val "26a: string key after number/bool/null/object/array siblings resolves" "after"
+run_resolve "$c26_home" N --root "$c26_root"
+if [ "$CODE" -ne 0 ] || [ -z "$OUT" ]; then
+  pass "26b: non-string sibling is not returned as a value"
+else
+  fail "26b: non-string sibling is not returned as a value" "code=$CODE out=[$OUT]"
+fi
+
+c27_home=$(new_home)
+c27_root=$(new_root)
+write_raw_settings "$c27_home/.claude/settings.json" \
+  '{"env":{"W":"C:\Users\x \u00e9 \q","NEXT":"ok"}}'
+run_resolve "$c27_home" W --root "$c27_root"
+expect_val "27a: non-JSON and \\u escapes kept verbatim with backslash" 'C:\Users\x \u00e9 \q'
+run_resolve "$c27_home" NEXT --root "$c27_root"
+expect_val "27b: key after verbatim-escape value still resolves" "ok"
+
+c28_home=$(new_home)
+c28_root=$(new_root)
+mkdir -p "$c28_home/.claude"
+if jq '. + {env: {CLAUDE_DEV_SERVER_CMD: "serve --port {port}"}}' \
+  "$REPO_ROOT/agent-specific/claude/settings.json" >"$c28_home/.claude/settings.json" 2>/dev/null; then
+  run_resolve "$c28_home" CLAUDE_DEV_SERVER_CMD --root "$c28_root"
+  expect_val "28: real agent-specific/claude/settings.json plus env block resolves injected key" "serve --port {port}"
+else
+  fail "28: fixture precondition -- jq built fixture from real settings.json" "jq failed"
+fi
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------

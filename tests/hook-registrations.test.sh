@@ -29,6 +29,7 @@ ${PRE_BASH}${T}${H}/pr-ready-hygiene-guard.sh${T}120
 ${PRE_BASH}${T}${H}/allow-workflow-cleanup.sh${T}30
 ${PRE_BASH}${T}${H}/branch-squash-guard.sh${T}30
 ${PRE_BASH}${T}${H}/lane-artifact-shell-guard.sh${T}30
+${PRE_BASH}${T}${H}/workflow-dev-server.sh --hook-pre-remove${T}30
 ${PRE_WRITE}${T}${H}/branch-squash-guard.sh${T}30
 ${PRE_WRITE}${T}${H}/scope-writes.sh${T}30
 ${POST_WRITE}${T}${H}/smart-lint.sh${T}300
@@ -36,6 +37,7 @@ ${POST_WRITE}${T}${H}/smart-test.sh${T}660
 ${POST_WRITE}${T}${H}/claude-install-drift.sh${T}30
 ${POST_WRITE}${T}${H}/parent-tree-guard.sh${T}60
 ${POST_BASH}${T}${H}/parent-tree-guard.sh${T}60
+${POST_BASH}${T}${H}/workflow-dev-server.sh${T}90
 ${POST_AGENT}${T}${H}/lane-bind-on-launch.sh${T}30
 ${STOP}${T}${H}/ntfy-notifier.sh notification${T}30
 ${STOP}${T}${H}/parent-tree-guard.sh${T}60
@@ -43,10 +45,10 @@ ${STOP}${T}${H}/workflow-diff-check.sh${T}600"
 
 # group<TAB>expected handler count
 COUNTS="\
-${PRE_BASH}${T}6
+${PRE_BASH}${T}7
 ${PRE_WRITE}${T}2
 ${POST_WRITE}${T}4
-${POST_BASH}${T}1
+${POST_BASH}${T}2
 ${POST_AGENT}${T}1
 ${STOP}${T}3"
 
@@ -136,6 +138,8 @@ unscoped PreToolUse Bash "$H/no-attribution-guard.sh"
 unscoped PreToolUse Bash "$H/pr-ready-hygiene-guard.sh"
 unscoped PreToolUse Bash "$H/branch-squash-guard.sh"
 unscoped PreToolUse Bash "$H/lane-artifact-shell-guard.sh"
+unscoped PreToolUse Bash "$H/workflow-dev-server.sh --hook-pre-remove"
+unscoped PostToolUse Bash "$H/workflow-dev-server.sh"
 unscoped PreToolUse "Write|Edit|MultiEdit|NotebookEdit" "$H/scope-writes.sh"
 unscoped PreToolUse "Write|Edit|MultiEdit|NotebookEdit" "$H/branch-squash-guard.sh"
 unscoped PostToolUse "Write|Edit|MultiEdit" "$H/smart-lint.sh"

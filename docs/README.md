@@ -39,6 +39,7 @@ don't exist, so they refer to each other by name and to bindings by `domain:`.
 | [`conventions.md`](conventions.md) | The authoritative spec: skill and rule file formats, the `domain:` classifier, model policy, artifact locations, plan format, contribution rules. |
 | [`pipeline.md`](pipeline.md) | The dae pipeline: one router, twelve types over six `pipeline`-axis values (build / plan / report / docs / live / proof) resolving to seven middle files, two workers through cold gates to a PR — or, for a report type, straight to chat — plus the hooks and scripts. |
 | [`tool-based.md`](tool-based.md) | The tech layers — status of each, naming, and how to add one. |
+| [`workflow-dev-server.md`](workflow-dev-server.md) | The generic per-worktree dev-server hook: lifecycle (setup, queue, start, tab, remove, sweep), config, pid-reuse guard, and design rationale. |
 | [`known-issues.md`](known-issues.md) | Known gaps in current behavior, and work parked on purpose. |
 
 ## At a glance

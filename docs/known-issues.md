@@ -159,3 +159,30 @@ worktree's removal to the termination of the agents working in it.
 **Source.** `agent-agnostic/hooks/parent-tree-guard.sh` (the marker walk and the git-status scan).
 
 **Status.** Fixed and awaiting removal; no code change shipped (2.2 dropped). Remove once the unexplained miss is no longer worth tracking.
+
+## workflow-dev-server hook limits
+
+**Limitation.** From `generic-dev-server-hook` (2026-11-22); see
+[`workflow-dev-server.md`](workflow-dev-server.md).
+
+- Pre-remove parsing skips quoted paths with spaces and `bash -c "…"` wrappers; the
+  registry sweep stops those servers on the next successful Bash call.
+- `PostToolUse` does not fire after a failing Bash command, so the sweep acts on the
+  next successful call, never on the failing one itself.
+- `\uXXXX` escapes (and any unhandled escape) in `env` values are passed through
+  verbatim by `resolve-config.sh`, not decoded.
+- `setsid`, `ps -o lstart` and the `lsof` cwd fallback are unverified on macOS.
+- The no-free-port and missing-`setsid` messages have no test.
+- `--start` skips the ready-paths check; it starts immediately.
+- The orphan sweep kills silently, with no message.
+- An opener still alive at 0.2s that dies later still writes the `opened` marker, so
+  no second tab is opened (code review round 2 nit).
+- `lane-artifact-shell-guard.sh` misreads `2>&1` as a write to a file named `1`.
+- Hook-level end-to-end only: no live Claude Code session confirmed that Bash events
+  dispatch to the wired entries.
+
+**Source.** `agent-agnostic/hooks/workflow-dev-server.sh`,
+`agent-agnostic/hooks/resolve-config.sh`, `agent-agnostic/hooks/lane-artifact-shell-guard.sh`.
+
+**Status.** No plan. Follow-ups: F1 (migrate mythic-made onto this hook, separate run in
+that repo), F2 (Antigravity wiring).

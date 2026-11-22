@@ -181,7 +181,8 @@ Bash, applying to a **consuming** project, not to `agentic` (except
 
 - Helpers (invoked, never wired): `workflow-setup.sh` (worktrees; types
   `feature|bug|hotfix|docs|sync`; `--parent` children; `--reuse` resume),
-  `resolve-config.sh` (CLAUDE_* chain), `resolve-type.sh` (the only reader of
+  `resolve-config.sh` (CLAUDE_* chain; its `env`-block parser is string- and
+  brace-aware, so values containing `{}` such as `{port}` resolve), `resolve-type.sh` (the only reader of
   the type table `workflows.yaml`; prints resolved axes as `KEY=value`,
   including `PATIENCE` on runs with a `code` phase; a row's `ship` cell is a
   `|`-separated allowed-value list, first = default — `publish | chat` /
@@ -203,6 +204,10 @@ Bash, applying to a **consuming** project, not to `agentic` (except
   `push-main` also owns plan lifecycle on this repo: it runs
   `plan-lifecycle.sh promote` and `archive` as chained commits, leaving a
   parent-tree-guard-clean tree.
+- `workflow-dev-server.sh` (`PreToolUse` `--hook-pre-remove` and `PostToolUse`,
+  both on Bash, no `if`) starts the project's dev server for a build worktree
+  and stops it on removal, with a registry-backed orphan sweep. Inert unless
+  `CLAUDE_DEV_SERVER_CMD` is set. See [`workflow-dev-server.md`](workflow-dev-server.md).
 - `smart-test.sh` (`settings.json`) is configured by env:
   `CLAUDE_HOOKS_TEST_TIMEOUT` (seconds, default 300, `0` disables) kills a
   hung run's process group with TERM, then KILL after

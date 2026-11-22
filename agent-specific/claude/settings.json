@@ -159,6 +159,11 @@
             "type": "command",
             "command": "~/.claude/hooks/lane-artifact-shell-guard.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/workflow-dev-server.sh --hook-pre-remove",
+            "timeout": 30
           }
         ]
       },
@@ -211,6 +216,11 @@
             "type": "command",
             "command": "~/.claude/hooks/parent-tree-guard.sh",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/workflow-dev-server.sh",
+            "timeout": 90
           }
         ]
       },

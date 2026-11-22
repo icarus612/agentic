@@ -169,7 +169,10 @@ and prompts; that prompt is the safety check, and the content diff against
 the base is what establishes the branch landed), and `branch-squash-guard.sh`
 (`PreToolUse` on `Bash` and the write tools — enforces this user's two-mode
 dev/main squash-only branch policy per `push-policy`; mode is detected per
-invocation from the target repo, never a static toggle). Configured by
+invocation from the target repo, never a static toggle), and
+`workflow-dev-server.sh` (`PreToolUse` and `PostToolUse` on `Bash`, unscoped;
+starts the project's own dev server per build worktree and stops it on
+removal, inert without `CLAUDE_DEV_SERVER_CMD`). Configured by
 `CLAUDE_HOOKS_*` env vars — see [`hooks/README.md`](hooks/README.md).
 
 **Helpers** — invoked explicitly, never wired: `workflow-setup.sh` (worktrees:

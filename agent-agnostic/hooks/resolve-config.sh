@@ -21,9 +21,8 @@
 #        origin/HEAD, else fail.
 #
 #   No jq dependency, matching this repo's other hooks (workflow-diff-check.sh)
-#   — the `env` block is Claude
-#   Code's documented flat "KEY": "value" string-pair schema, so grep/sed
-#   is enough without a JSON parser.
+#   — a string- and brace-aware awk scanner reads the top-level `env` block's
+#   flat "KEY": "value" string pairs.
 #
 #   --expect path|publish-target validates the RESOLVED value (whichever
 #   rung produced it — a settings file, --default, or --base-branch-default)
@@ -87,10 +86,65 @@ fi
 env_value_from() { # env_value_from <file> <key>
   local file="$1" key="$2"
   [ -f "$file" ] || return 1
-  awk 'BEGIN{RS="}"} /"env"[ \t]*:[ \t]*\{/{print; exit}' "$file" \
-    | grep -oE "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
-    | head -1 \
-    | sed -E "s/^\"$key\"[[:space:]]*:[[:space:]]*\"(.*)\"\$/\1/"
+  K="$key" awk '
+    function skipws(p) { while (p <= n && index(" \t\r\n", substr(s, p, 1))) p++; return p }
+    function strend(p,   c) { # p at opening quote; returns index of closing quote
+      p++
+      while (p <= n) {
+        c = substr(s, p, 1)
+        if (c == "\\") p++
+        else if (c == "\"") return p
+        p++
+      }
+      return n + 1
+    }
+    function unescape(r,   out, i, c, d, m) {
+      out = ""; m = length(r)
+      for (i = 1; i <= m; i++) {
+        c = substr(r, i, 1)
+        if (c != "\\" || i == m) { out = out c; continue }
+        d = substr(r, ++i, 1)
+        if (d == "\"" || d == "\\" || d == "/") out = out d
+        else if (d == "n") out = out "\n"
+        else if (d == "t") out = out "\t"
+        else out = out "\\" d
+      }
+      return out
+    }
+    { s = s $0 "\n" }
+    END {
+      n = length(s); want = ENVIRON["K"]; depth = 0; inenv = 0; i = 1
+      while (i <= n) {
+        c = substr(s, i, 1)
+        if (c == "\"") {
+          e = strend(i)
+          raw = substr(s, i + 1, e - i - 1)
+          p = skipws(e + 1)
+          if (substr(s, p, 1) == ":") {
+            p = skipws(p + 1)
+            v = substr(s, p, 1)
+            if (inenv && depth == 2 && raw == want && v == "\"") {
+              ve = strend(p)
+              print unescape(substr(s, p + 1, ve - p - 1))
+              exit 0
+            }
+            if (!inenv && depth == 1 && raw == "env" && v == "{") {
+              inenv = 1; depth++; i = p + 1
+              continue
+            }
+          }
+          i = e + 1
+          continue
+        }
+        if (c == "{" || c == "[") depth++
+        else if (c == "}" || c == "]") {
+          depth--
+          if (inenv && depth == 1) exit 1
+        }
+        i++
+      }
+      exit 1
+    }' "$file"
 }
 
 # --- scheme-vs-path discrimination, shared by both --expect arms -----------
