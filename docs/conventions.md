@@ -99,9 +99,9 @@ domain: <universal|svelte|django|…>
 <the rule, in a sentence or two>
 ```
 
-The 12 universal rules: `artifact-locations`, `doc-format`,
+The 13 universal rules: `artifact-locations`, `doc-format`,
 `minimal-code-comments`, `model-policy`, `no-attribution-trailers`,
-`plan-format`, `push-policy`, `respect-versions-and-conventions`,
+`optional-inputs-are-not-dead-code`, `plan-format`, `push-policy`, `respect-versions-and-conventions`,
 `run-artifacts`, `shell-discipline`, `tech-agnostic`, `verify-dont-assume`. Tech-bound rules live with their layer
 (`use-runes` → svelte, `typescript-strict` → typescript,
 `external-storage-cap` → confluence, …).
